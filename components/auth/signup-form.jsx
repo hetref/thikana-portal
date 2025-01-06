@@ -1,31 +1,40 @@
-"use client"
+"use client";
 
-import React from 'react';
-import classNames from 'classnames';
+import React from "react";
+import classNames from "classnames";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { Button } from '@/components/ui/button';
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { db } from "@/lib/firebase";
+import { setDoc } from "firebase/firestore";
+import { doc } from "firebase/firestore";
 
 export function SignUpForm({ className, ...props }) {
   const [isLoading, setIsLoading] = useState(false);
-  const { googleSignIn } = useAuth();
+  const { googleSignIn, signUpWithEmailAndPassword } = useAuth();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [fullname, setFullname] = useState("");
+  const [username, setUsername] = useState("");
+
   const router = useRouter();
 
   const handleGoogleSignUp = async () => {
     try {
       setIsLoading(true);
       await googleSignIn();
-      router.push("/");  // Redirect to home page after successful signup
+      router.push("/"); // Redirect to home page after successful signup
     } catch (error) {
       console.error("Error signing up with Google:", error);
     } finally {
@@ -33,21 +42,46 @@ export function SignUpForm({ className, ...props }) {
     }
   };
 
+  const handleSignUp = async (e) => {
+    if (password !== confirmPassword) {
+      alert("Passwords do not match");
+      return;
+    }
+    e.preventDefault();
+    // Implement your signup logic here
+    console.log("Signing up...");
+    setIsLoading(true);
+    await signUpWithEmailAndPassword(email, password).then(
+      async (userCredential) => {
+        console.log("User created and signed in:", userCredential);
+        await setDoc(doc(db, "users", userCredential.user.uid), {
+          email: userCredential.user.email,
+          fullname: fullname,
+          username: username,
+          createdAt: new Date(),
+          profilePic:
+            "https://cdn-icons-png.flaticon.com/512/10337/10337609.png",
+          uid: userCredential.user.uid,
+          lastSignIn: new Date(),
+        });
+      }
+    );
+    router.push("/"); // Redirect to home page after successful signup
+  };
+
   return (
-    <div className={classNames('flex flex-col gap-6', className)} {...props}>
+    <div className={classNames("flex flex-col gap-6", className)} {...props}>
       <Card>
         <CardHeader className="text-center">
           <CardTitle className="text-xl">Welcome back</CardTitle>
-          <CardDescription>
-            Sign Up with your Google account
-          </CardDescription>
+          <CardDescription>Sign Up with your Google account</CardDescription>
         </CardHeader>
         <CardContent>
           <form>
             <div className="grid gap-6">
               <div className="flex flex-col gap-4">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full"
                   onClick={handleGoogleSignUp}
                   disabled={isLoading}
@@ -98,6 +132,7 @@ export function SignUpForm({ className, ...props }) {
                       id="email"
                       type="email"
                       placeholder="m@example.com"
+                      onChange={(e) => setEmail(e.target.value)}
                       required
                     />
                   </div>
@@ -105,15 +140,49 @@ export function SignUpForm({ className, ...props }) {
                     <div className="flex items-center">
                       <Label htmlFor="password">Password</Label>
                     </div>
-                    <Input id="password" type="password" required />
+                    <Input
+                      id="password"
+                      type="password"
+                      required
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
                   </div>
                   <div className="grid gap-2">
                     <div className="flex items-center">
                       <Label htmlFor="confirmPassword">Confirm Password</Label>
                     </div>
-                    <Input id="confirmPassword" type="password" required />
+                    <Input
+                      id="confirmPassword"
+                      type="password"
+                      required
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                    />
                   </div>
-                  <Button type="submit" className="w-full">
+                  <div className="grid gap-2">
+                    <Label htmlFor="username">Full Name</Label>
+                    <Input
+                      id="fullname"
+                      type="text"
+                      placeholder="Full Name"
+                      required
+                      onChange={(e) => setFullname(e.target.value)}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="username">Username</Label>
+                    <Input
+                      id="username"
+                      type="text"
+                      placeholder="user123"
+                      required
+                      onChange={(e) => setUsername(e.target.value)}
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    onClick={handleSignUp}
+                    className="w-full"
+                  >
                     Sign Up
                   </Button>
                 </div>

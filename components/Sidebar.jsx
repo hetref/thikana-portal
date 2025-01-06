@@ -1,19 +1,25 @@
-"use client"
+"use client";
 
-import { useAuth } from "@/context/AuthContext"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Avatar, AvatarImage } from "@/components/ui/avatar"
-import { Separator } from "@/components/ui/separator"
-import { Button } from "@/components/ui/button"
-import { MapPinIcon, LinkIcon } from "lucide-react"
-import Link from "next/link"
+import { useAuth } from "@/context/AuthContext";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarImage } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { MapPinIcon, LinkIcon } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+import useGetUser from "@/hooks/useGetUser";
 
 function DefaultSidebar() {
   return (
     <div className="sticky top-20">
       <Card>
         <CardHeader>
-          <CardTitle className="text-center text-xl font-semibold">Welcome Back!</CardTitle>
+          <CardTitle className="text-center text-xl font-semibold">
+            Welcome Back!
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-center text-muted-foreground mb-4">
@@ -32,41 +38,52 @@ function DefaultSidebar() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
 
 export default function Sidebar() {
-  const { user } = useAuth()
+  const { user } = useAuth();
+  const userData = useGetUser(auth.currentUser.uid);
 
-  if (!user) return <DefaultSidebar />
+  if (!user) return <DefaultSidebar />;
 
   return (
     <div className="sticky top-20">
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col items-center text-center">
-            <Link href="/profile" className="flex flex-col items-center justify-center">
+            <Link
+              href={`/${userData?.username}?user=${userData?.uid}`}
+              className="flex flex-col items-center justify-center"
+            >
               <Avatar className="w-20 h-20 border-2">
-                <AvatarImage src={user.photoURL || ''} alt={user.displayName} />
+                <AvatarImage
+                  src={userData?.profilePic || ""}
+                  alt={userData?.fullname || "User"}
+                />
               </Avatar>
               <div className="mt-4 space-y-1">
-                <h3 className="font-semibold">{user.displayName || 'User'}</h3>
-                <p className="text-sm text-muted-foreground">{user.email}</p>
+                <h3 className="font-semibold">
+                  {userData?.username || "Guest_user"}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {userData?.email}
+                </p>
               </div>
             </Link>
             <p className="mt-3 text-sm text-muted-foreground">
-              {user.emailVerified ? 'Verified User' : 'Email not verified'}
+              {user.emailVerified ? "Verified User" : "Email not verified"}
             </p>
             <div className="w-full">
               <Separator className="my-4" />
               <div className="flex justify-between">
                 <div>
-                  <p className="font-medium">{user.displayName || 'User'}</p>
+                  <p className="font-medium">{userData?.following || "0"}</p>
                   <p className="text-xs text-muted-foreground">Following</p>
                 </div>
                 <Separator orientation="vertical" />
                 <div>
-                  <p className="font-medium">{user.displayName || 'User'}</p>
+                  <p className="font-medium">{userData?.followers || "0"}</p>
                   <p className="text-xs text-muted-foreground">Followers</p>
                 </div>
               </div>
@@ -75,16 +92,16 @@ export default function Sidebar() {
             <div className="w-full space-y-2 text-sm">
               <div className="flex items-center text-muted-foreground">
                 <MapPinIcon className="w-4 h-4 mr-2" />
-                {user.location || "No location"}
+                {userData?.location || "No location"}
               </div>
               <div className="flex items-center text-muted-foreground">
                 <LinkIcon className="w-4 h-4 mr-2 shrink-0" />
-                {user.website || "No website"}
+                {userData?.website || "No website"}
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
     </div>
-  )
-} 
+  );
+}

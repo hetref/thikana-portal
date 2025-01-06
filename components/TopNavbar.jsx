@@ -1,13 +1,16 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Home, Bell, User } from "lucide-react"
-import { ThemeToggle } from "@/components/theme-toggle"
-import { useAuth } from "@/context/AuthContext"
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Home, Bell, User, Plus } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { useAuth } from "@/context/AuthContext";
+import useGetUser from "@/hooks/useGetUser";
+import { auth } from "@/lib/firebase";
 
 export default function TopNavbar() {
-  const { user, logout } = useAuth()
+  const { user, logout } = useAuth();
+  const userData = useGetUser(auth.currentUser.uid);
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -20,8 +23,8 @@ export default function TopNavbar() {
         {/* Navigation Items */}
         <div className="flex items-center gap-6">
           <ThemeToggle />
-          
-          <Link 
+
+          <Link
             href="/"
             className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary"
           >
@@ -29,7 +32,7 @@ export default function TopNavbar() {
             <span className="hidden sm:inline">Home</span>
           </Link>
 
-          <Link 
+          <Link
             href="/notifications"
             className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary"
           >
@@ -37,12 +40,19 @@ export default function TopNavbar() {
             <span className="hidden sm:inline">Notifications</span>
           </Link>
 
-          <Link 
-            href="/profile"
+          <Link
+            href={`/${userData?.username}?user=${userData?.uid}`}
             className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary"
           >
             <User className="h-5 w-5" />
             <span className="hidden sm:inline">Profile</span>
+          </Link>
+          <Link
+            href="/create-post"
+            className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary"
+          >
+            <Plus className="h-5 w-5" />
+            <span className="hidden sm:inline">Create</span>
           </Link>
 
           {/* Auth Buttons */}
@@ -59,9 +69,7 @@ export default function TopNavbar() {
                   </Button>
                 </Link>
                 <Link href="/signUp">
-                  <Button size="sm">
-                    Sign up
-                  </Button>
+                  <Button size="sm">Sign up</Button>
                 </Link>
               </>
             )}
@@ -69,5 +77,5 @@ export default function TopNavbar() {
         </div>
       </div>
     </nav>
-  )
-} 
+  );
+}

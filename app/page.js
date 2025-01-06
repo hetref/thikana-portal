@@ -1,11 +1,11 @@
-import Sidebar from "@/components/Sidebar"
-import WhoToFollow from "@/components/WhoToFollow"
-import PostCard from "@/components/PostCard"
+import Sidebar from "@/components/Sidebar";
+import WhoToFollow from "@/components/WhoToFollow";
+import PostCard from "@/components/PostCard";
 
 export default function Home() {
   return (
-    <div className='flex items-center justify-center w-full'>
-      <div className='max-w-7xl w-full'>
+    <div className="flex items-center justify-center w-full">
+      <div className="max-w-7xl w-full">
         <div className="container grid grid-cols-1 lg:grid-cols-[300px_1fr_300px] gap-6 py-8">
           <aside className="hidden md:block">
             <Sidebar />
@@ -23,5 +23,5 @@ export default function Home() {
         </div>
       </div>
     </div>
-  )
+  );
 }
