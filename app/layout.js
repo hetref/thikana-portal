@@ -16,7 +16,6 @@ export default function RootLayout({ children }) {
         <ThemeProvider>
           <AuthContextProvider>
             <div className="relative flex min-h-screen flex-col">
-              <TopNavbar />
               <main className="flex-1">{children}</main>
             </div>
           </AuthContextProvider>

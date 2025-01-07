@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { db } from "@/lib/firebase";
 import { setDoc } from "firebase/firestore";
 import { doc } from "firebase/firestore";
+import Link from "next/link";
 
 export function SignUpForm({ className, ...props }) {
   const [isLoading, setIsLoading] = useState(false);
@@ -188,9 +189,9 @@ export function SignUpForm({ className, ...props }) {
                 </div>
                 <div className="text-center text-sm">
                   Have an account?{" "}
-                  <a href="/login" className="underline underline-offset-4">
+                  <Link href="/login" className="underline underline-offset-4">
                     Login
-                  </a>
+                  </Link>
                 </div>
               </div>
             </div>

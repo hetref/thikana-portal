@@ -14,7 +14,12 @@ const layout = ({ children }) => {
     redirect("/");
   }
 
-  return <div>{children}</div>;
+  return (
+    <div>
+      <TopNavbar type="authenticated" />
+      {children}
+    </div>
+  );
 };
 
 export default layout;
