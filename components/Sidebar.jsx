@@ -43,7 +43,7 @@ function DefaultSidebar() {
 
 export default function Sidebar() {
   const { user } = useAuth();
-  const userData = useGetUser(auth.currentUser.uid);
+  const userData = useGetUser(auth.currentUser?.uid || null);
 
   if (!user) return <DefaultSidebar />;
 
@@ -71,6 +71,7 @@ export default function Sidebar() {
                 </p>
               </div>
             </Link>
+            <Link href="/login">Sign In</Link>
             <p className="mt-3 text-sm text-muted-foreground">
               {user.emailVerified ? "Verified User" : "Email not verified"}
             </p>
