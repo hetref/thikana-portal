@@ -4,7 +4,7 @@ export const authenticatedItems = [
   {
     title: "Home",
     icon: Home,
-    href: "/",
+    href: "/feed",
   },
   {
     title: "Notifications",
