@@ -1,13 +1,15 @@
+"use client"
+
 import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 
 export default function useGetUser(userId) {
   const [user, setUser] = useState(null);
+  if (!userId) return null;
 
   useEffect(() => {
     const fetchUserData = async () => {
-      if (!userId) return;
       console.log(userId);
       const userDoc = await getDoc(doc(db, "users", userId));
       if (userDoc.exists()) {

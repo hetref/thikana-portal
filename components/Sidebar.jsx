@@ -43,7 +43,7 @@ function DefaultSidebar() {
 
 export default function Sidebar() {
   const { user } = useAuth();
-  const userData = useGetUser(auth.currentUser.uid);
+  const userData = useGetUser(auth.currentUser?.uid || null);
 
   if (!user) return <DefaultSidebar />;
 
