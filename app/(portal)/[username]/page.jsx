@@ -26,23 +26,25 @@ import {
   LinkIcon,
   MapPinIcon,
   Loader2Icon,
-  MessageCircle,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import WhoToFollow from "@/components/WhoToFollow";
 import { useSearchParams } from "next/navigation";
 import { useGetUserPosts } from "@/hooks/useGetPosts";
 import useGetUser from "@/hooks/useGetUser";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { collection, doc, getDoc, getDocs } from "firebase/firestore";
+import ProfilePosts from "@/components/ProfilePosts";
 
 export default function Profile() {
   const { user } = useAuth();
   const router = useRouter();
+  const [likedPosts, setLikedPosts] = useState([]);
   const searchParams = useSearchParams();
   const userId = searchParams.get("userId") || user?.uid;
-  console.log("userId" + userId);
+
+  // Ensure userData is fetched before using
   const userData = useGetUser(userId);
-  console.log("userData" + userData);
 
   const { posts, loading, fetchMorePosts, hasMore, error } =
     useGetUserPosts(userId);
@@ -54,11 +56,11 @@ export default function Profile() {
     location: "",
     website: "",
   });
-  console.log(posts);
+
   useEffect(() => {
     if (!user) {
       router.push("/login");
-    } else {
+    } else if (userData) {
       setEditForm({
         name: userData?.username || "",
         bio: userData?.bio || "",
@@ -66,11 +68,7 @@ export default function Profile() {
         website: userData?.website || "",
       });
     }
-  }, [user, router]);
-
-  if (!user) {
-    return null;
-  }
+  }, [user, router, userData]);
 
   const handleEditSubmit = async () => {
     // TODO: Implement profile update logic
@@ -109,52 +107,14 @@ export default function Profile() {
 
     return (
       <div className="space-y-4">
-        {posts.map((post) => (
-          <Card key={post.id} className="p-4">
-            <div className="flex gap-4">
-              <Avatar className="w-10 h-10">
-                <AvatarImage src={userData?.profilePic || "/avatar.png"} />
-              </Avatar>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold">
-                    {userData?.fullname || "User"}
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    {new Date(post.createdAt?.toDate()).toLocaleDateString()}
-                  </span>
-                </div>
-                <p className="mt-2">{post.description || "No description"}</p>
-                {post.image && (
-                  <img
-                    src={post.image}
-                    alt="Post image"
-                    className="mt-2 rounded-lg max-h-96 object-cover"
-                  />
-                )}
-                <div className="flex justify-between items-center mt-4">
-                  <div className="flex gap-2">
-                    <HeartIcon className="w-6 h-6" />
-                    <span className="text-sm text-muted-foreground">
-                      {post.likes}
-                    </span>
-                    <span className="text-sm text-muted-foreground">Likes</span>
-                  </div>
-                  <div>
-                    <span className="text-sm text-muted-foreground">
-                      <MessageCircle className="w-6 h-6" />
-                      {post.comments.length}
-                      <span className="text-sm text-muted-foreground">
-                        Comments
-                      </span>
-                    </span>
-                  </div>
-                </div>
-              </div>
-              {/* //likes */}
-            </div>
-          </Card>
-        ))}
+        {posts.map((post) => {
+          return (
+            <Card key={post.id} className="p-4">
+              <ProfilePosts post={post} userData={userData} />
+            </Card>
+          );
+        })}
+
         {hasMore && (
           <div className="flex justify-center pt-4">
             <Button
@@ -177,17 +137,43 @@ export default function Profile() {
     );
   };
 
+  const getLikedPosts = async () => {
+    if (!user) return;
+
+    let tempLikedPosts = [];
+    try {
+      const querySnapshot = await getDocs(
+        collection(db, "users", user.uid, "postlikes")
+      );
+      for (const docSnapshot of querySnapshot.docs) {
+        const postRef = doc(db, "posts", docSnapshot.id);
+        const postDoc = await getDoc(postRef);
+
+        if (postDoc.exists()) {
+          tempLikedPosts.push(postDoc.data());
+        } else {
+          console.log("Post does not exist:", docSnapshot.id);
+        }
+      }
+      setLikedPosts(tempLikedPosts);
+    } catch (error) {
+      console.error("Error fetching liked posts:", error);
+    }
+  };
+
+  useEffect(() => {
+    getLikedPosts();
+  }, [user]);
+
   return (
     <div className="flex items-center justify-center w-full">
       <div className="max-w-7xl w-full grid grid-cols-1 gap-0 py-8 lg:grid-cols-[300px_minmax(0,1fr)_300px] lg:gap-0.5">
-        {/* Left Sidebar  */}
         <aside className="hidden lg:block">
           <div className="sticky top-20">
             <Sidebar />
           </div>
         </aside>
 
-        {/* Main Content */}
         <main className="max-w-[580px] mx-auto w-full px-2">
           <div className="grid grid-cols-1 gap-6">
             <div className="w-full">
@@ -205,7 +191,6 @@ export default function Profile() {
                     <p className="text-muted-foreground">{user.email}</p>
                     <p className="mt-2 text-sm">{user.bio || "No bio yet"}</p>
 
-                    {/* Profile Stats */}
                     <div className="w-full mt-6">
                       <div className="flex justify-between mb-4">
                         <div>
@@ -231,7 +216,6 @@ export default function Profile() {
                       </div>
                     </div>
 
-                    {/* Edit Profile Button */}
                     {userId === user.uid && (
                       <Button
                         className="w-full mt-4"
@@ -242,7 +226,6 @@ export default function Profile() {
                       </Button>
                     )}
 
-                    {/* Location & Website */}
                     <div className="w-full mt-6 space-y-2 text-sm">
                       <div className="flex items-center text-muted-foreground">
                         <MapPinIcon className="w-4 h-4 mr-2" />
@@ -283,103 +266,40 @@ export default function Profile() {
                   value="posts"
                   className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 font-semibold"
                 >
-                  <FileTextIcon className="w-4 h-4" />
+                  <FileTextIcon className="w-5 h-5" />
                   Posts
                 </TabsTrigger>
+
                 <TabsTrigger
                   value="likes"
                   className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 font-semibold"
                 >
-                  <HeartIcon className="w-4 h-4" />
+                  <HeartIcon className="w-5 h-5" />
                   Likes
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="posts" className="mt-6">
-                {error ? (
-                  <div className="text-center py-8 text-destructive">
-                    Error loading posts. Please try again later.
-                  </div>
-                ) : (
-                  renderPosts()
-                )}
+              <TabsContent value="posts" className="p-6">
+                {renderPosts()}
               </TabsContent>
 
-              <TabsContent value="likes" className="mt-6">
-                <div className="text-center py-8 text-muted-foreground">
-                  No liked posts to show
+              <TabsContent value="likes" className="p-6">
+                <div className="space-y-4">
+                  {likedPosts.map((post) => {
+                    return (
+                      <Card key={post.id} className="p-4">
+                        <ProfilePosts post={post} userData={userData} />
+                      </Card>
+                    );
+                  })}
                 </div>
               </TabsContent>
             </Tabs>
-
-            <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-              <DialogContent className="sm:max-w-[500px]">
-                <DialogHeader>
-                  <DialogTitle>Edit Profile</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label>Name</Label>
-                    <Input
-                      name="name"
-                      value={editForm.name}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, name: e.target.value })
-                      }
-                      placeholder="Your name"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Bio</Label>
-                    <Textarea
-                      name="bio"
-                      value={editForm.bio}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, bio: e.target.value })
-                      }
-                      className="min-h-[100px]"
-                      placeholder="Tell us about yourself"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Location</Label>
-                    <Input
-                      name="location"
-                      value={editForm.location}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, location: e.target.value })
-                      }
-                      placeholder="Where are you based?"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Website</Label>
-                    <Input
-                      name="website"
-                      value={editForm.website}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, website: e.target.value })
-                      }
-                      placeholder="Your personal website"
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end gap-3">
-                  <DialogClose asChild>
-                    <Button variant="outline">Cancel</Button>
-                  </DialogClose>
-                  <Button onClick={handleEditSubmit}>Save Changes</Button>
-                </div>
-              </DialogContent>
-            </Dialog>
           </div>
         </main>
 
-        {/* Right Sidebar */}
         <aside className="hidden lg:block">
-          <div className="sticky top-20">
-            <WhoToFollow />
-          </div>
+          <WhoToFollow />
         </aside>
       </div>
     </div>
