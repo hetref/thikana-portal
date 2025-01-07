@@ -7,8 +7,9 @@ import { useAuth } from "@/context/AuthContext";
 import useGetUser from "@/hooks/useGetUser";
 import { auth } from "@/lib/firebase";
 import { authenticatedItems, unauthenticatedItems } from "@/constants/navLinks";
+import Image from "next/image";
 
-export default function TopNavbar() {
+export default function TopNavbar({ type = "unauthenticated" }) {
   const { user, logout } = useAuth();
   const userData = useGetUser(auth.currentUser?.uid);
 
@@ -28,14 +29,20 @@ export default function TopNavbar() {
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
-        <Link href="/" className="flex items-center gap-2 font-semibold">
-          <span>Thikana</span>
+        <Link href="/" className="flex items-center gap-2 font-semibold w-fit">
+          <Image
+            src="/logo/black-logo.png"
+            alt="Thikana Logo"
+            width={150}
+            height={64}
+            className="h-16 object-contain w-fit"
+          />
         </Link>
 
         <div className="flex items-center gap-6">
           <ThemeToggle />
 
-          {user
+          {user && type === "authenticated"
             ? authenticatedItems.map((item) => (
                 <Link
                   key={item.title}
@@ -59,13 +66,13 @@ export default function TopNavbar() {
 
           {/* Auth Buttons */}
           <div className="flex items-center gap-2">
-            {user ? (
+            {user && type === "authenticated" ? (
               <Button size="sm" onClick={logout}>
                 Sign out
               </Button>
             ) : (
               <Button size="sm" asChild>
-                <Link href="/login">Get Started</Link>
+                <Link href={user ? "/feed" : "/login"}>Get Started</Link>
               </Button>
             )}
           </div>

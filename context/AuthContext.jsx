@@ -9,6 +9,7 @@ import {
   signOut,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { redirect } from "next/navigation";
 
 const AuthContext = createContext({});
 
@@ -59,7 +60,8 @@ export const AuthContextProvider = ({ children }) => {
   const logout = async () => {
     try {
       await signOut(auth);
-      setUser(null);
+      setUser(false);
+      redirect("/");
     } catch (error) {
       console.error("Logout Error:", error);
       throw error;
@@ -70,7 +72,13 @@ export const AuthContextProvider = ({ children }) => {
     <AuthContext.Provider
       value={{ user, googleSignIn, signUpWithEmailAndPassword, logout }}
     >
-      {!loading && children}
+      {loading ? (
+        <div className="flex justify-center items-center text-center w-full h-[100vh] text-xl font-semibold">
+          Loading...
+        </div>
+      ) : (
+        children
+      )}
     </AuthContext.Provider>
   );
 };
