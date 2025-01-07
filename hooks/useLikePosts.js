@@ -39,7 +39,7 @@ const useLikePost = (post) => {
       });
     }
   }, [post.likes, authUser]);
-
+  //comment
   const handleLikePost = async () => {
     if (isUpdating) return;
 
