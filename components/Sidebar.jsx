@@ -13,6 +13,9 @@ import { auth, db } from "@/lib/firebase";
 import useGetUser from "@/hooks/useGetUser";
 
 function DefaultSidebar() {
+  const { user } = useAuth();
+  const userData = user ? useGetUser(auth.currentUser.uid) : null;
+
   return (
     <div className="sticky top-20">
       <Card>
@@ -22,9 +25,20 @@ function DefaultSidebar() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-center text-muted-foreground mb-4">
-            Login to access your profile and connect with others.
-          </p>
+          {userData ? (
+            <>
+              <Avatar className="h-10 w-10">
+                <AvatarImage src={userData.avatarUrl || "/default-avatar.png"} />
+              </Avatar>
+              <p className="text-center text-muted-foreground mb-4">
+                {userData.username}
+              </p>
+            </>
+          ) : (
+            <p className="text-center text-muted-foreground mb-4">
+              Login to access your profile and connect with others.
+            </p>
+          )}
           <Link href="/login">
             <Button className="w-full" variant="outline">
               Login
@@ -41,67 +55,4 @@ function DefaultSidebar() {
   );
 }
 
-export default function Sidebar() {
-  const { user } = useAuth();
-  const userData = useGetUser(auth.currentUser.uid);
-
-  if (!user) return <DefaultSidebar />;
-
-  return (
-    <div className="sticky top-20">
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col items-center text-center">
-            <Link
-              href={`/${userData?.username}?user=${userData?.uid}`}
-              className="flex flex-col items-center justify-center"
-            >
-              <Avatar className="w-20 h-20 border-2">
-                <AvatarImage
-                  src={userData?.profilePic || ""}
-                  alt={userData?.fullname || "User"}
-                />
-              </Avatar>
-              <div className="mt-4 space-y-1">
-                <h3 className="font-semibold">
-                  {userData?.username || "Guest_user"}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {userData?.email}
-                </p>
-              </div>
-            </Link>
-            <p className="mt-3 text-sm text-muted-foreground">
-              {user.emailVerified ? "Verified User" : "Email not verified"}
-            </p>
-            <div className="w-full">
-              <Separator className="my-4" />
-              <div className="flex justify-between">
-                <div>
-                  <p className="font-medium">{userData?.following || "0"}</p>
-                  <p className="text-xs text-muted-foreground">Following</p>
-                </div>
-                <Separator orientation="vertical" />
-                <div>
-                  <p className="font-medium">{userData?.followers || "0"}</p>
-                  <p className="text-xs text-muted-foreground">Followers</p>
-                </div>
-              </div>
-              <Separator className="my-4" />
-            </div>
-            <div className="w-full space-y-2 text-sm">
-              <div className="flex items-center text-muted-foreground">
-                <MapPinIcon className="w-4 h-4 mr-2" />
-                {userData?.location || "No location"}
-              </div>
-              <div className="flex items-center text-muted-foreground">
-                <LinkIcon className="w-4 h-4 mr-2 shrink-0" />
-                {userData?.website || "No website"}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
+export default DefaultSidebar;

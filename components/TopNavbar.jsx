@@ -10,7 +10,7 @@ import { auth } from "@/lib/firebase";
 
 export default function TopNavbar() {
   const { user, logout } = useAuth();
-  const userData = useGetUser(auth.currentUser.uid);
+  const userData = auth.currentUser ? useGetUser(auth.currentUser.uid) : null;
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -40,13 +40,16 @@ export default function TopNavbar() {
             <span className="hidden sm:inline">Notifications</span>
           </Link>
 
-          <Link
-            href={`/${userData?.username}?user=${userData?.uid}`}
-            className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary"
-          >
-            <User className="h-5 w-5" />
-            <span className="hidden sm:inline">Profile</span>
-          </Link>
+          {userData && (
+            <Link
+              href={`/${userData.username}?user=${userData.uid}`}
+              className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary"
+            >
+              <User className="h-5 w-5" />
+              <span className="hidden sm:inline">Profile</span>
+            </Link>
+          )}
+
           <Link
             href="/create-post"
             className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary"

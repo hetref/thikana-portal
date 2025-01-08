@@ -36,6 +36,7 @@ import {
 } from "lucide-react"
 import Sidebar from "@/components/Sidebar"
 import WhoToFollow from "@/components/WhoToFollow"
+import Chatbot from '@/components/Chatbot'
 
 export default function Profile() {
   const { user, logout } = useAuth()
@@ -66,7 +67,8 @@ export default function Profile() {
   }
 
   const handleEditSubmit = async () => {
-    // TODO: Implement profile update logic
+    // Send the editForm data to the chatbot
+    // You can also update the user info in your state or database here
     setShowEditDialog(false)
   }
 
@@ -245,6 +247,9 @@ export default function Profile() {
           </div>
         </aside>
       </div>
+
+      {/* Include the Chatbot component and pass user info */}
+      <Chatbot userInfo={editForm} />
     </div>
   )
 } 
