@@ -8,10 +8,11 @@ import useGetUser from "@/hooks/useGetUser";
 import { auth } from "@/lib/firebase";
 import { authenticatedItems, unauthenticatedItems } from "@/constants/navLinks";
 import Image from "next/image";
+import { Home, Bell, User, Plus } from "lucide-react";
 
 export default function TopNavbar({ type = "unauthenticated" }) {
   const { user, logout } = useAuth();
-  const userData = useGetUser(auth.currentUser.uid);
+  const userData = auth.currentUser ? useGetUser(auth.currentUser.uid) : null;
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">

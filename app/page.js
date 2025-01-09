@@ -1,12 +1,11 @@
 import TopNavbar from "@/components/TopNavbar";
+import Navigation from "@/components/landing-pages/Navigation";
+import LandingPage from "@/components/landing-pages/LandingPage";
 
 export default function Home() {
   return (
     <div>
-      <TopNavbar />
-      <div className="flex h-[300px] flex-col items-center justify-center gap-6 text-xl font-semibold p-6 md:p-10">
-        Landing Page
-      </div>
+      <LandingPage />
     </div>
   );
 }
