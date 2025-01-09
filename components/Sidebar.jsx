@@ -30,7 +30,7 @@ function DefaultSidebar() {
               Login
             </Button>
           </Link>
-          <Link href="/sign-up">
+          <Link href="/register">
             <Button className="w-full mt-2" variant="default">
               Sign Up
             </Button>

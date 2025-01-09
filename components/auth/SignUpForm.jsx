@@ -19,17 +19,34 @@ import { db } from "@/lib/firebase";
 import { setDoc } from "firebase/firestore";
 import { doc } from "firebase/firestore";
 import Link from "next/link";
+import { Eye, EyeOff } from "lucide-react";
 
 export function SignUpForm({ className, ...props }) {
   const [isLoading, setIsLoading] = useState(false);
   const { googleSignIn, signUpWithEmailAndPassword } = useAuth();
+  // const [email, setEmail] = useState("");
+  // const [password, setPassword] = useState("");
+  // const [confirmPassword, setConfirmPassword] = useState("");
+  // const [fullname, setFullname] = useState("");
+  // const [username, setUsername] = useState("");
+
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [fullname, setFullname] = useState("");
   const [username, setUsername] = useState("");
+  const [passwordShow, setPasswordShow] = useState(false);
 
   const router = useRouter();
+
+  // Register Details:
+  // 1. First Name
+  // 2. Last Name
+  // 3. Phone
+  // 4. Email
+  // 5. Password
 
   const handleGoogleSignUp = async () => {
     try {
@@ -127,7 +144,7 @@ export function SignUpForm({ className, ...props }) {
                   </span>
                 </div>
                 <div className="grid gap-6">
-                  <div className="grid gap-2">
+                  {/* <div className="grid gap-2">
                     <Label htmlFor="email">Email</Label>
                     <Input
                       id="email"
@@ -178,7 +195,76 @@ export function SignUpForm({ className, ...props }) {
                       required
                       onChange={(e) => setUsername(e.target.value)}
                     />
+                  </div> */}
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="firstname">First Name</Label>
+                    <Input
+                      id="firstname"
+                      type="text"
+                      placeholder="First Name"
+                      required
+                      onChange={(e) => setFirstName(e.target.value)}
+                    />
                   </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="lastname">Last Name</Label>
+                    <Input
+                      id="lastname"
+                      type="text"
+                      placeholder="Last Name"
+                      required
+                      onChange={(e) => setLastName(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="phone">Phone</Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="+91 1234567890"
+                      required
+                      onChange={(e) => setPhone(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="m@example.com"
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <div className="flex items-center">
+                      <Label htmlFor="password">Password</Label>
+                    </div>
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        type={passwordShow ? "text" : "password"}
+                        placeholder="* * * * * *"
+                        required
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="pr-10"
+                      />
+                      <div className="absolute right-2 top-0 bottom-0 flex items-center">
+                        <Button
+                          onClick={() => setPasswordShow(!passwordShow)}
+                          variant="ghost"
+                        >
+                          {passwordShow ? <EyeOff /> : <Eye />}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
                   <Button
                     type="submit"
                     onClick={handleSignUp}

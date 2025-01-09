@@ -16,13 +16,18 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
+import { signInWithEmailAndPassword } from "firebase/auth";
 
 export function LoginForm({ className, ...props }) {
   const [isLoading, setIsLoading] = useState(false);
   const { googleSignIn } = useAuth();
   const router = useRouter();
 
-  const handleGoogleSignIn = async () => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const handleGoogleSignIn = async (e) => {
+    e.preventDefault();
     try {
       setIsLoading(true);
       await googleSignIn();
@@ -32,6 +37,29 @@ export function LoginForm({ className, ...props }) {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+
+    console.log("Signing up...", email, password);
+    setIsLoading(true);
+    await signInWithEmailAndPassword(email, password).then(
+      async (userCredential) => {
+        console.log("User created and signed in:", userCredential);
+        // await setDoc(doc(db, "users", userCredential.user.uid), {
+        //   email: userCredential.user.email,
+        //   fullname: fullname,
+        //   username: username,
+        //   createdAt: new Date(),
+        //   profilePic:
+        //     "https://cdn-icons-png.flaticon.com/512/10337/10337609.png",
+        //   uid: userCredential.user.uid,
+        //   lastSignIn: new Date(),
+        // });
+      }
+    );
+    router.push("/");
   };
 
   return (
@@ -98,6 +126,8 @@ export function LoginForm({ className, ...props }) {
                       type="email"
                       placeholder="m@example.com"
                       required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                     />
                   </div>
                   <div className="grid gap-2">
@@ -110,17 +140,27 @@ export function LoginForm({ className, ...props }) {
                         Forgot password?
                       </a>
                     </div>
-                    <Input id="password" type="password" required />
+                    <Input
+                      id="password"
+                      type="password"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
                   </div>
 
-                  <Button type="submit" className="w-full">
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    onClick={handleLogin}
+                  >
                     Log in
                   </Button>
                 </div>
                 <div className="text-center text-sm">
                   Don't have an account?{" "}
                   <Link
-                    href="/sign-up"
+                    href="/register"
                     className="underline underline-offset-4"
                   >
                     Sign up
