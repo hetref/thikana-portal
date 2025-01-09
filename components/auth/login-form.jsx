@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import Link from "next/link";
 
 export function LoginForm({ className, ...props }) {
   const [isLoading, setIsLoading] = useState(false);
@@ -118,9 +119,12 @@ export function LoginForm({ className, ...props }) {
                 </div>
                 <div className="text-center text-sm">
                   Don't have an account?{" "}
-                  <a href="/signUp" className="underline underline-offset-4">
+                  <Link
+                    href="/sign-up"
+                    className="underline underline-offset-4"
+                  >
                     Sign up
-                  </a>
+                  </Link>
                 </div>
               </div>
             </div>
