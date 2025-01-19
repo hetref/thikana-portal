@@ -183,8 +183,8 @@ const ProfilePosts = ({ post: initialPost, userData, onPostDelete }) => {
                   className={`w-6 h-6 ${isLiked ? "fill-red-500" : ""}`}
                 />
                 <span className="text-sm">{likes}</span>
+                <span className="text-sm text-muted-foreground">Likes</span>
               </button>
-              <span className="text-sm text-muted-foreground">Likes</span>
             </div>
             <div className="flex items-center gap-2">
               <MessageCircle className="w-6 h-6" />
