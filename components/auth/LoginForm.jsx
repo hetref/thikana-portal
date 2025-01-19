@@ -2,31 +2,39 @@
 
 import React from "react";
 import classNames from "classnames";
-import { useRouter } from "next/navigation";
+import { redirect, useRouter } from "next/navigation";
 import { useState } from "react";
-import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
+import {
+  GoogleAuthProvider,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+} from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
-export function LoginForm({ className, ...props }) {
+export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
-  const { googleSignIn } = useAuth();
   const router = useRouter();
 
-  const handleGoogleSignIn = async () => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const handleGoogleSignIn = async (e) => {
+    e.preventDefault();
     try {
       setIsLoading(true);
-      await googleSignIn();
-      router.push("/"); // Redirect to home page after successful login
+      try {
+        const provider = new GoogleAuthProvider();
+        const result = await signInWithPopup(auth, provider);
+        console.log("User signed in with Google:", result.user);
+        redirect("/feed");
+      } catch (error) {
+        console.error("Google Sign In Error:", error);
+        throw error;
+      }
     } catch (error) {
       console.error("Error signing in with Google:", error);
     } finally {
@@ -34,18 +42,32 @@ export function LoginForm({ className, ...props }) {
     }
   };
 
+  const handleLogin = async (e) => {
+    e.preventDefault();
+
+    console.log("Signing up...", email, password);
+    setIsLoading(true);
+
+    await signInWithEmailAndPassword(auth, email, password)
+      .then((userCredential) => {
+        // Signed in
+        const user = userCredential.user;
+        // ...
+        console.log("User signed in:", user);
+      })
+      .catch((error) => {
+        const errorCode = error.code;
+        const errorMessage = error.message;
+      });
+
+    router.push("/");
+  };
+
   return (
-    <div className={classNames("flex flex-col gap-6", className)} {...props}>
-      <Card>
-        <CardHeader className="text-center">
-          <CardTitle className="text-xl">Welcome back</CardTitle>
-          <CardDescription>Log in to your account</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form>
-            <div className="grid gap-6">
-              <div className="flex flex-col gap-4">
-                <Button
+    <form>
+      <div className="grid gap-6">
+        <div className="flex flex-col gap-4">
+          {/* <Button
                   variant="outline"
                   className="w-full"
                   onClick={handleGoogleSignIn}
@@ -89,52 +111,50 @@ export function LoginForm({ className, ...props }) {
                   <span className="relative z-10 bg-background px-2 text-muted-foreground">
                     Or continue with
                   </span>
-                </div>
-                <div className="grid gap-6">
-                  <div className="grid gap-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="m@example.com"
-                      required
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="password">Password</Label>
-                      <a
-                        href="#"
-                        className="text-sm text-muted-foreground underline underline-offset-4 hover:text-primary"
-                      >
-                        Forgot password?
-                      </a>
-                    </div>
-                    <Input id="password" type="password" required />
-                  </div>
-
-                  <Button type="submit" className="w-full">
-                    Log in
-                  </Button>
-                </div>
-                <div className="text-center text-sm">
-                  Don't have an account?{" "}
-                  <Link
-                    href="/sign-up"
-                    className="underline underline-offset-4"
-                  >
-                    Sign up
-                  </Link>
-                </div>
-              </div>
+                </div> */}
+          <div className="grid gap-6">
+            <div className="grid gap-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="m@example.com"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
             </div>
-          </form>
-        </CardContent>
-      </Card>
-      <div className="text-balance text-center text-xs text-muted-foreground [&_a]:underline [&_a]:underline-offset-4 [&_a]:hover:text-primary">
-        By clicking continue, you agree to our <a href="#">Terms of Service</a>{" "}
-        and <a href="#">Privacy Policy</a>.
+            <div className="grid gap-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <a
+                  href="#"
+                  className="text-sm text-muted-foreground underline underline-offset-4 hover:text-primary"
+                >
+                  Forgot password?
+                </a>
+              </div>
+              <Input
+                id="password"
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+
+            <Button type="submit" className="w-full" onClick={handleLogin}>
+              Log in
+            </Button>
+          </div>
+          <div className="text-center text-sm">
+            Don't have an account?{" "}
+            <Link href="/register" className="underline underline-offset-4">
+              Sign up
+            </Link>
+          </div>
+        </div>
       </div>
-    </div>
+    </form>
   );
 }
