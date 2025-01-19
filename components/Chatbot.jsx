@@ -56,7 +56,7 @@ export default function Chatbot() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 100 }}
                         transition={{ duration: 0.2 }}
-                        className="fixed bottom-4 right-4 z-50"
+                        className="fixed bottom-4 right-4 z-80"
                     >
                         <Button
                             ref={chatIconRef} 
