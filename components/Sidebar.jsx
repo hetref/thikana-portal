@@ -6,8 +6,11 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { MapPinIcon, LinkIcon } from "lucide-react";
 import Link from "next/link";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import useGetUser from "@/hooks/useGetUser";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { collection, onSnapshot } from "firebase/firestore";
 
 function DefaultSidebar() {
   return (
@@ -39,8 +42,31 @@ function DefaultSidebar() {
 }
 
 export default function Sidebar() {
-  const user = auth.currentUser;
-  const userData = useGetUser(auth.currentUser?.uid || null);
+  const user = useGetUser(auth.currentUser?.uid || null);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const followersRef = collection(db, "users", user.uid, "followers");
+    const followingRef = collection(db, "users", user.uid, "following");
+
+    // Set up real-time listener for followers count
+    const unsubscribeFollowers = onSnapshot(followersRef, (snapshot) => {
+      setFollowersCount(snapshot.size); // Update followers count in real-time
+    });
+
+    // Set up real-time listener for following count
+    const unsubscribeFollowing = onSnapshot(followingRef, (snapshot) => {
+      setFollowingCount(snapshot.size); // Update following count in real-time
+    });
+
+    return () => {
+      unsubscribeFollowers(); // Cleanup on unmount
+      unsubscribeFollowing(); // Cleanup on unmount
+    };
+  }, [user]);
 
   if (!user) return <DefaultSidebar />;
 
@@ -50,21 +76,19 @@ export default function Sidebar() {
         <CardContent className="pt-6">
           <div className="flex flex-col items-center text-center">
             <Link
-              href={`/${userData?.username}?user=${userData?.uid}`}
+              href={`/${user.username}?user=${user.uid}`}
               className="flex flex-col items-center justify-center"
             >
               <Avatar className="w-20 h-20 border-2">
                 <AvatarImage
-                  src={userData?.profilePic || ""}
-                  alt={userData?.fullname || "User"}
+                  src={user.profilePic || ""}
+                  alt={user.fullname || "User"}
                 />
               </Avatar>
               <div className="mt-4 space-y-1">
-                <h3 className="font-semibold">
-                  {userData?.username || "Guest_user"}
-                </h3>
+                <h3 className="font-semibold">{user.name || "Guest_user"}</h3>
                 <p className="text-sm text-muted-foreground">
-                  {userData?.email}
+                  @{user.username}
                 </p>
               </div>
             </Link>
@@ -75,12 +99,12 @@ export default function Sidebar() {
               <Separator className="my-4" />
               <div className="flex justify-between">
                 <div>
-                  <p className="font-medium">{userData?.following || "0"}</p>
+                  <p className="font-medium">{followingCount || "0"}</p>
                   <p className="text-xs text-muted-foreground">Following</p>
                 </div>
                 <Separator orientation="vertical" />
                 <div>
-                  <p className="font-medium">{userData?.followers || "0"}</p>
+                  <p className="font-medium">{followersCount || "0"}</p>
                   <p className="text-xs text-muted-foreground">Followers</p>
                 </div>
               </div>
@@ -89,11 +113,11 @@ export default function Sidebar() {
             <div className="w-full space-y-2 text-sm">
               <div className="flex items-center text-muted-foreground">
                 <MapPinIcon className="w-4 h-4 mr-2" />
-                {userData?.location || "No location"}
+                {user.location || "No location"}
               </div>
               <div className="flex items-center text-muted-foreground">
                 <LinkIcon className="w-4 h-4 mr-2 shrink-0" />
-                {userData?.website || "No website"}
+                {user.website || "No website"}
               </div>
             </div>
           </div>
