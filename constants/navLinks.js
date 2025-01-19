@@ -16,11 +16,6 @@ export const authenticatedItems = [
     icon: User,
     href: "/profile",
   },
-  {
-    title: "Create",
-    icon: Plus,
-    href: "/create",
-  },
 ];
 
 export const unauthenticatedItems = [

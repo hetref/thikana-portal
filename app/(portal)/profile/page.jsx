@@ -24,6 +24,7 @@ import {
   LinkIcon,
   MapPinIcon,
   Loader2Icon,
+  Images,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import WhoToFollow from "@/components/WhoToFollow";
@@ -38,6 +39,7 @@ import {
   onSnapshot,
 } from "firebase/firestore";
 import ProfilePosts from "@/components/ProfilePosts";
+import ProfileEditModal from "@/components/ProfileEditModal";
 
 export default function Profile() {
   const router = useRouter();
@@ -49,6 +51,7 @@ export default function Profile() {
   const userData = useGetUser(userId);
   const { posts, loading, fetchMorePosts, hasMore, error } =
     useGetUserPosts(userId);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   console.log("USERDATA", posts);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -245,12 +248,20 @@ export default function Profile() {
                     {userId === user?.uid && (
                       <Button
                         className="w-full mt-4"
-                        onClick={() => setShowEditDialog(true)}
+                        onClick={() => {
+                          setIsModalOpen(true);
+                          console.log("Edit button clicked", userData);
+                        }}
                       >
                         <EditIcon className="w-4 h-4 mr-2" />
                         Edit Profile
                       </Button>
                     )}
+                    <ProfileEditModal
+                      isOpen={isModalOpen}
+                      onClose={() => setIsModalOpen(false)}
+                      currentUser={userData}
+                    />
                     <div className="w-full mt-6 space-y-2 text-sm">
                       <div className="flex items-center text-muted-foreground">
                         <MapPinIcon className="w-4 h-4 mr-2" />
@@ -300,6 +311,13 @@ export default function Profile() {
                   <HeartIcon className="w-5 h-5" />
                   Likes
                 </TabsTrigger>
+                <TabsTrigger
+                  value="photos"
+                  className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 font-semibold"
+                >
+                  <Images className="w-5 h-5" />
+                  Photos
+                </TabsTrigger>
               </TabsList>
               <TabsContent value="posts" className="p-6">
                 {renderPosts()}
@@ -312,6 +330,37 @@ export default function Profile() {
                     </Card>
                   ))}
                 </div>
+              </TabsContent>
+              <TabsContent value="photos" className="p-6">
+                {userData?.photos && userData.photos.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-4">
+                    {userData.photos.map((photo) => (
+                      <div key={photo.photoUrl} className="relative">
+                        <img
+                          src={photo.photoUrl}
+                          alt={photo.title}
+                          className="w-full h-auto rounded-lg"
+                        />
+                        <div className="absolute bottom-0 left-0 bg-black bg-opacity-50 text-white p-2 rounded-b-lg">
+                          <p>{photo.title}</p>
+                          <p>{new Date(photo.addedOn).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <p className="text-muted-foreground">No Photos Added Yet</p>
+                    <Button
+                      className="mt-2"
+                      onClick={() => {
+                        /* Add photo logic */
+                      }}
+                    >
+                      Add Photo
+                    </Button>
+                  </div>
+                )}
               </TabsContent>
             </Tabs>
           </div>
