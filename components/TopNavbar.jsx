@@ -7,11 +7,24 @@ import useGetUser from "@/hooks/useGetUser";
 import { auth } from "@/lib/firebase";
 import { authenticatedItems, unauthenticatedItems } from "@/constants/navLinks";
 import Image from "next/image";
-import { signOut } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import { redirect } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function TopNavbar({ type = "unauthenticated" }) {
-  const user = auth.currentUser;
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setUser(user);
+      } else {
+        setUser(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const logoutHandler = async () => {
     try {
@@ -39,27 +52,30 @@ export default function TopNavbar({ type = "unauthenticated" }) {
         <div className="flex items-center gap-6">
           <ThemeToggle />
 
-          {user && type === "authenticated"
-            ? authenticatedItems.map((item) => (
-                <Link
-                  key={item.title}
-                  href={item.href}
-                  className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary"
-                >
-                  {item.icon && <item.icon className="h-5 w-5" />}
-                  <span className="hidden sm:inline">{item.title}</span>
-                </Link>
-              ))
-            : unauthenticatedItems.map((item) => (
-                <Link
-                  key={item.title}
-                  href={item.href}
-                  className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary"
-                >
-                  {item.icon && <item.icon className="h-5 w-5" />}
-                  <span className="hidden sm:inline">{item.title}</span>
-                </Link>
-              ))}
+          {user &&
+            type === "authenticated" &&
+            authenticatedItems.map((item) => (
+              <Link
+                key={item.title}
+                href={item.href}
+                className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary"
+              >
+                {item.icon && <item.icon className="h-5 w-5" />}
+                <span className="hidden sm:inline">{item.title}</span>
+              </Link>
+            ))}
+          {user &&
+            type === "unauthenticated" &&
+            unauthenticatedItems.map((item) => (
+              <Link
+                key={item.title}
+                href={item.href}
+                className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary"
+              >
+                {item.icon && <item.icon className="h-5 w-5" />}
+                <span className="hidden sm:inline">{item.title}</span>
+              </Link>
+            ))}
 
           {/* Auth Buttons */}
           <div className="flex items-center gap-2">
