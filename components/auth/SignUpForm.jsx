@@ -2,9 +2,8 @@
 
 import React from "react";
 import classNames from "classnames";
-import { useRouter } from "next/navigation";
+import { redirect, useRouter } from "next/navigation";
 import { useState } from "react";
-import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -15,20 +14,20 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { db } from "@/lib/firebase";
-import { setDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+import { getDoc, setDoc } from "firebase/firestore";
 import { doc } from "firebase/firestore";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
+import {
+  createUserWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithPopup,
+} from "firebase/auth";
+import { ref, set } from "firebase/database";
 
 export function SignUpForm({ className, ...props }) {
   const [isLoading, setIsLoading] = useState(false);
-  const { googleSignIn, signUpWithEmailAndPassword } = useAuth();
-  // const [email, setEmail] = useState("");
-  // const [password, setPassword] = useState("");
-  // const [confirmPassword, setConfirmPassword] = useState("");
-  // const [fullname, setFullname] = useState("");
-  // const [username, setUsername] = useState("");
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -48,11 +47,60 @@ export function SignUpForm({ className, ...props }) {
   // 4. Email
   // 5. Password
 
+  const fetchUserData = async (uid) => {
+    const docRef = doc(db, "users", uid);
+    const docSnap = await getDoc(docRef);
+
+    return docSnap.exists() ? docSnap.data() : null;
+  };
+
   const handleGoogleSignUp = async () => {
     try {
       setIsLoading(true);
-      await googleSignIn();
-      router.push("/"); // Redirect to home page after successful signup
+
+      try {
+        const provider = new GoogleAuthProvider();
+        await signInWithPopup(auth, provider).then(async (result) => {
+          const credential = GoogleAuthProvider.credentialFromResult(result);
+          const token = credential.accessToken;
+          const user = result.user;
+          const uid = user.uid;
+
+          console.log("User signed in with Google:", user, token);
+
+          const prevDoc = await fetchUserData(uid);
+          console.log("PREVDOC", prevDoc);
+          if (prevDoc) {
+            redirect("/feed");
+          }
+          await setDoc(doc(db, "users", uid), {
+            name: user.displayName || "",
+            email: user.email,
+            phone: user.phone || "",
+            role: "user",
+            username: `${user.displayName.split(" ").join("-").toLowerCase()}-${
+              Math.floor(Math.random() * 90000) + 10000
+            }`,
+            createdAt: new Date(),
+            profilePic: user.photoURL,
+            uid: uid,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+            .then(() => {
+              redirect("/feed");
+            })
+            .catch((error) => {
+              console.log("GERROR", error);
+              throw new Error(
+                "User signed in with Google, but data not added in DB."
+              );
+            });
+        });
+      } catch (error) {
+        console.error("Google Sign In Error:", error);
+        throw error;
+      }
     } catch (error) {
       console.error("Error signing up with Google:", error);
     } finally {
@@ -61,30 +109,45 @@ export function SignUpForm({ className, ...props }) {
   };
 
   const handleSignUp = async (e) => {
-    if (password !== confirmPassword) {
-      alert("Passwords do not match");
-      return;
-    }
     e.preventDefault();
-    // Implement your signup logic here
     console.log("Signing up...");
     setIsLoading(true);
-    await signUpWithEmailAndPassword(email, password).then(
-      async (userCredential) => {
-        console.log("User created and signed in:", userCredential);
+
+    await createUserWithEmailAndPassword(auth, email, password)
+      .then(async (userCredential) => {
+        const uid = userCredential.user.uid;
+        console.log("User created and signed in:", userCredential, uid);
         await setDoc(doc(db, "users", userCredential.user.uid), {
-          email: userCredential.user.email,
-          fullname: fullname,
-          username: username,
+          name: firstName + " " + lastName,
+          email: email,
+          phone: phone,
+          role: "user",
+          username: `${firstName.toLowerCase()}-${lastName.toLowerCase()}-${
+            Math.floor(Math.random() * 90000) + 10000
+          }`,
           createdAt: new Date(),
-          profilePic:
-            "https://cdn-icons-png.flaticon.com/512/10337/10337609.png",
-          uid: userCredential.user.uid,
+          profilePic: "https://via.placeholder.com/600x600",
+          uid: uid,
+          createdAt: new Date(),
+          updatedAt: new Date(),
           lastSignIn: new Date(),
         });
-      }
-    );
-    router.push("/"); // Redirect to home page after successful signup
+        router.push("/feed");
+      })
+      .catch((error) => {
+        const errorCode = error.code;
+        const errorMessage = error.message;
+
+        console.log(errorCode, errorMessage);
+        if (errorCode === "auth/email-already-in-use") {
+          alert("Email already in use! Please use a different email.");
+        } else if (errorCode === "auth/weak-password") {
+          alert("Password should be at least 6 characters long!");
+        } else {
+          alert(errorMessage);
+        }
+        setIsLoading(false);
+      });
   };
 
   return (
@@ -144,59 +207,6 @@ export function SignUpForm({ className, ...props }) {
                   </span>
                 </div>
                 <div className="grid gap-6">
-                  {/* <div className="grid gap-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="m@example.com"
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <div className="flex items-center">
-                      <Label htmlFor="password">Password</Label>
-                    </div>
-                    <Input
-                      id="password"
-                      type="password"
-                      required
-                      onChange={(e) => setPassword(e.target.value)}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <div className="flex items-center">
-                      <Label htmlFor="confirmPassword">Confirm Password</Label>
-                    </div>
-                    <Input
-                      id="confirmPassword"
-                      type="password"
-                      required
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="username">Full Name</Label>
-                    <Input
-                      id="fullname"
-                      type="text"
-                      placeholder="Full Name"
-                      required
-                      onChange={(e) => setFullname(e.target.value)}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="username">Username</Label>
-                    <Input
-                      id="username"
-                      type="text"
-                      placeholder="user123"
-                      required
-                      onChange={(e) => setUsername(e.target.value)}
-                    />
-                  </div> */}
-
                   <div className="grid gap-2">
                     <Label htmlFor="firstname">First Name</Label>
                     <Input
@@ -269,6 +279,14 @@ export function SignUpForm({ className, ...props }) {
                     type="submit"
                     onClick={handleSignUp}
                     className="w-full"
+                    disabled={
+                      !firstName ||
+                      !lastName ||
+                      !phone ||
+                      !email ||
+                      !password ||
+                      isLoading
+                    }
                   >
                     Sign Up
                   </Button>

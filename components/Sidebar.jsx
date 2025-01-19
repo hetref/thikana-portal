@@ -1,15 +1,12 @@
 "use client";
 
-import { useAuth } from "@/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { MapPinIcon, LinkIcon } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 import useGetUser from "@/hooks/useGetUser";
 
 function DefaultSidebar() {
@@ -42,7 +39,7 @@ function DefaultSidebar() {
 }
 
 export default function Sidebar() {
-  const { user } = useAuth();
+  const user = auth.currentUser;
   const userData = useGetUser(auth.currentUser?.uid || null);
 
   if (!user) return <DefaultSidebar />;

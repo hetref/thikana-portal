@@ -1,22 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogClose,
-} from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   CalendarIcon,
@@ -37,7 +26,7 @@ import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import ProfilePosts from "@/components/ProfilePosts";
 
 export default function Profile() {
-  const { user } = useAuth();
+  const user = auth.currentUser;
   const router = useRouter();
   const [likedPosts, setLikedPosts] = useState([]);
   const searchParams = useSearchParams();

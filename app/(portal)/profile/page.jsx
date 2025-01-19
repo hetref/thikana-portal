@@ -1,79 +1,73 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useAuth } from "@/context/AuthContext"
-import { useRouter } from "next/navigation"
-import { 
-  Card, 
-  CardContent 
-} from "@/components/ui/card"
-import { Avatar, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Card, CardContent } from "@/components/ui/card";
+import { Avatar, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogClose,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
-import { 
-  CalendarIcon, 
-  EditIcon, 
-  FileTextIcon, 
+  CalendarIcon,
+  EditIcon,
+  FileTextIcon,
   HeartIcon,
   LinkIcon,
-  MapPinIcon 
-} from "lucide-react"
-import Sidebar from "@/components/Sidebar"
-import WhoToFollow from "@/components/WhoToFollow"
+  MapPinIcon,
+} from "lucide-react";
+import Sidebar from "@/components/Sidebar";
+import WhoToFollow from "@/components/WhoToFollow";
+import { auth } from "@/lib/firebase";
 
 export default function Profile() {
-  const { user, logout } = useAuth()
-  const router = useRouter()
-  const [showEditDialog, setShowEditDialog] = useState(false)
+  const user = auth.currentUser;
+  const router = useRouter();
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const [editForm, setEditForm] = useState({
     name: "",
     bio: "",
     location: "",
-    website: ""
-  })
+    website: "",
+  });
 
   useEffect(() => {
     if (!user) {
-      router.push("/login")
+      router.push("/login");
     } else {
       setEditForm({
         name: user.displayName || "",
         bio: user.bio || "",
         location: user.location || "",
-        website: user.website || ""
-      })
+        website: user.website || "",
+      });
     }
-  }, [user, router])
+  }, [user, router]);
 
   if (!user) {
-    return null
+    return null;
   }
 
   const handleEditSubmit = async () => {
     // TODO: Implement profile update logic
-    setShowEditDialog(false)
-  }
+    setShowEditDialog(false);
+  };
 
-  const formattedDate = new Date(user?.metadata?.creationTime).toLocaleDateString('en-US', {
-    month: 'long',
-    year: 'numeric'
-  })
+  const formattedDate = new Date(
+    user?.metadata?.creationTime
+  ).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
 
   return (
     <div className="flex items-center justify-center w-full">
@@ -93,34 +87,45 @@ export default function Profile() {
                 <CardContent className="pt-6">
                   <div className="flex flex-col items-center text-center">
                     <Avatar className="w-24 h-24">
-                      <AvatarImage src={user.photoURL || '/avatar.png'} />
+                      <AvatarImage src={user.photoURL || "/avatar.png"} />
                     </Avatar>
-                    <h1 className="mt-4 text-2xl font-bold">{user.displayName || 'User'}</h1>
+                    <h1 className="mt-4 text-2xl font-bold">
+                      {user.displayName || "User"}
+                    </h1>
                     <p className="text-muted-foreground">{user.email}</p>
-                    <p className="mt-2 text-sm">{user.bio || 'No bio yet'}</p>
+                    <p className="mt-2 text-sm">{user.bio || "No bio yet"}</p>
 
                     {/* Profile Stats */}
                     <div className="w-full mt-6">
                       <div className="flex justify-between mb-4">
                         <div>
                           <div className="font-semibold">0</div>
-                          <div className="text-sm text-muted-foreground">Following</div>
+                          <div className="text-sm text-muted-foreground">
+                            Following
+                          </div>
                         </div>
                         <Separator orientation="vertical" />
                         <div>
                           <div className="font-semibold">0</div>
-                          <div className="text-sm text-muted-foreground">Followers</div>
+                          <div className="text-sm text-muted-foreground">
+                            Followers
+                          </div>
                         </div>
                         <Separator orientation="vertical" />
                         <div>
                           <div className="font-semibold">0</div>
-                          <div className="text-sm text-muted-foreground">Posts</div>
+                          <div className="text-sm text-muted-foreground">
+                            Posts
+                          </div>
                         </div>
                       </div>
                     </div>
 
                     {/* Edit Profile Button */}
-                    <Button className="w-full mt-4" onClick={() => setShowEditDialog(true)}>
+                    <Button
+                      className="w-full mt-4"
+                      onClick={() => setShowEditDialog(true)}
+                    >
                       <EditIcon className="w-4 h-4 mr-2" />
                       Edit Profile
                     </Button>
@@ -135,7 +140,11 @@ export default function Profile() {
                         <LinkIcon className="w-4 h-4 mr-2" />
                         {user.website ? (
                           <a
-                            href={user.website.startsWith("http") ? user.website : `https://${user.website}`}
+                            href={
+                              user.website.startsWith("http")
+                                ? user.website
+                                : `https://${user.website}`
+                            }
                             className="hover:underline"
                             target="_blank"
                             rel="noopener noreferrer"
@@ -175,11 +184,15 @@ export default function Profile() {
               </TabsList>
 
               <TabsContent value="posts" className="mt-6">
-                <div className="text-center py-8 text-muted-foreground">No posts yet</div>
+                <div className="text-center py-8 text-muted-foreground">
+                  No posts yet
+                </div>
               </TabsContent>
 
               <TabsContent value="likes" className="mt-6">
-                <div className="text-center py-8 text-muted-foreground">No liked posts to show</div>
+                <div className="text-center py-8 text-muted-foreground">
+                  No liked posts to show
+                </div>
               </TabsContent>
             </Tabs>
 
@@ -194,7 +207,9 @@ export default function Profile() {
                     <Input
                       name="name"
                       value={editForm.name}
-                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, name: e.target.value })
+                      }
                       placeholder="Your name"
                     />
                   </div>
@@ -203,7 +218,9 @@ export default function Profile() {
                     <Textarea
                       name="bio"
                       value={editForm.bio}
-                      onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, bio: e.target.value })
+                      }
                       className="min-h-[100px]"
                       placeholder="Tell us about yourself"
                     />
@@ -213,7 +230,9 @@ export default function Profile() {
                     <Input
                       name="location"
                       value={editForm.location}
-                      onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, location: e.target.value })
+                      }
                       placeholder="Where are you based?"
                     />
                   </div>
@@ -222,7 +241,9 @@ export default function Profile() {
                     <Input
                       name="website"
                       value={editForm.website}
-                      onChange={(e) => setEditForm({ ...editForm, website: e.target.value })}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, website: e.target.value })
+                      }
                       placeholder="Your personal website"
                     />
                   </div>
@@ -246,5 +267,5 @@ export default function Profile() {
         </aside>
       </div>
     </div>
-  )
-} 
+  );
+}

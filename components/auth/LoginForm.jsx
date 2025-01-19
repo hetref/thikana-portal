@@ -2,9 +2,8 @@
 
 import React from "react";
 import classNames from "classnames";
-import { useRouter } from "next/navigation";
+import { redirect, useRouter } from "next/navigation";
 import { useState } from "react";
-import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -16,11 +15,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import {
+  GoogleAuthProvider,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+} from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 export function LoginForm({ className, ...props }) {
   const [isLoading, setIsLoading] = useState(false);
-  const { googleSignIn } = useAuth();
   const router = useRouter();
 
   const [email, setEmail] = useState("");
@@ -30,8 +33,15 @@ export function LoginForm({ className, ...props }) {
     e.preventDefault();
     try {
       setIsLoading(true);
-      await googleSignIn();
-      router.push("/"); // Redirect to home page after successful login
+      try {
+        const provider = new GoogleAuthProvider();
+        const result = await signInWithPopup(auth, provider);
+        console.log("User signed in with Google:", result.user);
+        redirect("/feed");
+      } catch (error) {
+        console.error("Google Sign In Error:", error);
+        throw error;
+      }
     } catch (error) {
       console.error("Error signing in with Google:", error);
     } finally {
@@ -44,21 +54,19 @@ export function LoginForm({ className, ...props }) {
 
     console.log("Signing up...", email, password);
     setIsLoading(true);
-    await signInWithEmailAndPassword(email, password).then(
-      async (userCredential) => {
-        console.log("User created and signed in:", userCredential);
-        // await setDoc(doc(db, "users", userCredential.user.uid), {
-        //   email: userCredential.user.email,
-        //   fullname: fullname,
-        //   username: username,
-        //   createdAt: new Date(),
-        //   profilePic:
-        //     "https://cdn-icons-png.flaticon.com/512/10337/10337609.png",
-        //   uid: userCredential.user.uid,
-        //   lastSignIn: new Date(),
-        // });
-      }
-    );
+
+    await signInWithEmailAndPassword(auth, email, password)
+      .then((userCredential) => {
+        // Signed in
+        const user = userCredential.user;
+        // ...
+        console.log("User signed in:", user);
+      })
+      .catch((error) => {
+        const errorCode = error.code;
+        const errorMessage = error.message;
+      });
+
     router.push("/");
   };
 
