@@ -19,87 +19,78 @@ import { useEffect, useState } from "react";
 export default function WhoToFollow() {
   const [users, setUsers] = useState([]);
   const [following, setFollowing] = useState(new Set());
-  const [isLoading, setIsLoading] = useState({});
 
   useEffect(() => {
     const fetchUsers = async () => {
-      const querySnapshot = await getDocs(collection(db, "users"));
+      const querySnapshot = await getDocs(
+        query(
+          collection(db, "users"),
+          where("uid", "not-in", [auth.currentUser?.uid])
+        )
+      );
       const usersList = [];
-      querySnapshot.forEach((doc) => {
-        if (doc.id !== auth.currentUser?.uid) {
-          // Don't show current user
-          usersList.push({ id: doc.id, ...doc.data() });
-        }
-      });
+      querySnapshot.forEach((doc) =>
+        usersList.push({ id: doc.id, ...doc.data() })
+      );
       setUsers(usersList);
     };
     fetchUsers();
   }, []);
 
-  // Listen to current user's following collection
   useEffect(() => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) return;
-
     const unsubscribe = onSnapshot(
-      collection(db, "users", currentUser.uid, "following"),
+      collection(db, "users", auth.currentUser?.uid, "following"),
       (snapshot) => {
         const followingSet = new Set();
-        snapshot.forEach((doc) => {
-          followingSet.add(doc.data().uid);
-        });
+        snapshot.forEach((doc) => followingSet.add(doc.data().uid));
         setFollowing(followingSet);
       }
     );
 
     return () => unsubscribe();
-  }, []);
+  }, [auth.currentUser]);
 
   const handleFollow = async (userId) => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) return;
+    if (!auth.currentUser) return;
 
-    setIsLoading((prev) => ({ ...prev, [userId]: true }));
+    setFollowing((prev) => new Set(prev).add(userId));
 
     try {
-      // Add to the target user's followers collection
-      await setDoc(doc(db, "users", userId, "followers", currentUser.uid), {
-        uid: currentUser.uid,
-        timestamp: new Date(),
-      });
-
-      // Add to the current user's following collection
-      await setDoc(doc(db, "users", currentUser.uid, "following", userId), {
-        uid: userId,
-        timestamp: new Date(),
-      });
+      await Promise.all([
+        setDoc(doc(db, "users", userId, "followers", auth.currentUser.uid), {
+          uid: auth.currentUser.uid,
+          timestamp: new Date(),
+        }),
+        setDoc(doc(db, "users", auth.currentUser.uid, "following", userId), {
+          uid: userId,
+          timestamp: new Date(),
+        }),
+      ]);
 
       console.log(`Successfully followed user with ID: ${userId}`);
     } catch (error) {
       console.error("Error following user: ", error);
-    } finally {
-      setIsLoading((prev) => ({ ...prev, [userId]: false }));
     }
   };
 
   const handleUnfollow = async (userId) => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) return;
+    if (!auth.currentUser) return;
 
-    setIsLoading((prev) => ({ ...prev, [userId]: true }));
+    setFollowing((prev) => {
+      const updatedFollowing = new Set(prev);
+      updatedFollowing.delete(userId);
+      return updatedFollowing;
+    });
 
     try {
-      // Remove from the target user's followers collection
-      await deleteDoc(doc(db, "users", userId, "followers", currentUser.uid));
-
-      // Remove from the current user's following collection
-      await deleteDoc(doc(db, "users", currentUser.uid, "following", userId));
+      await Promise.all([
+        deleteDoc(doc(db, "users", userId, "followers", auth.currentUser.uid)),
+        deleteDoc(doc(db, "users", auth.currentUser.uid, "following", userId)),
+      ]);
 
       console.log(`Successfully unfollowed user with ID: ${userId}`);
     } catch (error) {
       console.error("Error unfollowing user: ", error);
-    } finally {
-      setIsLoading((prev) => ({ ...prev, [userId]: false }));
     }
   };
 
@@ -136,7 +127,6 @@ export default function WhoToFollow() {
                       ? handleUnfollow(user.id)
                       : handleFollow(user.id)
                   }
-                  disabled={isLoading[user.id]}
                 >
                   {following.has(user.id) ? "Unfollow" : "Follow"}
                 </Button>

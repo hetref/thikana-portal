@@ -43,6 +43,8 @@ export default function Profile() {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [likedPosts, setLikedPosts] = useState([]);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
   const userId = user?.uid;
   const userData = useGetUser(userId);
   const { posts, loading, fetchMorePosts, hasMore, error } =
@@ -77,6 +79,28 @@ export default function Profile() {
       });
     }
   }, [userData]);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const followersRef = collection(db, "users", userId, "followers");
+    const followingRef = collection(db, "users", userId, "following");
+
+    // Set up real-time listener for followers count
+    const unsubscribeFollowers = onSnapshot(followersRef, (snapshot) => {
+      setFollowersCount(snapshot.size); // Update followers count in real-time
+    });
+
+    // Set up real-time listener for following count
+    const unsubscribeFollowing = onSnapshot(followingRef, (snapshot) => {
+      setFollowingCount(snapshot.size); // Update following count in real-time
+    });
+
+    return () => {
+      unsubscribeFollowers(); // Cleanup on unmount
+      unsubscribeFollowing(); // Cleanup on unmount
+    };
+  }, [userId]);
 
   const handleEditSubmit = async () => {
     // TODO: Implement profile update logic
@@ -159,7 +183,6 @@ export default function Profile() {
         console.error("Error fetching liked posts:", error);
       }
     );
-
     return () => unsubscribe(); // Cleanup subscription on unmount
   };
 
@@ -198,14 +221,14 @@ export default function Profile() {
                     <div className="w-full mt-6">
                       <div className="flex justify-between mb-4">
                         <div>
-                          <div className="font-semibold">0</div>
+                          <div className="font-semibold">{followingCount}</div>
                           <div className="text-sm text-muted-foreground">
                             Following
                           </div>
                         </div>
                         <Separator orientation="vertical" />
                         <div>
-                          <div className="font-semibold">0</div>
+                          <div className="font-semibold">{followersCount}</div>
                           <div className="text-sm text-muted-foreground">
                             Followers
                           </div>
