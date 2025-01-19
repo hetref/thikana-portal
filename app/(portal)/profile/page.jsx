@@ -1,7 +1,5 @@
 "use client";
-
 import { useState, useEffect } from "react";
-import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
@@ -29,7 +27,6 @@ import {
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import WhoToFollow from "@/components/WhoToFollow";
-import { useSearchParams } from "next/navigation";
 import { useGetUserPosts } from "@/hooks/useGetPosts";
 import useGetUser from "@/hooks/useGetUser";
 import { auth, db } from "@/lib/firebase";
@@ -37,17 +34,13 @@ import { collection, doc, getDoc, getDocs } from "firebase/firestore";
 import ProfilePosts from "@/components/ProfilePosts";
 
 export default function Profile() {
-  const { user } = useAuth();
   const router = useRouter();
+  const [user, setUser] = useState(null);
   const [likedPosts, setLikedPosts] = useState([]);
   const userId = user?.uid;
-
-  // Ensure userData is fetched before using
   const userData = useGetUser(userId);
-
   const { posts, loading, fetchMorePosts, hasMore, error } =
     useGetUserPosts(userId);
-
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editForm, setEditForm] = useState({
     name: "",
@@ -57,9 +50,19 @@ export default function Profile() {
   });
 
   useEffect(() => {
-    if (!user) {
-      router.push("/login");
-    } else if (userData) {
+    const unsubscribe = auth.onAuthStateChanged((authUser) => {
+      if (authUser) {
+        setUser(authUser);
+      } else {
+        router.push("/login");
+      }
+    });
+
+    return () => unsubscribe();
+  }, [router]);
+
+  useEffect(() => {
+    if (userData) {
       setEditForm({
         name: userData?.username || "",
         bio: userData?.bio || "",
@@ -67,7 +70,7 @@ export default function Profile() {
         website: userData?.website || "",
       });
     }
-  }, [user, router, userData]);
+  }, [user, userData]);
 
   const handleEditSubmit = async () => {
     // TODO: Implement profile update logic
@@ -95,7 +98,6 @@ export default function Profile() {
         </div>
       );
     }
-
     if (!loading && !posts.length) {
       return (
         <div className="text-center py-8 text-muted-foreground">
@@ -103,7 +105,6 @@ export default function Profile() {
         </div>
       );
     }
-
     return (
       <div className="space-y-4">
         {posts.map((post) => {
@@ -113,7 +114,6 @@ export default function Profile() {
             </Card>
           );
         })}
-
         {hasMore && (
           <div className="flex justify-center pt-4">
             <Button
@@ -138,7 +138,6 @@ export default function Profile() {
 
   const getLikedPosts = async () => {
     if (!user) return;
-
     let tempLikedPosts = [];
     try {
       const querySnapshot = await getDocs(
@@ -147,7 +146,6 @@ export default function Profile() {
       for (const docSnapshot of querySnapshot.docs) {
         const postRef = doc(db, "posts", docSnapshot.id);
         const postDoc = await getDoc(postRef);
-
         if (postDoc.exists()) {
           tempLikedPosts.push(postDoc.data());
         } else {
@@ -172,7 +170,6 @@ export default function Profile() {
             <Sidebar />
           </div>
         </aside>
-
         <main className="max-w-[580px] mx-auto w-full px-2">
           <div className="grid grid-cols-1 gap-6">
             <div className="w-full">
@@ -185,11 +182,12 @@ export default function Profile() {
                       />
                     </Avatar>
                     <h1 className="mt-4 text-2xl font-bold">
-                      {user.displayName || "User"}
+                      {user?.displayName || "User"}
                     </h1>
-                    <p className="text-muted-foreground">{user.email}</p>
-                    <p className="mt-2 text-sm">{user.bio || "No bio yet"}</p>
-
+                    <p className="text-muted-foreground">{user?.email}</p>
+                    <p className="mt-2 text-sm">
+                      {userData?.bio || "No bio yet"}
+                    </p>
                     <div className="w-full mt-6">
                       <div className="flex justify-between mb-4">
                         <div>
@@ -214,8 +212,7 @@ export default function Profile() {
                         </div>
                       </div>
                     </div>
-
-                    {userId === user.uid && (
+                    {userId === user?.uid && (
                       <Button
                         className="w-full mt-4"
                         onClick={() => setShowEditDialog(true)}
@@ -224,26 +221,25 @@ export default function Profile() {
                         Edit Profile
                       </Button>
                     )}
-
                     <div className="w-full mt-6 space-y-2 text-sm">
                       <div className="flex items-center text-muted-foreground">
                         <MapPinIcon className="w-4 h-4 mr-2" />
-                        {user.location || "No location"}
+                        {userData?.location || "No location"}
                       </div>
                       <div className="flex items-center text-muted-foreground">
                         <LinkIcon className="w-4 h-4 mr-2" />
-                        {user.website ? (
+                        {userData?.website ? (
                           <a
                             href={
-                              user.website.startsWith("http")
-                                ? user.website
-                                : `https://${user.website}`
+                              userData.website.startsWith("http")
+                                ? userData.website
+                                : `https://${userData.website}`
                             }
                             className="hover:underline"
                             target="_blank"
                             rel="noopener noreferrer"
                           >
-                            {user.website}
+                            {userData.website}
                           </a>
                         ) : (
                           "No website"
@@ -258,7 +254,6 @@ export default function Profile() {
                 </CardContent>
               </Card>
             </div>
-
             <Tabs defaultValue="posts" className="w-full">
               <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent">
                 <TabsTrigger
@@ -268,7 +263,6 @@ export default function Profile() {
                   <FileTextIcon className="w-5 h-5" />
                   Posts
                 </TabsTrigger>
-
                 <TabsTrigger
                   value="likes"
                   className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 font-semibold"
@@ -277,11 +271,9 @@ export default function Profile() {
                   Likes
                 </TabsTrigger>
               </TabsList>
-
               <TabsContent value="posts" className="p-6">
                 {renderPosts()}
               </TabsContent>
-
               <TabsContent value="likes" className="p-6">
                 <div className="space-y-4">
                   {likedPosts.map((post) => {
@@ -296,7 +288,6 @@ export default function Profile() {
             </Tabs>
           </div>
         </main>
-
         <aside className="hidden lg:block">
           <WhoToFollow />
         </aside>

@@ -25,57 +25,61 @@ const BusinessRegistration = () => {
 
   const handleSignUp = async (e) => {
     e.preventDefault();
-    console.log("Signing up...");
     setIsLoading(true);
 
-    await createUserWithEmailAndPassword(auth, email, password)
-      .then(async (userCredential) => {
-        const uid = userCredential.user.uid;
-        console.log("User created and signed in:", userCredential, uid);
-        await setDoc(doc(db, "users", uid), {
-          businessName,
-          name: firstName + " " + lastName,
-          email,
-          phone,
-          role: "business",
-          username: `${businessName.toLowerCase()}-${
-            Math.floor(Math.random() * 90000) + 10000
-          }`,
-          profilePic:
-            "https://firebasestorage.googleapis.com/v0/b/recommendation-system-62a42.appspot.com/o/assets%2Favatar.png?alt=media&token=7782c79f-c178-4b02-8778-bb3b93965aa5",
-          uid,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          lastSignIn: new Date(),
-        });
-        await setDoc(doc(db, "businesses", uid), {
-          businessName,
-          adminName: firstName + " " + lastName,
-          email,
-          phone,
-          plan: "free",
-          username: `${businessName.toLowerCase()}-${
-            Math.floor(Math.random() * 90000) + 10000
-          }`,
-          adminId: uid,
-          createdAt: new Date(),
-        });
-        router.push("/feed");
-      })
-      .catch((error) => {
-        const errorCode = error.code;
-        const errorMessage = error.message;
+    try {
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      const uid = userCredential.user.uid;
+      const businessData = {
+        businessName,
+        name: firstName + " " + lastName,
+        email,
+        phone,
+        role: "business",
+        username: `${businessName.toLowerCase()}-${
+          Math.floor(Math.random() * 90000) + 10000
+        }`,
+        profilePic:
+          "https://firebasestorage.googleapis.com/v0/b/recommendation-system-62a42.appspot.com/o/assets%2Favatar.png?alt=media&token=7782c79f-c178-4b02-8778-bb3b93965aa5",
+        uid,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        lastSignIn: new Date(),
+      };
+      const business = {
+        businessName,
+        adminName: firstName + " " + lastName,
+        email,
+        phone,
+        plan: "free",
+        username: `${businessName.toLowerCase()}-${
+          Math.floor(Math.random() * 90000) + 10000
+        }`,
+        adminId: uid,
+        createdAt: new Date(),
+      };
 
-        console.log(errorCode, errorMessage);
-        if (errorCode === "auth/email-already-in-use") {
-          alert("Email already in use! Please use a different email.");
-        } else if (errorCode === "auth/weak-password") {
-          alert("Password should be at least 6 characters long!");
-        } else {
-          alert(errorMessage);
-        }
-        setIsLoading(false);
-      });
+      await Promise.all([
+        setDoc(doc(db, "users", uid), businessData),
+        setDoc(doc(db, "businesses", uid), business),
+      ]);
+      router.push("/feed");
+    } catch (error) {
+      const { code, message } = error;
+      console.error(code, message);
+      if (code === "auth/email-already-in-use") {
+        alert("Email already in use! Please use a different email.");
+      } else if (code === "auth/weak-password") {
+        alert("Password should be at least 6 characters long!");
+      } else {
+        alert(message);
+      }
+      setIsLoading(false);
+    }
   };
 
   return (
