@@ -35,6 +35,10 @@ export default function Profile() {
   // Ensure userData is fetched before using
   const userData = useGetUser(userId);
 
+  if (userData) {
+    console.log("USERDATA", userData);
+  }
+
   const { posts, loading, fetchMorePosts, hasMore, error } =
     useGetUserPosts(userId);
 
@@ -175,10 +179,10 @@ export default function Profile() {
                       />
                     </Avatar>
                     <h1 className="mt-4 text-2xl font-bold">
-                      {user.displayName || "User"}
+                      {user?.name || "User"}
                     </h1>
-                    <p className="text-muted-foreground">{user.email}</p>
-                    <p className="mt-2 text-sm">{user.bio || "No bio yet"}</p>
+                    <p className="text-muted-foreground">{user?.email}</p>
+                    <p className="mt-2 text-sm">{user?.bio || "No bio yet"}</p>
 
                     <div className="w-full mt-6">
                       <div className="flex justify-between mb-4">
@@ -205,7 +209,7 @@ export default function Profile() {
                       </div>
                     </div>
 
-                    {userId === user.uid && (
+                    {userId === user?.uid && (
                       <Button
                         className="w-full mt-4"
                         onClick={() => setShowEditDialog(true)}
@@ -218,11 +222,11 @@ export default function Profile() {
                     <div className="w-full mt-6 space-y-2 text-sm">
                       <div className="flex items-center text-muted-foreground">
                         <MapPinIcon className="w-4 h-4 mr-2" />
-                        {user.location || "No location"}
+                        {user?.location || "No location"}
                       </div>
                       <div className="flex items-center text-muted-foreground">
                         <LinkIcon className="w-4 h-4 mr-2" />
-                        {user.website ? (
+                        {user?.website ? (
                           <a
                             href={
                               user.website.startsWith("http")

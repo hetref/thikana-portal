@@ -6,21 +6,19 @@ import { doc, getDoc } from "firebase/firestore";
 
 export default function useGetUser(userId) {
   const [user, setUser] = useState(null);
-  if (!userId) return null;
-
   useEffect(() => {
-    const fetchUserData = async () => {
-      console.log(userId);
-      const userDoc = await getDoc(doc(db, "users", userId));
-      if (userDoc.exists()) {
-        console.log("Document data:", userDoc.data());
-        setUser(userDoc.data());
+    if (!userId) return;
+
+    const unsubscribe = onSnapshot(doc(db, "users", userId), (doc) => {
+      if (doc.exists()) {
+        setUser(doc.data());
       } else {
-        // docSnap.data() will be undefined in this case
-        console.log("No such document!");
+        setUser(null);
       }
-    };
-    fetchUserData();
+      console.log("User data:", doc.data());
+    });
+
+    return () => unsubscribe();
   }, [userId]);
 
   return user;

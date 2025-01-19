@@ -1,17 +1,9 @@
 "use client";
 
 import React from "react";
-import classNames from "classnames";
 import { redirect, useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { auth, db } from "@/lib/firebase";
@@ -24,9 +16,8 @@ import {
   GoogleAuthProvider,
   signInWithPopup,
 } from "firebase/auth";
-import { ref, set } from "firebase/database";
 
-export function SignUpForm({ className, ...props }) {
+export function SignUpForm() {
   const [isLoading, setIsLoading] = useState(false);
 
   const [firstName, setFirstName] = useState("");
@@ -34,134 +25,113 @@ export function SignUpForm({ className, ...props }) {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [username, setUsername] = useState("");
   const [passwordShow, setPasswordShow] = useState(false);
 
   const router = useRouter();
 
-  // Register Details:
-  // 1. First Name
-  // 2. Last Name
-  // 3. Phone
-  // 4. Email
-  // 5. Password
+  // const handleGoogleSignUp = async () => {
+  //   try {
+  //     setIsLoading(true);
 
-  const fetchUserData = async (uid) => {
-    const docRef = doc(db, "users", uid);
-    const docSnap = await getDoc(docRef);
+  //     try {
+  //       const provider = new GoogleAuthProvider();
+  //       await signInWithPopup(auth, provider).then(async (result) => {
+  //         const credential = GoogleAuthProvider.credentialFromResult(result);
+  //         const token = credential.accessToken;
+  //         const user = result.user;
+  //         const uid = user.uid;
 
-    return docSnap.exists() ? docSnap.data() : null;
-  };
+  //         console.log("User signed in with Google:", user, token);
 
-  const handleGoogleSignUp = async () => {
-    try {
-      setIsLoading(true);
-
-      try {
-        const provider = new GoogleAuthProvider();
-        await signInWithPopup(auth, provider).then(async (result) => {
-          const credential = GoogleAuthProvider.credentialFromResult(result);
-          const token = credential.accessToken;
-          const user = result.user;
-          const uid = user.uid;
-
-          console.log("User signed in with Google:", user, token);
-
-          const prevDoc = await fetchUserData(uid);
-          console.log("PREVDOC", prevDoc);
-          if (prevDoc) {
-            redirect("/feed");
-          }
-          await setDoc(doc(db, "users", uid), {
-            name: user.displayName || "",
-            email: user.email,
-            phone: user.phone || "",
-            role: "user",
-            username: `${user.displayName.split(" ").join("-").toLowerCase()}-${
-              Math.floor(Math.random() * 90000) + 10000
-            }`,
-            createdAt: new Date(),
-            profilePic: user.photoURL,
-            uid: uid,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          })
-            .then(() => {
-              redirect("/feed");
-            })
-            .catch((error) => {
-              console.log("GERROR", error);
-              throw new Error(
-                "User signed in with Google, but data not added in DB."
-              );
-            });
-        });
-      } catch (error) {
-        console.error("Google Sign In Error:", error);
-        throw error;
-      }
-    } catch (error) {
-      console.error("Error signing up with Google:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  //         const prevDoc = await fetchUserData(uid);
+  //         console.log("PREVDOC", prevDoc);
+  //         if (prevDoc) {
+  //           redirect("/feed");
+  //         }
+  //         await setDoc(doc(db, "users", uid), {
+  //           name: user.displayName || "",
+  //           email: user.email,
+  //           phone: user.phone || "",
+  //           role: "user",
+  //           username: `${user.displayName.split(" ").join("-").toLowerCase()}-${
+  //             Math.floor(Math.random() * 90000) + 10000
+  //           }`,
+  //           createdAt: new Date(),
+  //           profilePic: user.photoURL,
+  //           uid: uid,
+  //           createdAt: new Date(),
+  //           updatedAt: new Date(),
+  //         })
+  //           .then(() => {
+  //             redirect("/feed");
+  //           })
+  //           .catch((error) => {
+  //             console.log("GERROR", error);
+  //             throw new Error(
+  //               "User signed in with Google, but data not added in DB."
+  //             );
+  //           });
+  //       });
+  //     } catch (error) {
+  //       console.error("Google Sign In Error:", error);
+  //       throw error;
+  //     }
+  //   } catch (error) {
+  //     console.error("Error signing up with Google:", error);
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
 
   const handleSignUp = async (e) => {
     e.preventDefault();
-    console.log("Signing up...");
     setIsLoading(true);
 
-    await createUserWithEmailAndPassword(auth, email, password)
-      .then(async (userCredential) => {
-        const uid = userCredential.user.uid;
-        console.log("User created and signed in:", userCredential, uid);
-        await setDoc(doc(db, "users", userCredential.user.uid), {
-          name: firstName + " " + lastName,
-          email: email,
-          phone: phone,
+    try {
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      const uid = userCredential.user.uid;
+      await setDoc(
+        doc(db, "users", uid),
+        {
+          name: `${firstName} ${lastName}`,
+          email,
+          phone,
           role: "user",
           username: `${firstName.toLowerCase()}-${lastName.toLowerCase()}-${
             Math.floor(Math.random() * 90000) + 10000
           }`,
-          createdAt: new Date(),
           profilePic: "https://via.placeholder.com/600x600",
-          uid: uid,
+          uid,
           createdAt: new Date(),
           updatedAt: new Date(),
           lastSignIn: new Date(),
-        });
-        router.push("/feed");
-      })
-      .catch((error) => {
-        const errorCode = error.code;
-        const errorMessage = error.message;
-
-        console.log(errorCode, errorMessage);
-        if (errorCode === "auth/email-already-in-use") {
-          alert("Email already in use! Please use a different email.");
-        } else if (errorCode === "auth/weak-password") {
-          alert("Password should be at least 6 characters long!");
-        } else {
-          alert(errorMessage);
-        }
-        setIsLoading(false);
-      });
+        },
+        { merge: true }
+      );
+      router.push("/feed");
+    } catch (error) {
+      const { code, message } = error;
+      console.error(code, message);
+      if (code === "auth/email-already-in-use") {
+        alert("Email already in use! Please use a different email.");
+      } else if (code === "auth/weak-password") {
+        alert("Password should be at least 6 characters long!");
+      } else {
+        alert(message);
+      }
+      setIsLoading(false);
+    }
   };
 
   return (
-    <div className={classNames("flex flex-col gap-6", className)} {...props}>
-      <Card>
-        <CardHeader className="text-center">
-          <CardTitle className="text-xl">Welcome back</CardTitle>
-          <CardDescription>Sign Up with your Google account</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form>
-            <div className="grid gap-6">
-              <div className="flex flex-col gap-4">
-                <Button
+    <form>
+      <div className="grid gap-6">
+        <div className="flex flex-col gap-4">
+          {/* <Button
                   variant="outline"
                   className="w-full"
                   onClick={handleGoogleSignUp}
@@ -205,107 +175,110 @@ export function SignUpForm({ className, ...props }) {
                   <span className="relative z-10 bg-background px-2 text-muted-foreground">
                     Or continue with
                   </span>
-                </div>
-                <div className="grid gap-6">
-                  <div className="grid gap-2">
-                    <Label htmlFor="firstname">First Name</Label>
-                    <Input
-                      id="firstname"
-                      type="text"
-                      placeholder="First Name"
-                      required
-                      onChange={(e) => setFirstName(e.target.value)}
-                    />
-                  </div>
+                </div> */}
+          <div className="grid gap-6">
+            <div className="grid gap-2">
+              <Label htmlFor="firstname">First Name</Label>
+              <Input
+                id="firstname"
+                type="text"
+                placeholder="First Name"
+                required
+                onChange={(e) => setFirstName(e.target.value)}
+              />
+            </div>
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="lastname">Last Name</Label>
-                    <Input
-                      id="lastname"
-                      type="text"
-                      placeholder="Last Name"
-                      required
-                      onChange={(e) => setLastName(e.target.value)}
-                    />
-                  </div>
+            <div className="grid gap-2">
+              <Label htmlFor="lastname">Last Name</Label>
+              <Input
+                id="lastname"
+                type="text"
+                placeholder="Last Name"
+                required
+                onChange={(e) => setLastName(e.target.value)}
+              />
+            </div>
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="phone">Phone</Label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="+91 1234567890"
-                      required
-                      onChange={(e) => setPhone(e.target.value)}
-                    />
-                  </div>
+            <div className="grid gap-2">
+              <Label htmlFor="phone">Phone</Label>
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="1234567890"
+                required
+                onChange={(e) => setPhone(e.target.value)}
+              />
+            </div>
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="m@example.com"
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
+            <div className="grid gap-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="m@example.com"
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
 
-                  <div className="grid gap-2">
-                    <div className="flex items-center">
-                      <Label htmlFor="password">Password</Label>
-                    </div>
-                    <div className="relative">
-                      <Input
-                        id="password"
-                        type={passwordShow ? "text" : "password"}
-                        placeholder="* * * * * *"
-                        required
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="pr-10"
-                      />
-                      <div className="absolute right-2 top-0 bottom-0 flex items-center">
-                        <Button
-                          onClick={() => setPasswordShow(!passwordShow)}
-                          variant="ghost"
-                        >
-                          {passwordShow ? <EyeOff /> : <Eye />}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-
+            <div className="grid gap-2">
+              <div className="flex items-center">
+                <Label htmlFor="password">Password</Label>
+              </div>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={passwordShow ? "text" : "password"}
+                  placeholder="* * * * * *"
+                  required
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pr-10"
+                />
+                <div className="absolute right-2 top-0 bottom-0 flex items-center">
                   <Button
-                    type="submit"
-                    onClick={handleSignUp}
-                    className="w-full"
-                    disabled={
-                      !firstName ||
-                      !lastName ||
-                      !phone ||
-                      !email ||
-                      !password ||
-                      isLoading
-                    }
+                    onClick={() => setPasswordShow(!passwordShow)}
+                    variant="ghost"
+                    type="button"
                   >
-                    Sign Up
+                    {passwordShow ? <EyeOff /> : <Eye />}
                   </Button>
-                </div>
-                <div className="text-center text-sm">
-                  Have an account?{" "}
-                  <Link href="/login" className="underline underline-offset-4">
-                    Login
-                  </Link>
                 </div>
               </div>
             </div>
-          </form>
-        </CardContent>
-      </Card>
-      <div className="text-balance text-center text-xs text-muted-foreground [&_a]:underline [&_a]:underline-offset-4 [&_a]:hover:text-primary">
-        By clicking continue, you agree to our <a href="#">Terms of Service</a>{" "}
-        and <a href="#">Privacy Policy</a>.
+
+            <Button
+              type="submit"
+              onClick={handleSignUp}
+              className="w-full"
+              disabled={
+                !firstName ||
+                !lastName ||
+                !phone ||
+                !email ||
+                !password ||
+                isLoading
+              }
+            >
+              Sign Up
+            </Button>
+          </div>
+          <div className="text-center text-sm">
+            Wanna join as Business?{" "}
+            <Link
+              href="/register/business"
+              className="underline underline-offset-4"
+            >
+              Register as Business
+            </Link>
+          </div>
+          <div className="text-center text-sm">
+            Have an account?{" "}
+            <Link href="/login" className="underline underline-offset-4">
+              Login
+            </Link>
+          </div>
+        </div>
       </div>
-    </div>
+    </form>
   );
 }

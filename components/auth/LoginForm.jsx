@@ -5,13 +5,6 @@ import classNames from "classnames";
 import { redirect, useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
@@ -22,7 +15,7 @@ import {
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 
-export function LoginForm({ className, ...props }) {
+export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
@@ -71,17 +64,10 @@ export function LoginForm({ className, ...props }) {
   };
 
   return (
-    <div className={classNames("flex flex-col gap-6", className)} {...props}>
-      <Card>
-        <CardHeader className="text-center">
-          <CardTitle className="text-xl">Welcome back</CardTitle>
-          <CardDescription>Log in to your account</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form>
-            <div className="grid gap-6">
-              <div className="flex flex-col gap-4">
-                <Button
+    <form>
+      <div className="grid gap-6">
+        <div className="flex flex-col gap-4">
+          {/* <Button
                   variant="outline"
                   className="w-full"
                   onClick={handleGoogleSignIn}
@@ -125,64 +111,50 @@ export function LoginForm({ className, ...props }) {
                   <span className="relative z-10 bg-background px-2 text-muted-foreground">
                     Or continue with
                   </span>
-                </div>
-                <div className="grid gap-6">
-                  <div className="grid gap-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="m@example.com"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="password">Password</Label>
-                      <a
-                        href="#"
-                        className="text-sm text-muted-foreground underline underline-offset-4 hover:text-primary"
-                      >
-                        Forgot password?
-                      </a>
-                    </div>
-                    <Input
-                      id="password"
-                      type="password"
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                    />
-                  </div>
-
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    onClick={handleLogin}
-                  >
-                    Log in
-                  </Button>
-                </div>
-                <div className="text-center text-sm">
-                  Don't have an account?{" "}
-                  <Link
-                    href="/register"
-                    className="underline underline-offset-4"
-                  >
-                    Sign up
-                  </Link>
-                </div>
-              </div>
+                </div> */}
+          <div className="grid gap-6">
+            <div className="grid gap-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="m@example.com"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
             </div>
-          </form>
-        </CardContent>
-      </Card>
-      <div className="text-balance text-center text-xs text-muted-foreground [&_a]:underline [&_a]:underline-offset-4 [&_a]:hover:text-primary">
-        By clicking continue, you agree to our <a href="#">Terms of Service</a>{" "}
-        and <a href="#">Privacy Policy</a>.
+            <div className="grid gap-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <a
+                  href="#"
+                  className="text-sm text-muted-foreground underline underline-offset-4 hover:text-primary"
+                >
+                  Forgot password?
+                </a>
+              </div>
+              <Input
+                id="password"
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+
+            <Button type="submit" className="w-full" onClick={handleLogin}>
+              Log in
+            </Button>
+          </div>
+          <div className="text-center text-sm">
+            Don't have an account?{" "}
+            <Link href="/register" className="underline underline-offset-4">
+              Sign up
+            </Link>
+          </div>
+        </div>
       </div>
-    </div>
+    </form>
   );
 }
