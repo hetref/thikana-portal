@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
@@ -24,14 +25,29 @@ import {
   HeartIcon,
   LinkIcon,
   MapPinIcon,
+  Loader2Icon,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import WhoToFollow from "@/components/WhoToFollow";
-import { auth } from "@/lib/firebase";
+import { useSearchParams } from "next/navigation";
+import { useGetUserPosts } from "@/hooks/useGetPosts";
+import useGetUser from "@/hooks/useGetUser";
+import { auth, db } from "@/lib/firebase";
+import { collection, doc, getDoc, getDocs } from "firebase/firestore";
+import ProfilePosts from "@/components/ProfilePosts";
 
 export default function Profile() {
-  const user = auth.currentUser;
+  const { user } = useAuth();
   const router = useRouter();
+  const [likedPosts, setLikedPosts] = useState([]);
+  const userId = user?.uid;
+
+  // Ensure userData is fetched before using
+  const userData = useGetUser(userId);
+
+  const { posts, loading, fetchMorePosts, hasMore, error } =
+    useGetUserPosts(userId);
+
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editForm, setEditForm] = useState({
     name: "",
@@ -43,23 +59,25 @@ export default function Profile() {
   useEffect(() => {
     if (!user) {
       router.push("/login");
-    } else {
+    } else if (userData) {
       setEditForm({
-        name: user.displayName || "",
-        bio: user.bio || "",
-        location: user.location || "",
-        website: user.website || "",
+        name: userData?.username || "",
+        bio: userData?.bio || "",
+        location: userData?.location || "",
+        website: userData?.website || "",
       });
     }
-  }, [user, router]);
-
-  if (!user) {
-    return null;
-  }
+  }, [user, router, userData]);
 
   const handleEditSubmit = async () => {
     // TODO: Implement profile update logic
     setShowEditDialog(false);
+  };
+
+  const handleLoadMore = () => {
+    if (hasMore && !loading) {
+      fetchMorePosts();
+    }
   };
 
   const formattedDate = new Date(
@@ -69,17 +87,92 @@ export default function Profile() {
     year: "numeric",
   });
 
+  const renderPosts = () => {
+    if (loading && !posts.length) {
+      return (
+        <div className="flex justify-center py-8">
+          <Loader2Icon className="w-6 h-6 animate-spin" />
+        </div>
+      );
+    }
+
+    if (!loading && !posts.length) {
+      return (
+        <div className="text-center py-8 text-muted-foreground">
+          No posts yet
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        {posts.map((post) => {
+          return (
+            <Card key={post.id} className="p-4">
+              <ProfilePosts post={post} userData={userData} />
+            </Card>
+          );
+        })}
+
+        {hasMore && (
+          <div className="flex justify-center pt-4">
+            <Button
+              variant="outline"
+              onClick={handleLoadMore}
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <Loader2Icon className="w-4 h-4 mr-2 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                "Load More"
+              )}
+            </Button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const getLikedPosts = async () => {
+    if (!user) return;
+
+    let tempLikedPosts = [];
+    try {
+      const querySnapshot = await getDocs(
+        collection(db, "users", user.uid, "postlikes")
+      );
+      for (const docSnapshot of querySnapshot.docs) {
+        const postRef = doc(db, "posts", docSnapshot.id);
+        const postDoc = await getDoc(postRef);
+
+        if (postDoc.exists()) {
+          tempLikedPosts.push(postDoc.data());
+        } else {
+          console.log("Post does not exist:", docSnapshot.id);
+        }
+      }
+      setLikedPosts(tempLikedPosts);
+    } catch (error) {
+      console.error("Error fetching liked posts:", error);
+    }
+  };
+
+  useEffect(() => {
+    getLikedPosts();
+  }, [user]);
+
   return (
     <div className="flex items-center justify-center w-full">
       <div className="max-w-7xl w-full grid grid-cols-1 gap-0 py-8 lg:grid-cols-[300px_minmax(0,1fr)_300px] lg:gap-0.5">
-        {/* Left Sidebar */}
         <aside className="hidden lg:block">
           <div className="sticky top-20">
             <Sidebar />
           </div>
         </aside>
 
-        {/* Main Content */}
         <main className="max-w-[580px] mx-auto w-full px-2">
           <div className="grid grid-cols-1 gap-6">
             <div className="w-full">
@@ -87,7 +180,9 @@ export default function Profile() {
                 <CardContent className="pt-6">
                   <div className="flex flex-col items-center text-center">
                     <Avatar className="w-24 h-24">
-                      <AvatarImage src={user.photoURL || "/avatar.png"} />
+                      <AvatarImage
+                        src={userData?.profilePic || "/avatar.png"}
+                      />
                     </Avatar>
                     <h1 className="mt-4 text-2xl font-bold">
                       {user.displayName || "User"}
@@ -95,7 +190,6 @@ export default function Profile() {
                     <p className="text-muted-foreground">{user.email}</p>
                     <p className="mt-2 text-sm">{user.bio || "No bio yet"}</p>
 
-                    {/* Profile Stats */}
                     <div className="w-full mt-6">
                       <div className="flex justify-between mb-4">
                         <div>
@@ -113,7 +207,7 @@ export default function Profile() {
                         </div>
                         <Separator orientation="vertical" />
                         <div>
-                          <div className="font-semibold">0</div>
+                          <div className="font-semibold">{posts.length}</div>
                           <div className="text-sm text-muted-foreground">
                             Posts
                           </div>
@@ -121,16 +215,16 @@ export default function Profile() {
                       </div>
                     </div>
 
-                    {/* Edit Profile Button */}
-                    <Button
-                      className="w-full mt-4"
-                      onClick={() => setShowEditDialog(true)}
-                    >
-                      <EditIcon className="w-4 h-4 mr-2" />
-                      Edit Profile
-                    </Button>
+                    {userId === user.uid && (
+                      <Button
+                        className="w-full mt-4"
+                        onClick={() => setShowEditDialog(true)}
+                      >
+                        <EditIcon className="w-4 h-4 mr-2" />
+                        Edit Profile
+                      </Button>
+                    )}
 
-                    {/* Location & Website */}
                     <div className="w-full mt-6 space-y-2 text-sm">
                       <div className="flex items-center text-muted-foreground">
                         <MapPinIcon className="w-4 h-4 mr-2" />
@@ -171,99 +265,40 @@ export default function Profile() {
                   value="posts"
                   className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 font-semibold"
                 >
-                  <FileTextIcon className="w-4 h-4" />
+                  <FileTextIcon className="w-5 h-5" />
                   Posts
                 </TabsTrigger>
+
                 <TabsTrigger
                   value="likes"
                   className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 font-semibold"
                 >
-                  <HeartIcon className="w-4 h-4" />
+                  <HeartIcon className="w-5 h-5" />
                   Likes
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="posts" className="mt-6">
-                <div className="text-center py-8 text-muted-foreground">
-                  No posts yet
-                </div>
+              <TabsContent value="posts" className="p-6">
+                {renderPosts()}
               </TabsContent>
 
-              <TabsContent value="likes" className="mt-6">
-                <div className="text-center py-8 text-muted-foreground">
-                  No liked posts to show
+              <TabsContent value="likes" className="p-6">
+                <div className="space-y-4">
+                  {likedPosts.map((post) => {
+                    return (
+                      <Card key={post.id} className="p-4">
+                        <ProfilePosts post={post} userData={userData} />
+                      </Card>
+                    );
+                  })}
                 </div>
               </TabsContent>
             </Tabs>
-
-            <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-              <DialogContent className="sm:max-w-[500px]">
-                <DialogHeader>
-                  <DialogTitle>Edit Profile</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label>Name</Label>
-                    <Input
-                      name="name"
-                      value={editForm.name}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, name: e.target.value })
-                      }
-                      placeholder="Your name"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Bio</Label>
-                    <Textarea
-                      name="bio"
-                      value={editForm.bio}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, bio: e.target.value })
-                      }
-                      className="min-h-[100px]"
-                      placeholder="Tell us about yourself"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Location</Label>
-                    <Input
-                      name="location"
-                      value={editForm.location}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, location: e.target.value })
-                      }
-                      placeholder="Where are you based?"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Website</Label>
-                    <Input
-                      name="website"
-                      value={editForm.website}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, website: e.target.value })
-                      }
-                      placeholder="Your personal website"
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end gap-3">
-                  <DialogClose asChild>
-                    <Button variant="outline">Cancel</Button>
-                  </DialogClose>
-                  <Button onClick={handleEditSubmit}>Save Changes</Button>
-                </div>
-              </DialogContent>
-            </Dialog>
           </div>
         </main>
 
-        {/* Right Sidebar */}
         <aside className="hidden lg:block">
-          <div className="sticky top-20">
-            <WhoToFollow />
-          </div>
+          <WhoToFollow />
         </aside>
       </div>
     </div>
