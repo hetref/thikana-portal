@@ -1,5 +1,7 @@
-import { GalleryVerticalEnd } from "lucide-react";
-import { LoginForm } from "@/components/auth/LoginForm";
+"use client";
+
+import React from "react";
+import classNames from "classnames";
 import {
   Card,
   CardContent,
@@ -7,8 +9,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { GalleryVerticalEnd } from "lucide-react";
+import BusinessRegistration from "@/components/auth/BusinessRegistration";
 
-export default function LoginPage() {
+const BusinessRegistrationPage = ({ className }) => {
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted p-6 md:p-10">
       <div className="flex w-full max-w-sm flex-col gap-6">
@@ -18,14 +22,16 @@ export default function LoginPage() {
           </div>
           Thikana
         </a>
-        <div className="flex flex-col gap-6">
+        <div className={classNames("flex flex-col gap-6", className)}>
           <Card>
             <CardHeader className="text-center">
-              <CardTitle className="text-xl">Welcome back</CardTitle>
-              <CardDescription>Log in to your account</CardDescription>
+              <CardTitle className="text-xl">Business Registration</CardTitle>
+              <CardDescription>
+                Register as a Business to get started with Thikana.
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <LoginForm />
+              <BusinessRegistration />
             </CardContent>
           </Card>
           <div className="text-balance text-center text-xs text-muted-foreground [&_a]:underline [&_a]:underline-offset-4 [&_a]:hover:text-primary">
@@ -36,4 +42,6 @@ export default function LoginPage() {
       </div>
     </div>
   );
-}
+};
+
+export default BusinessRegistrationPage;

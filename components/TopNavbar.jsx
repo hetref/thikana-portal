@@ -3,28 +3,25 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { useAuth } from "@/context/AuthContext";
 import useGetUser from "@/hooks/useGetUser";
 import { auth } from "@/lib/firebase";
 import { authenticatedItems, unauthenticatedItems } from "@/constants/navLinks";
 import Image from "next/image";
+import { signOut } from "firebase/auth";
+import { redirect } from "next/navigation";
 
 export default function TopNavbar({ type = "unauthenticated" }) {
-  const { user, logout } = useAuth();
-  const userData = useGetUser(auth.currentUser?.uid);
+  const user = auth.currentUser;
 
-  // If Authenticated:
-  // - Home
-  // - Notifications
-  // - Profile
-  // - Create
-  // - Logout
-
-  // If UnAuthenticated
-  // - Home
-  // - Pricing
-  // - Contact Us
-  // - Get Started
+  const logoutHandler = async () => {
+    try {
+      await signOut(auth);
+      redirect("/");
+    } catch (error) {
+      console.error("Logout Error:", error);
+      throw error;
+    }
+  };
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -67,7 +64,7 @@ export default function TopNavbar({ type = "unauthenticated" }) {
           {/* Auth Buttons */}
           <div className="flex items-center gap-2">
             {user && type === "authenticated" ? (
-              <Button size="sm" onClick={logout}>
+              <Button size="sm" onClick={logoutHandler}>
                 Sign out
               </Button>
             ) : (

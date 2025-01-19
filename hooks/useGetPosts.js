@@ -21,6 +21,7 @@ export const useGetUserPosts = (userId) => {
   // Fetch initial posts
   const fetchInitialPosts = useCallback(async () => {
     if (!userId) return;
+    console.log("Fetching initial posts...");
 
     setLoading(true);
     try {
@@ -54,6 +55,7 @@ export const useGetUserPosts = (userId) => {
   // Fetch more posts for pagination
   const fetchMorePosts = useCallback(async () => {
     if (!userId || !lastVisible || !hasMore) return;
+    console.log("Fetching more posts...");
 
     setLoading(true);
     try {
@@ -85,6 +87,7 @@ export const useGetUserPosts = (userId) => {
 
   // Automatically fetch initial posts when userId changes
   useEffect(() => {
+    console.log("userId changed:", userId);
     fetchInitialPosts();
   }, [fetchInitialPosts]);
 

@@ -1,16 +1,18 @@
 "use client";
 
-import { useAuth } from "@/context/AuthContext";
+import { auth } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 import { redirect } from "next/navigation";
-import React from "react";
+import React, { useEffect } from "react";
 
 const layout = ({ children }) => {
-  const { user } = useAuth();
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) redirect("/");
+    });
 
-  if (user) {
-    console.log(user);
-    redirect("/");
-  }
+    return () => unsubscribe();
+  }, []);
 
   return <div>{children}</div>;
 };
