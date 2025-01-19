@@ -3,14 +3,14 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { initialMessage } from "../../../lib/data";
 
 const google = createGoogleGenerativeAI({
-    apiKey: process.env.GOOGLE_API_KEY || ""
+    apiKey: 'AIzaSyDOmYsvQ8Vci4swqN5kFvJh0bJPxl8OXAU',
 });
 
 export const runtime = "edge";
 
 const generateId = () => Math.random().toString(36).slice(2, 15);
 
-const buildGoogleGenAIPrompt = (messages: Message[]): Message[] => [
+const buildGoogleGenAIPrompt = (messages) => [
     {
         id: generateId(),
         role: "user",
@@ -23,7 +23,7 @@ const buildGoogleGenAIPrompt = (messages: Message[]): Message[] => [
     })),
 ];
 
-export async function POST(request: Request) {
+export async function POST(request) {
     const { messages } = await request.json();
     const stream = await streamText({
         model: google("gemini-1.5-pro"),
