@@ -6,10 +6,11 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { MapPinIcon, LinkIcon } from "lucide-react";
 import Link from "next/link";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import useGetUser from "@/hooks/useGetUser";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { collection, onSnapshot } from "firebase/firestore";
 
 function DefaultSidebar() {
   return (
@@ -42,6 +43,30 @@ function DefaultSidebar() {
 
 export default function Sidebar() {
   const user = useGetUser(auth.currentUser?.uid || null);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const followersRef = collection(db, "users", user.uid, "followers");
+    const followingRef = collection(db, "users", user.uid, "following");
+
+    // Set up real-time listener for followers count
+    const unsubscribeFollowers = onSnapshot(followersRef, (snapshot) => {
+      setFollowersCount(snapshot.size); // Update followers count in real-time
+    });
+
+    // Set up real-time listener for following count
+    const unsubscribeFollowing = onSnapshot(followingRef, (snapshot) => {
+      setFollowingCount(snapshot.size); // Update following count in real-time
+    });
+
+    return () => {
+      unsubscribeFollowers(); // Cleanup on unmount
+      unsubscribeFollowing(); // Cleanup on unmount
+    };
+  }, [user]);
 
   if (!user) return <DefaultSidebar />;
 
@@ -74,12 +99,12 @@ export default function Sidebar() {
               <Separator className="my-4" />
               <div className="flex justify-between">
                 <div>
-                  <p className="font-medium">{user.following || "0"}</p>
+                  <p className="font-medium">{followingCount || "0"}</p>
                   <p className="text-xs text-muted-foreground">Following</p>
                 </div>
                 <Separator orientation="vertical" />
                 <div>
-                  <p className="font-medium">{user.followers || "0"}</p>
+                  <p className="font-medium">{followersCount || "0"}</p>
                   <p className="text-xs text-muted-foreground">Followers</p>
                 </div>
               </div>

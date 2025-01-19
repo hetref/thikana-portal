@@ -21,25 +21,24 @@ export default function WhoToFollow() {
   const [following, setFollowing] = useState(new Set());
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      const querySnapshot = await getDocs(
-        query(
-          collection(db, "users"),
-          where("uid", "not-in", [auth.currentUser?.uid])
-        )
-      );
-      const usersList = [];
-      querySnapshot.forEach((doc) =>
-        usersList.push({ id: doc.id, ...doc.data() })
-      );
-      setUsers(usersList);
-    };
-    fetchUsers();
-  }, []);
+    if (!auth.currentUser) return;
 
-  useEffect(() => {
-    const unsubscribe = onSnapshot(
-      collection(db, "users", auth.currentUser?.uid, "following"),
+    const unsubscribeUsers = onSnapshot(
+      query(
+        collection(db, "users"),
+        where("uid", "not-in", [auth.currentUser.uid])
+      ),
+      (snapshot) => {
+        const usersList = [];
+        snapshot.forEach((doc) =>
+          usersList.push({ id: doc.id, ...doc.data() })
+        );
+        setUsers(usersList);
+      }
+    );
+
+    const unsubscribeFollowing = onSnapshot(
+      collection(db, "users", auth.currentUser.uid, "following"),
       (snapshot) => {
         const followingSet = new Set();
         snapshot.forEach((doc) => followingSet.add(doc.data().uid));
@@ -47,14 +46,15 @@ export default function WhoToFollow() {
       }
     );
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeUsers();
+      unsubscribeFollowing();
+    };
   }, [auth.currentUser]);
 
   const handleFollow = async (userId) => {
     if (!auth.currentUser) return;
-
     setFollowing((prev) => new Set(prev).add(userId));
-
     try {
       await Promise.all([
         setDoc(doc(db, "users", userId, "followers", auth.currentUser.uid), {
@@ -66,7 +66,6 @@ export default function WhoToFollow() {
           timestamp: new Date(),
         }),
       ]);
-
       console.log(`Successfully followed user with ID: ${userId}`);
     } catch (error) {
       console.error("Error following user: ", error);
@@ -75,19 +74,16 @@ export default function WhoToFollow() {
 
   const handleUnfollow = async (userId) => {
     if (!auth.currentUser) return;
-
     setFollowing((prev) => {
       const updatedFollowing = new Set(prev);
       updatedFollowing.delete(userId);
       return updatedFollowing;
     });
-
     try {
       await Promise.all([
         deleteDoc(doc(db, "users", userId, "followers", auth.currentUser.uid)),
         deleteDoc(doc(db, "users", auth.currentUser.uid, "following", userId)),
       ]);
-
       console.log(`Successfully unfollowed user with ID: ${userId}`);
     } catch (error) {
       console.error("Error unfollowing user: ", error);
