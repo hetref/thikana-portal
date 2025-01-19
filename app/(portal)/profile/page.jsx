@@ -14,6 +14,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogClose,
+  DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -243,6 +245,15 @@ export default function Profile() {
                             Posts
                           </div>
                         </div>
+                        <Separator orientation="vertical" />
+                        <div>
+                          <div className="font-semibold">
+                            {userData?.photos.length || 0}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            Photos
+                          </div>
+                        </div>
                       </div>
                     </div>
                     {userId === user?.uid && (
@@ -334,18 +345,38 @@ export default function Profile() {
               <TabsContent value="photos" className="p-6">
                 {userData?.photos && userData.photos.length > 0 ? (
                   <div className="grid grid-cols-2 gap-4">
-                    {userData.photos.map((photo) => (
-                      <div key={photo.photoUrl} className="relative">
-                        <img
-                          src={photo.photoUrl}
-                          alt={photo.title}
-                          className="w-full h-auto rounded-lg"
-                        />
-                        <div className="absolute bottom-0 left-0 bg-black bg-opacity-50 text-white p-2 rounded-b-lg">
-                          <p>{photo.title}</p>
-                          <p>{new Date(photo.addedOn).toLocaleDateString()}</p>
-                        </div>
-                      </div>
+                    {userData.photos.map((photo, index) => (
+                      <Dialog key={index}>
+                        {/* Trigger for the Dialog */}
+                        <DialogTrigger asChild>
+                          <div>
+                            <img
+                              src={photo.photoUrl}
+                              alt={photo.title}
+                              className="w-full h-auto rounded-lg rounded-b-none"
+                            />
+                            <div className="bg-black bg-opacity-90 border-t-2 border-white text-white p-2 rounded-b-lg">
+                              <p>{photo.title}</p>
+                              <p>
+                                {new Date(photo.addedOn).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                        </DialogTrigger>
+
+                        {/* Dialog Content */}
+                        <DialogContent className="w-full max-w-3xl p-4 flex flex-col gap-2 justify-center items-center">
+                          <DialogTitle>{photo.title}</DialogTitle>
+                          <DialogDescription>
+                            {new Date(photo.addedOn).toLocaleDateString()}
+                          </DialogDescription>
+                          <img
+                            src={photo.photoUrl}
+                            alt="Full View"
+                            className="max-w-full rounded-lg max-h-[80svh] max-w-[80vw]]"
+                          />
+                        </DialogContent>
+                      </Dialog>
                     ))}
                   </div>
                 ) : (

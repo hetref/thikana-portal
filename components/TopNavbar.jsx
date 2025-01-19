@@ -17,9 +17,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import AddPhotoModal from "./AddPhotoModal";
 
 export default function TopNavbar({ type = "unauthenticated" }) {
   const [user, setUser] = useState(null);
+  const [isAddPhotoModalOpen, setIsAddPhotoModalOpen] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -72,34 +74,35 @@ export default function TopNavbar({ type = "unauthenticated" }) {
               </Link>
             ))}
           {user && type === "authenticated" && (
-            // <Link
-            //   key="Create"
-            //   href="/create"
-            //   className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary"
-            // >
-            //   <Plus className="h-5 w-5" />
-            //   <span className="hidden sm:inline">Create</span>
-            // </Link>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary">
-                  <Plus className="h-5 w-5" />
-                  <span className="hidden sm:inline">Create</span>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem asChild>
-                  <Link href="/create" className="flex items-center gap-2">
-                    <span>Create Post</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/add-photos" className="flex items-center gap-2">
+            <>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary">
+                    <Plus className="h-5 w-5" />
+                    <span className="hidden sm:inline">Create</span>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link href="/create" className="flex items-center gap-2">
+                      <span>Create Post</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => setIsAddPhotoModalOpen(true)}
+                  >
                     <span>Add Photos</span>
-                  </Link>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {user && (
+                <AddPhotoModal
+                  isOpen={isAddPhotoModalOpen}
+                  onClose={() => setIsAddPhotoModalOpen(false)}
+                  userId={user.uid}
+                />
+              )}
+            </>
           )}
           {user &&
             type === "unauthenticated" &&

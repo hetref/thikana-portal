@@ -76,6 +76,11 @@ export default function ProfileEditModal({ isOpen, onClose, currentUser }) {
     }
   };
 
+  async function updateProfile(userData) {
+    const userRef = doc(db, "users", userData.uid);
+    await setDoc(userRef, userData, { merge: true });
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
