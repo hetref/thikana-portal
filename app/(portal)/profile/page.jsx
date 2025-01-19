@@ -30,7 +30,13 @@ import WhoToFollow from "@/components/WhoToFollow";
 import { useGetUserPosts } from "@/hooks/useGetPosts";
 import useGetUser from "@/hooks/useGetUser";
 import { auth, db } from "@/lib/firebase";
-import { collection, doc, getDoc, getDocs } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  onSnapshot,
+} from "firebase/firestore";
 import ProfilePosts from "@/components/ProfilePosts";
 
 export default function Profile() {
@@ -41,6 +47,7 @@ export default function Profile() {
   const userData = useGetUser(userId);
   const { posts, loading, fetchMorePosts, hasMore, error } =
     useGetUserPosts(userId);
+  console.log("USERDATA", posts);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editForm, setEditForm] = useState({
     name: "",
@@ -57,7 +64,6 @@ export default function Profile() {
         router.push("/login");
       }
     });
-
     return () => unsubscribe();
   }, [router]);
 
@@ -70,11 +76,11 @@ export default function Profile() {
         website: userData?.website || "",
       });
     }
-  }, [user, userData]);
+  }, [userData]);
 
   const handleEditSubmit = async () => {
     // TODO: Implement profile update logic
-    setShowEditDialog(false);
+    setShowEditDialog(true);
   };
 
   const handleLoadMore = () => {
@@ -107,13 +113,11 @@ export default function Profile() {
     }
     return (
       <div className="space-y-4">
-        {posts.map((post) => {
-          return (
-            <Card key={post.id} className="p-4">
-              <ProfilePosts post={post} userData={userData} />
-            </Card>
-          );
-        })}
+        {posts.map((post) => (
+          <Card key={post.id} className="p-4">
+            <ProfilePosts post={post} userData={userData} />
+          </Card>
+        ))}
         {hasMore && (
           <div className="flex justify-center pt-4">
             <Button
@@ -136,26 +140,27 @@ export default function Profile() {
     );
   };
 
-  const getLikedPosts = async () => {
+  const getLikedPosts = () => {
     if (!user) return;
-    let tempLikedPosts = [];
-    try {
-      const querySnapshot = await getDocs(
-        collection(db, "users", user.uid, "postlikes")
-      );
-      for (const docSnapshot of querySnapshot.docs) {
-        const postRef = doc(db, "posts", docSnapshot.id);
-        const postDoc = await getDoc(postRef);
-        if (postDoc.exists()) {
-          tempLikedPosts.push(postDoc.data());
-        } else {
-          console.log("Post does not exist:", docSnapshot.id);
-        }
+    const unsubscribe = onSnapshot(
+      collection(db, "users", user.uid, "postlikes"),
+      async (querySnapshot) => {
+        const postIds = querySnapshot.docs.map((doc) => doc.id);
+        const postDocs = await Promise.all(
+          postIds.map((id) => getDoc(doc(db, "posts", id)))
+        );
+        const tempLikedPosts = postDocs
+          .filter((doc) => doc.exists())
+          .map((doc) => ({ ...doc.data(), id: doc.id }));
+        console.log("tempLikedPosts", tempLikedPosts);
+        setLikedPosts(tempLikedPosts);
+      },
+      (error) => {
+        console.error("Error fetching liked posts:", error);
       }
-      setLikedPosts(tempLikedPosts);
-    } catch (error) {
-      console.error("Error fetching liked posts:", error);
-    }
+    );
+
+    return () => unsubscribe(); // Cleanup subscription on unmount
   };
 
   useEffect(() => {
@@ -182,9 +187,11 @@ export default function Profile() {
                       />
                     </Avatar>
                     <h1 className="mt-4 text-2xl font-bold">
-                      {user?.displayName || "User"}
+                      {userData?.name}
                     </h1>
-                    <p className="text-muted-foreground">{user?.email}</p>
+                    <p className="text-muted-foreground">
+                      @{userData?.username}
+                    </p>
                     <p className="mt-2 text-sm">
                       {userData?.bio || "No bio yet"}
                     </p>
@@ -276,13 +283,11 @@ export default function Profile() {
               </TabsContent>
               <TabsContent value="likes" className="p-6">
                 <div className="space-y-4">
-                  {likedPosts.map((post) => {
-                    return (
-                      <Card key={post.id} className="p-4">
-                        <ProfilePosts post={post} userData={userData} />
-                      </Card>
-                    );
-                  })}
+                  {likedPosts.map((post, index) => (
+                    <Card key={index} className="p-4">
+                      <ProfilePosts post={post} userData={userData} />
+                    </Card>
+                  ))}
                 </div>
               </TabsContent>
             </Tabs>
