@@ -249,7 +249,7 @@ export default function Profile() {
                         <Separator orientation="vertical" />
                         <div>
                           <div className="font-semibold">
-                            {userData?.photos.length || 0}
+                            {userData?.photos?.length || 0}
                           </div>
                           <div className="text-sm text-muted-foreground">
                             Photos
