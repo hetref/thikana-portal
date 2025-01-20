@@ -56,21 +56,21 @@ export default function Chatbot() {
   const scrollRef = useRef(null);
   const [suggestions, setSuggestions] = useState([]);
 
-  // useEffect(() => {
-  //   const handleScroll = () => {
-  //     if (window.scrollY > 200) {
-  //       setShowChatIcon(true);
-  //     } else {
-  //       setShowChatIcon(false);
-  //       // setIsChatOpen(false);
-  //     }
-  //   };
-  //   handleScroll();
-  //   window.addEventListener("scroll", handleScroll);
-  //   return () => {
-  //     window.removeEventListener("scroll", handleScroll);
-  //   };
-  // }, []);
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 200) {
+        setShowChatIcon(true);
+      } else {
+        setShowChatIcon(false);
+        // setIsChatOpen(false);
+      }
+    };
+    handleScroll();
+    window.addEventListener("scroll", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
 
   const toggleChat = () => {
     setIsChatOpen(!isChatOpen);
@@ -114,10 +114,11 @@ export default function Chatbot() {
             ref={chatIconRef}
             onClick={toggleChat}
             size="icon"
-            className="rounded-full size-14 p-2 shadow-lg"
+            className="rounded-full size-14 p-2 shadow-lg font-bold"
+            placeholder="Chat with Thikana AI"
           >
             {!isChatOpen ? (
-              <MessageCircle className="size-7" />
+              <MessageCircle className="size-7 text-lg" />
             ) : (
               <ArrowDownCircleIcon />
             )}

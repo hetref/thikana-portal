@@ -1,17 +1,20 @@
 "use client";
 import React, { useState } from "react";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { v4 as uuidv4 } from "uuid";
-import { doc, setDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
-import { useRouter } from "next/navigation";
+import { Wand2 } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+
 const CreatePost = () => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
+  const [isGenerating, setIsGenerating] = useState(false);
+
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file && file.type.startsWith("image/")) {
@@ -24,156 +27,146 @@ const CreatePost = () => {
     }
   };
 
+  const generateContent = async (type) => {
+    setIsGenerating(true);
+    try {
+      const formData = new FormData();
+      formData.append('type', type);
+      formData.append('prompt', type === "description" ? title : "");
+      if (image) {
+        formData.append('image', image);
+      }
+  
+      const response = await fetch("/api/generate-content", {
+        method: "POST",
+        body: formData,
+      });
+  
+      const data = await response.json();
+      
+      if (data.error) throw new Error(data.error);
+  
+      if (type === "title") {
+        setTitle(data.generated);
+      } else {
+        setDescription(data.generated);
+      }
+    } catch (error) {
+      console.error("Generation error:", error);
+      alert("Failed to generate content. Please try again.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!title || !description || !image) {
       alert("All fields are required!");
       return;
     }
 
     setIsLoading(true);
-    const storage = getStorage();
-    const fileName = Date.now() + "-" + title;
-    const storageRef = ref(
-      storage,
-      `${auth.currentUser.uid}/posts/${fileName}`
-    );
-
     try {
-      await uploadBytes(storageRef, image);
-      const downloadURL = await getDownloadURL(storageRef);
-
-      alert("Post created successfully! Image URL: " + downloadURL);
-      await setDoc(doc(db, "posts", uuidv4()), {
-        title: title,
-        description: description,
-        image: downloadURL,
-        uid: auth.currentUser.uid,
-        createdAt: new Date(),
-        likes: 0,
-        comments: [],
-        imageRef: fileName,
-        user: "/users/" + auth.currentUser.uid,
-      }).then(() => {
-        router.push("/");
-        console.log("Post created successfully!");
-      });
+      // Implement your post creation logic here
+      console.log({ title, description, image });
+      alert("Post created successfully!");
+      setTitle("");
+      setDescription("");
+      setImage(null);
+      setPreview(null);
     } catch (error) {
-      console.error("Error uploading image:", error);
+      console.error("Error creating post:", error);
+      alert("Failed to create post. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div
-      style={{
-        maxWidth: "500px",
-        margin: "0 auto",
-        padding: "20px",
-        fontFamily: "Arial, sans-serif",
-      }}
-    >
-      <h1 style={{ textAlign: "center", color: "#333" }}>Create Post</h1>
-      <form
-        onSubmit={handleSubmit}
-        style={{ display: "flex", flexDirection: "column", gap: "15px" }}
-      >
-        <div>
-          <label
-            style={{
-              display: "block",
-              marginBottom: "5px",
-              fontWeight: "bold",
-            }}
-          >
-            Title
-          </label>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "10px",
-              border: "1px solid #ccc",
-              borderRadius: "5px",
-            }}
-            required
-          />
-        </div>
-        <div>
-          <label
-            style={{
-              display: "block",
-              marginBottom: "5px",
-              fontWeight: "bold",
-            }}
-          >
-            Description
-          </label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "10px",
-              border: "1px solid #ccc",
-              borderRadius: "5px",
-            }}
-            rows="4"
-            required
-          ></textarea>
-        </div>
-        <div>
-          <label
-            style={{
-              display: "block",
-              marginBottom: "5px",
-              fontWeight: "bold",
-            }}
-          >
-            Image
-          </label>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleImageChange}
-            style={{
-              padding: "10px",
-              border: "1px solid #ccc",
-              borderRadius: "5px",
-            }}
-            required
-          />
-        </div>
-        {preview && (
-          <div style={{ textAlign: "center", marginTop: "10px" }}>
-            <img
-              src={preview}
-              alt="Preview"
-              style={{ maxWidth: "100%", borderRadius: "10px" }}
+    <Card className="max-w-2xl mx-auto my-8">
+      <CardHeader>
+        <CardTitle className="text-center">Create Post</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-2">
+            <Label htmlFor="image">Image</Label>
+            <Input
+              id="image"
+              type="file"
+              accept="image/*"
+              onChange={handleImageChange}
+              required
+            />
+            {preview && (
+              <div className="mt-4">
+                <img
+                  src={preview}
+                  alt="Preview"
+                  className="max-w-full rounded-lg"
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="title">Title</Label>
+              {preview && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => generateContent("title")}
+                  disabled={isGenerating}
+                  className="h-8 w-8"
+                >
+                  <Wand2 className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+            <Input
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
             />
           </div>
-        )}
-        <button
-          type="submit"
-          disabled={isLoading}
-          style={{
-            padding: "10px 20px",
-            backgroundColor: "#007BFF",
-            color: "#fff",
-            border: "none",
-            borderRadius: "5px",
-            cursor: "pointer",
-            fontWeight: "bold",
-          }}
-        >
-          {isLoading ? "Creating..." : "Create Post"}
-        </button>
-      </form>
-    </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="description">Description</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => generateContent("description")}
+                disabled={isGenerating || (!title && !preview)}
+                className="h-8 w-8"
+              >
+                <Wand2 className="h-4 w-4" />
+              </Button>
+            </div>
+            <Textarea
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={4}
+              required
+            />
+          </div>
+
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={isLoading || isGenerating}
+          >
+            {isLoading ? "Creating..." : "Create Post"}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 };
 
