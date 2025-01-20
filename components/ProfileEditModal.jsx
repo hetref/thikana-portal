@@ -13,14 +13,15 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import ImageUpload from "./ImageUpload";
-import { updateProfile, uploadImage } from "@/lib/firebase";
+import { db, storage, updateProfile, uploadImage } from "@/lib/firebase";
+import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
+import { doc, setDoc } from "firebase/firestore";
 
 export default function ProfileEditModal({ isOpen, onClose, currentUser }) {
   const [isBusinessUser, setIsBusinessUser] = useState(
-    currentUser?.isBusinessUser || false
+    currentUser?.role === "business"
   );
   const [profileImageFile, setProfileImageFile] = useState(null);
-  const [bannerImageFile, setBannerImageFile] = useState(null);
   const [coverImageFile, setCoverImageFile] = useState(null);
 
   const {
@@ -36,7 +37,6 @@ export default function ProfileEditModal({ isOpen, onClose, currentUser }) {
       location: currentUser?.location || "",
       website: currentUser?.website || "",
       bio: currentUser?.bio || "",
-      isBusinessUser: isBusinessUser,
     },
   });
 
@@ -53,23 +53,21 @@ export default function ProfileEditModal({ isOpen, onClose, currentUser }) {
       }
 
       if (isBusinessUser) {
-        if (bannerImageFile) {
-          bannerImageUrl = await uploadImage(bannerImageFile);
-        }
         if (coverImageFile) {
           coverImageUrl = await uploadImage(coverImageFile);
         }
       } else {
-        bannerImageUrl = null;
         coverImageUrl = null;
       }
 
-      await updateProfile({
+      const updatedData = {
         ...data,
-        profileImage: profileImageUrl,
-        bannerImage: bannerImageUrl,
-        coverImage: coverImageUrl,
-      });
+        ...(profileImageUrl ? { profilePic: profileImageUrl } : {}),
+        ...(coverImageUrl ? { coverPic: coverImageUrl } : {}),
+      };
+      console.log("UPDATEDDATA", updatedData);
+
+      await updateProfile(updatedData);
       onClose();
     } catch (error) {
       console.error("Error updating profile:", error);
@@ -77,8 +75,33 @@ export default function ProfileEditModal({ isOpen, onClose, currentUser }) {
   };
 
   async function updateProfile(userData) {
-    const userRef = doc(db, "users", userData.uid);
+    const userRef = doc(db, "users", currentUser.uid);
     await setDoc(userRef, userData, { merge: true });
+  }
+
+  async function uploadImage(file, onProgress) {
+    const storageRef = ref(storage, `${currentUser.uid}/profilePhoto`);
+    const uploadTask = uploadBytesResumable(storageRef, file);
+
+    return new Promise((resolve, reject) => {
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => {
+          const progress =
+            (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          if (onProgress) {
+            onProgress(progress);
+          }
+        },
+        (error) => {
+          reject(error);
+        },
+        async () => {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          resolve(downloadURL);
+        }
+      );
+    });
   }
 
   return (
@@ -98,11 +121,6 @@ export default function ProfileEditModal({ isOpen, onClose, currentUser }) {
           />
           {isBusinessUser && (
             <>
-              <ImageUpload
-                label="Banner Image"
-                currentImage={currentUser?.bannerImage}
-                onImageChange={setBannerImageFile}
-              />
               <ImageUpload
                 label="Cover Image"
                 currentImage={currentUser?.coverImage}
@@ -157,20 +175,6 @@ export default function ProfileEditModal({ isOpen, onClose, currentUser }) {
           <div>
             <Label htmlFor="bio">Bio</Label>
             <Textarea id="bio" {...register("bio")} />
-          </div>
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="business-user"
-              checked={isBusinessUser}
-              onCheckedChange={(checked) => {
-                setIsBusinessUser(checked);
-                if (!checked) {
-                  setBannerImageFile(null);
-                  setCoverImageFile(null);
-                }
-              }}
-            />
-            <Label htmlFor="business-user">Business User</Label>
           </div>
           <Button type="submit" className="w-full">
             Save Changes

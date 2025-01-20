@@ -209,7 +209,7 @@ export default function Profile() {
               <Card className="bg-card">
                 <CardContent className="pt-6">
                   <div className="flex flex-col items-center text-center">
-                    <Avatar className="w-24 h-24">
+                    <Avatar className="w-24 h-24 border">
                       <AvatarImage
                         src={userData?.profilePic || "/avatar.png"}
                       />
@@ -257,22 +257,24 @@ export default function Profile() {
                       </div>
                     </div>
                     {userId === user?.uid && (
-                      <Button
-                        className="w-full mt-4"
-                        onClick={() => {
-                          setIsModalOpen(true);
-                          console.log("Edit button clicked", userData);
-                        }}
-                      >
-                        <EditIcon className="w-4 h-4 mr-2" />
-                        Edit Profile
-                      </Button>
+                      <>
+                        <Button
+                          className="w-full mt-4"
+                          onClick={() => {
+                            setIsModalOpen(true);
+                            console.log("Edit button clicked", userData);
+                          }}
+                        >
+                          <EditIcon className="w-4 h-4 mr-2" />
+                          Edit Profile
+                        </Button>
+                        <ProfileEditModal
+                          isOpen={isModalOpen}
+                          onClose={() => setIsModalOpen(false)}
+                          currentUser={userData}
+                        />
+                      </>
                     )}
-                    <ProfileEditModal
-                      isOpen={isModalOpen}
-                      onClose={() => setIsModalOpen(false)}
-                      currentUser={userData}
-                    />
                     <div className="w-full mt-6 space-y-2 text-sm">
                       <div className="flex items-center text-muted-foreground">
                         <MapPinIcon className="w-4 h-4 mr-2" />
