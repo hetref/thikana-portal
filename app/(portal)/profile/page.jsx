@@ -14,6 +14,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogClose,
+  DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -24,6 +26,7 @@ import {
   LinkIcon,
   MapPinIcon,
   Loader2Icon,
+  Images,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import WhoToFollow from "@/components/WhoToFollow";
@@ -38,6 +41,8 @@ import {
   onSnapshot,
 } from "firebase/firestore";
 import ProfilePosts from "@/components/ProfilePosts";
+import ProfileEditModal from "@/components/ProfileEditModal";
+import Chatbot from "@/components/Chatbot";
 
 export default function Profile() {
   const router = useRouter();
@@ -49,6 +54,7 @@ export default function Profile() {
   const userData = useGetUser(userId);
   const { posts, loading, fetchMorePosts, hasMore, error } =
     useGetUserPosts(userId);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   console.log("USERDATA", posts);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -204,7 +210,7 @@ export default function Profile() {
               <Card className="bg-card">
                 <CardContent className="pt-6">
                   <div className="flex flex-col items-center text-center">
-                    <Avatar className="w-24 h-24">
+                    <Avatar className="w-24 h-24 border">
                       <AvatarImage
                         src={userData?.profilePic || "/avatar.png"}
                       />
@@ -240,16 +246,35 @@ export default function Profile() {
                             Posts
                           </div>
                         </div>
+                        <Separator orientation="vertical" />
+                        <div>
+                          <div className="font-semibold">
+                            {userData?.photos?.length || 0}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            Photos
+                          </div>
+                        </div>
                       </div>
                     </div>
                     {userId === user?.uid && (
-                      <Button
-                        className="w-full mt-4"
-                        onClick={() => setShowEditDialog(true)}
-                      >
-                        <EditIcon className="w-4 h-4 mr-2" />
-                        Edit Profile
-                      </Button>
+                      <>
+                        <Button
+                          className="w-full mt-4"
+                          onClick={() => {
+                            setIsModalOpen(true);
+                            console.log("Edit button clicked", userData);
+                          }}
+                        >
+                          <EditIcon className="w-4 h-4 mr-2" />
+                          Edit Profile
+                        </Button>
+                        <ProfileEditModal
+                          isOpen={isModalOpen}
+                          onClose={() => setIsModalOpen(false)}
+                          currentUser={userData}
+                        />
+                      </>
                     )}
                     <div className="w-full mt-6 space-y-2 text-sm">
                       <div className="flex items-center text-muted-foreground">
@@ -300,6 +325,13 @@ export default function Profile() {
                   <HeartIcon className="w-5 h-5" />
                   Likes
                 </TabsTrigger>
+                <TabsTrigger
+                  value="photos"
+                  className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 font-semibold"
+                >
+                  <Images className="w-5 h-5" />
+                  Photos
+                </TabsTrigger>
               </TabsList>
               <TabsContent value="posts" className="p-6">
                 {renderPosts()}
@@ -312,6 +344,57 @@ export default function Profile() {
                     </Card>
                   ))}
                 </div>
+              </TabsContent>
+              <TabsContent value="photos" className="p-6">
+                {userData?.photos && userData.photos.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-4">
+                    {userData.photos.map((photo, index) => (
+                      <Dialog key={index}>
+                        {/* Trigger for the Dialog */}
+                        <DialogTrigger asChild>
+                          <div>
+                            <img
+                              src={photo.photoUrl}
+                              alt={photo.title}
+                              className="w-full h-auto rounded-lg rounded-b-none"
+                            />
+                            <div className="bg-black bg-opacity-90 border-t-2 border-white text-white p-2 rounded-b-lg">
+                              <p>{photo.title}</p>
+                              <p>
+                                {new Date(photo.addedOn).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                        </DialogTrigger>
+
+                        {/* Dialog Content */}
+                        <DialogContent className="w-full max-w-3xl p-4 flex flex-col gap-2 justify-center items-center">
+                          <DialogTitle>{photo.title}</DialogTitle>
+                          <DialogDescription>
+                            {new Date(photo.addedOn).toLocaleDateString()}
+                          </DialogDescription>
+                          <img
+                            src={photo.photoUrl}
+                            alt="Full View"
+                            className="max-w-full rounded-lg max-h-[80svh] max-w-[80vw]]"
+                          />
+                        </DialogContent>
+                      </Dialog>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <p className="text-muted-foreground">No Photos Added Yet</p>
+                    <Button
+                      className="mt-2"
+                      onClick={() => {
+                        /* Add photo logic */
+                      }}
+                    >
+                      Add Photo
+                    </Button>
+                  </div>
+                )}
               </TabsContent>
             </Tabs>
           </div>

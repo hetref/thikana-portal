@@ -79,7 +79,7 @@ export default function Sidebar() {
               href={`/${user.username}?user=${user.uid}`}
               className="flex flex-col items-center justify-center"
             >
-              <Avatar className="w-20 h-20 border-2">
+              <Avatar className="w-20 h-20 border">
                 <AvatarImage
                   src={user.profilePic || ""}
                   alt={user.fullname || "User"}
@@ -97,7 +97,7 @@ export default function Sidebar() {
             </p>
             <div className="w-full">
               <Separator className="my-4" />
-              <div className="flex justify-between">
+              <div className="flex justify-center gap-6">
                 <div>
                   <p className="font-medium">{followingCount || "0"}</p>
                   <p className="text-xs text-muted-foreground">Following</p>
