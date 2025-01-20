@@ -56,21 +56,21 @@ export default function Chatbot() {
   const scrollRef = useRef(null);
   const [suggestions, setSuggestions] = useState([]);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      if (window.scrollY > 200) {
-        setShowChatIcon(true);
-      } else {
-        setShowChatIcon(false);
-        setIsChatOpen(false);
-      }
-    };
-    handleScroll();
-    window.addEventListener("scroll", handleScroll);
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-    };
-  }, []);
+  // useEffect(() => {
+  //   const handleScroll = () => {
+  //     if (window.scrollY > 200) {
+  //       setShowChatIcon(true);
+  //     } else {
+  //       setShowChatIcon(false);
+  //       // setIsChatOpen(false);
+  //     }
+  //   };
+  //   handleScroll();
+  //   window.addEventListener("scroll", handleScroll);
+  //   return () => {
+  //     window.removeEventListener("scroll", handleScroll);
+  //   };
+  // }, []);
 
   const toggleChat = () => {
     setIsChatOpen(!isChatOpen);
@@ -107,7 +107,7 @@ export default function Chatbot() {
   };
 
   return (
-    <div>
+    <div style={{ zIndex: "9999999" }}>
       <AnimatePresence>
         <motion.div className="fixed bottom-4 right-4 z-80">
           <Button

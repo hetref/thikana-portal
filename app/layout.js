@@ -1,6 +1,7 @@
 import { ThemeProvider } from "@/components/theme-provider"
 import { geistSans } from "@/lib/fonts"
 import "@/app/globals.css"
+import Chatbot from "@/components/Chatbot"
 
 export const metadata = {
   title: "Thikana",
@@ -15,6 +16,7 @@ export default function RootLayout({ children }) {
           <div className="relative flex min-h-screen flex-col">
             <main className="flex-1">{children}</main>
           </div>
+          <Chatbot />
         </ThemeProvider>
       </body>
     </html>
