@@ -415,7 +415,9 @@ export default function Profile() {
                     </Card>
                   ))}
                 </div> */}
-                <ShowProductsTabContent userId={userId} />
+                {userData && user && (
+                  <ShowProductsTabContent userId={userId} userData={userData} />
+                )}
               </TabsContent>
             </Tabs>
           </div>

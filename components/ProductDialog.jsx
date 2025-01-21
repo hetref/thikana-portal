@@ -11,7 +11,7 @@ import { ShoppingCart } from "lucide-react";
 import { useState } from "react";
 import toast from "react-hot-toast";
 
-export function ProductDialog({ product, isOpen, onClose, userId }) {
+export function ProductDialog({ product, isOpen, onClose, userId, userData }) {
   const [isLoading, setIsLoading] = useState(false);
 
   const createRazorpayOrder = async (userId, amount) => {
@@ -36,17 +36,17 @@ export function ProductDialog({ product, isOpen, onClose, userId }) {
       key: keyId,
       amount: amount * 100, // Razorpay expects amount in paise
       currency: "INR",
-      name: "Your Company Name",
-      description: "Test Transaction",
+      name: userData.name,
+      description: "Buy Our Produt",
       order_id: order.id,
       handler: function (response) {
         toast.success("Payment successful!");
         onClose();
       },
       prefill: {
-        name: "Customer Name",
-        email: "customer@example.com",
-        contact: "9999999999",
+        name: userData.name,
+        email: userData.email,
+        contact: userData.phone,
       },
       notes: {
         address: "Razorpay Corporate Office",
