@@ -3,7 +3,7 @@ import { collection, getDocs, query } from "firebase/firestore";
 import { db } from "@/lib/firebase"; // Ensure you have your Firebase setup in firebase.js
 import { ProductGrid } from "../ProductGrid";
 
-const ShowProductsTabContent = ({ userId }) => {
+const ShowProductsTabContent = ({ userId, userData }) => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -43,7 +43,7 @@ const ShowProductsTabContent = ({ userId }) => {
       {products.length === 0 ? (
         <p>No products found.</p>
       ) : (
-        <ProductGrid products={products} userId={userId} />
+        <ProductGrid products={products} userId={userId} userData={userData} />
       )}
     </div>
   );
