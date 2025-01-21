@@ -1,6 +1,6 @@
 "use client";
 
-import TopNavbar from "@/components/TopNavbar";
+import TopNavbar from "../../components/TopNavbar";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { get, ref } from "firebase/database";
