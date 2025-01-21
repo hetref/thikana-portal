@@ -2,6 +2,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { geistSans } from "@/lib/fonts"
 import "@/app/globals.css"
 import Chatbot from "@/components/Chatbot"
+import { Toaster } from "react-hot-toast"
 
 export const metadata = {
   title: "Thikana",
@@ -17,6 +18,7 @@ export default function RootLayout({ children }) {
             <main className="flex-1">{children}</main>
           </div>
           <Chatbot />
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>

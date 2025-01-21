@@ -15,6 +15,7 @@ import {
 } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 export default function WhoToFollow() {
   const [users, setUsers] = useState([]);
@@ -108,12 +109,15 @@ export default function WhoToFollow() {
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={user.profilePic || "/avatar.png"} />
                   </Avatar>
-                  <div className="grid gap-0.5 text-sm">
+                  <Link
+                    href={`/${user.username}?user=${user.id}`}
+                    className="grid gap-0.5 text-sm"
+                  >
                     <span className="font-medium">{user.name}</span>
                     <span className="text-muted-foreground">
                       @{user.username}
                     </span>
-                  </div>
+                  </Link>
                 </div>
                 <Button
                   size="sm"

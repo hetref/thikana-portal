@@ -55,7 +55,7 @@ export default function Profile() {
   const { posts, loading, fetchMorePosts, hasMore, error } =
     useGetUserPosts(userId);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  console.log("USERDATA", posts);
+  console.log("USERDATA", userData);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editForm, setEditForm] = useState({
     name: "",
@@ -88,7 +88,6 @@ export default function Profile() {
 
   useEffect(() => {
     if (!userId) return;
-
     const followersRef = collection(db, "users", userId, "followers");
     const followingRef = collection(db, "users", userId, "following");
 
@@ -269,11 +268,13 @@ export default function Profile() {
                           <EditIcon className="w-4 h-4 mr-2" />
                           Edit Profile
                         </Button>
-                        <ProfileEditModal
-                          isOpen={isModalOpen}
-                          onClose={() => setIsModalOpen(false)}
-                          currentUser={userData}
-                        />
+                        {userData && (
+                          <ProfileEditModal
+                            isOpen={isModalOpen}
+                            onClose={() => setIsModalOpen(false)}
+                            currentUser={userData}
+                          />
+                        )}
                       </>
                     )}
                     <div className="w-full mt-6 space-y-2 text-sm">
@@ -366,7 +367,6 @@ export default function Profile() {
                             </div>
                           </div>
                         </DialogTrigger>
-
                         {/* Dialog Content */}
                         <DialogContent className="w-full max-w-3xl p-4 flex flex-col gap-2 justify-center items-center">
                           <DialogTitle>{photo.title}</DialogTitle>
