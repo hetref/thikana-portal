@@ -1,6 +1,7 @@
 import Sidebar from "@/components/Sidebar";
 import WhoToFollow from "@/components/WhoToFollow";
 import PostCard from "@/components/PostCard";
+import Chatbot from "@/components/Chatbot";
 
 const FeedPage = () => {
   return (
@@ -18,6 +19,11 @@ const FeedPage = () => {
           <aside className="hidden lg:block">
             <div className="sticky top-20">
               <WhoToFollow />
+            </div>
+          </aside>
+          <aside>
+            <div className="fixed bottom-4 right-4">
+              <Chatbot />
             </div>
           </aside>
         </div>

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import * as React from "react"
 import { cva } from "class-variance-authority";
 
@@ -32,3 +33,15 @@ function Badge({
 }
 
 export { Badge, badgeVariants }
+=======
+export function Badge({ children, onClick, className = "" }) {
+    return (
+        <span
+            className={`inline-flex items-center px-3 py-1 text-sm font-medium text-gray-700 bg-gray-200 rounded-full cursor-pointer hover:bg-gray-300 ${className}`}
+            onClick={onClick}
+        >
+            {children}
+        </span>
+    );
+}
+>>>>>>> 895dc218c399f6bc73343c388631c13d74de1f42
