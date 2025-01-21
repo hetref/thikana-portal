@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 import { doc, setDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
+
 const CreatePost = () => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -12,6 +13,7 @@ const CreatePost = () => {
   const [preview, setPreview] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file && file.type.startsWith("image/")) {
@@ -34,7 +36,7 @@ const CreatePost = () => {
 
     setIsLoading(true);
     const storage = getStorage();
-    const fileName = Date.now() + "-" + title;
+    const fileName = `${Date.now()}-${uuidv4()}`;
     const storageRef = ref(
       storage,
       `${auth.currentUser.uid}/posts/${fileName}`
@@ -44,21 +46,33 @@ const CreatePost = () => {
       await uploadBytes(storageRef, image);
       const downloadURL = await getDownloadURL(storageRef);
 
-      alert("Post created successfully! Image URL: " + downloadURL);
-      await setDoc(doc(db, "posts", uuidv4()), {
-        title: title,
-        description: description,
-        image: downloadURL,
-        uid: auth.currentUser.uid,
-        createdAt: new Date(),
-        likes: 0,
-        comments: [],
-        imageRef: fileName,
-        user: "/users/" + auth.currentUser.uid,
-      }).then(() => {
-        router.push("/");
-        console.log("Post created successfully!");
+      const postId = uuidv4();
+      const createdAt = new Date();
+      const userId = auth.currentUser.uid;
+
+      await setDoc(doc(db, "posts", postId), {
+        postId: postId,
+        businessId: userId, // Assuming the user is the business owner
+        mediaUrl: [downloadURL],
+        caption: description,
+        categories: [], // Placeholder for AI-detected categories or tags
+        detectedTags: [], // Placeholder for AI-generated tags
+        location: null, // Can be updated with geolocation data if available
+        createdAt: createdAt,
+        engagement: {
+          likes: 0,
+          commentsCount: 0,
+          shares: 0,
+          saves: 0,
+        },
+        analytics: {
+          views: 0,
+          timeSpent: 0,
+        },
       });
+
+      alert("Post created successfully!");
+      router.push("/");
     } catch (error) {
       console.error("Error uploading image:", error);
     } finally {
