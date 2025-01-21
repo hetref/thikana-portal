@@ -1,13 +1,17 @@
 "use client";
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { MapPinIcon, LinkIcon } from "lucide-react";
+import { MapPinIcon, LinkIcon, LoaderCircle } from "lucide-react";
 import Link from "next/link";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import useGetUser from "@/hooks/useGetUser";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { collection, onSnapshot } from "firebase/firestore";
+import { sendEmailVerification } from "firebase/auth";
+// import toast from "react-hot-toast";
 
 function DefaultSidebar() {
   return (
@@ -39,10 +43,51 @@ function DefaultSidebar() {
 }
 
 export default function Sidebar() {
-  const user = auth.currentUser;
-  const userData = useGetUser(auth.currentUser?.uid || null);
+  const userId = auth.currentUser?.uid || null;
+  const user = useGetUser(userId);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
 
-  if (!user) return <DefaultSidebar />;
+  useEffect(() => {
+    if (!userId) return;
+
+    const followersRef = collection(db, "users", userId, "followers");
+    const followingRef = collection(db, "users", userId, "following");
+
+    // Set up real-time listener for followers count
+    const unsubscribeFollowers = onSnapshot(followersRef, (snapshot) => {
+      setFollowersCount(snapshot.size); // Update followers count in real-time
+    });
+
+    // Set up real-time listener for following count
+    const unsubscribeFollowing = onSnapshot(followingRef, (snapshot) => {
+      setFollowingCount(snapshot.size); // Update following count in real-time
+    });
+
+    return () => {
+      unsubscribeFollowers(); // Cleanup on unmount
+      unsubscribeFollowing(); // Cleanup on unmount
+    };
+  }, [userId]);
+
+  const verifyEmailHandler = async () => {
+    await sendEmailVerification(auth.currentUser)
+      .then(() => {
+        toast.success("Verification email sent!");
+      })
+      .catch((error) => {
+        toast.error("Error sending verification email: " + error.code);
+      });
+  };
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center">
+        <h2>Loading ...</h2>
+        <LoaderCircle className="animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="sticky top-20">
@@ -50,37 +95,42 @@ export default function Sidebar() {
         <CardContent className="pt-6">
           <div className="flex flex-col items-center text-center">
             <Link
-              href={`/${userData?.username}?user=${userData?.uid}`}
+              href="/profile"
               className="flex flex-col items-center justify-center"
             >
-              <Avatar className="w-20 h-20 border-2">
+              <Avatar className="w-20 h-20 border">
                 <AvatarImage
-                  src={userData?.profilePic || ""}
-                  alt={userData?.fullname || "User"}
+                  src={user.profilePic || ""}
+                  alt={user.fullname || "User"}
                 />
               </Avatar>
               <div className="mt-4 space-y-1">
-                <h3 className="font-semibold">
-                  {userData?.username || "Guest_user"}
-                </h3>
+                <h3 className="font-semibold">{user.name || "Guest_user"}</h3>
                 <p className="text-sm text-muted-foreground">
-                  {userData?.email}
+                  @{user.username}
                 </p>
               </div>
             </Link>
-            <p className="mt-3 text-sm text-muted-foreground">
-              {user.emailVerified ? "Verified User" : "Email not verified"}
-            </p>
+            {!auth?.currentUser.emailVerified && (
+              <>
+                <p className="mt-3 text-sm text-muted-foreground">
+                  <p>Email not verified</p>
+                  <Button onClick={verifyEmailHandler} variant="ghost">
+                    Verify Email
+                  </Button>
+                </p>
+              </>
+            )}
             <div className="w-full">
               <Separator className="my-4" />
-              <div className="flex justify-between">
+              <div className="flex justify-center gap-6">
                 <div>
-                  <p className="font-medium">{userData?.following || "0"}</p>
+                  <p className="font-medium">{followingCount || "0"}</p>
                   <p className="text-xs text-muted-foreground">Following</p>
                 </div>
                 <Separator orientation="vertical" />
                 <div>
-                  <p className="font-medium">{userData?.followers || "0"}</p>
+                  <p className="font-medium">{followersCount || "0"}</p>
                   <p className="text-xs text-muted-foreground">Followers</p>
                 </div>
               </div>
@@ -89,11 +139,11 @@ export default function Sidebar() {
             <div className="w-full space-y-2 text-sm">
               <div className="flex items-center text-muted-foreground">
                 <MapPinIcon className="w-4 h-4 mr-2" />
-                {userData?.location || "No location"}
+                {user.location || "No location"}
               </div>
               <div className="flex items-center text-muted-foreground">
                 <LinkIcon className="w-4 h-4 mr-2 shrink-0" />
-                {userData?.website || "No website"}
+                {user.website || "No website"}
               </div>
             </div>
           </div>

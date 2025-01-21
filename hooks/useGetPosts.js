@@ -6,6 +6,7 @@ import {
   limit,
   startAfter,
   getDocs,
+  onSnapshot,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -19,37 +20,40 @@ export const useGetUserPosts = (userId) => {
   const [hasMore, setHasMore] = useState(true); // To track if more posts exist
 
   // Fetch initial posts
-  const fetchInitialPosts = useCallback(async () => {
+  const fetchInitialPosts = useCallback(() => {
     if (!userId) return;
     console.log("Fetching initial posts...");
 
     setLoading(true);
-    try {
-      const q = query(
-        collection(db, "posts"),
-        where("uid", "==", userId),
-        limit(POSTS_LIMIT)
-      );
-      const querySnapshot = await getDocs(q);
+    const q = query(
+      collection(db, "posts"),
+      where("uid", "==", userId),
+      limit(POSTS_LIMIT)
+    );
 
+    // Use onSnapshot for real-time updates
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
       if (!querySnapshot.empty) {
         const newPosts = querySnapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }));
         setPosts(newPosts);
-        console.log("posts" + posts);
+        console.log("posts" + newPosts); // Updated to log newPosts
         setLastVisible(querySnapshot.docs[querySnapshot.docs.length - 1]);
         setHasMore(querySnapshot.docs.length === POSTS_LIMIT); // Check if more posts exist
-        // console.log(newPosts);
       } else {
         setHasMore(false); // No more posts
       }
-    } catch (err) {
+      setLoading(false);
+    }, (err) => {
       console.error("Error fetching posts:", err);
       setError(err);
-    }
-    setLoading(false);
+      setLoading(false);
+    });
+
+    // Cleanup function to unsubscribe from the listener
+    return () => unsubscribe();
   }, [userId]);
 
   // Fetch more posts for pagination

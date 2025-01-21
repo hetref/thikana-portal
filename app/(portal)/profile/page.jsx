@@ -14,6 +14,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogClose,
+  DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -24,23 +26,39 @@ import {
   LinkIcon,
   MapPinIcon,
   Loader2Icon,
+  Images,
+  SquareChartGantt,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import WhoToFollow from "@/components/WhoToFollow";
 import { useGetUserPosts } from "@/hooks/useGetPosts";
 import useGetUser from "@/hooks/useGetUser";
 import { auth, db } from "@/lib/firebase";
-import { collection, doc, getDoc, getDocs } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  onSnapshot,
+} from "firebase/firestore";
 import ProfilePosts from "@/components/ProfilePosts";
+import ProfileEditModal from "@/components/ProfileEditModal";
+import Chatbot from "@/components/Chatbot";
+import Link from "next/link";
+import ShowProductsTabContent from "@/components/profile/ShowProductsTabContent";
 
 export default function Profile() {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [likedPosts, setLikedPosts] = useState([]);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
   const userId = user?.uid;
   const userData = useGetUser(userId);
   const { posts, loading, fetchMorePosts, hasMore, error } =
     useGetUserPosts(userId);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  console.log("USERDATA", userData);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editForm, setEditForm] = useState({
     name: "",
@@ -57,7 +75,6 @@ export default function Profile() {
         router.push("/login");
       }
     });
-
     return () => unsubscribe();
   }, [router]);
 
@@ -70,11 +87,32 @@ export default function Profile() {
         website: userData?.website || "",
       });
     }
-  }, [user, userData]);
+  }, [userData]);
+
+  useEffect(() => {
+    if (!userId) return;
+    const followersRef = collection(db, "users", userId, "followers");
+    const followingRef = collection(db, "users", userId, "following");
+
+    // Set up real-time listener for followers count
+    const unsubscribeFollowers = onSnapshot(followersRef, (snapshot) => {
+      setFollowersCount(snapshot.size); // Update followers count in real-time
+    });
+
+    // Set up real-time listener for following count
+    const unsubscribeFollowing = onSnapshot(followingRef, (snapshot) => {
+      setFollowingCount(snapshot.size); // Update following count in real-time
+    });
+
+    return () => {
+      unsubscribeFollowers(); // Cleanup on unmount
+      unsubscribeFollowing(); // Cleanup on unmount
+    };
+  }, [userId]);
 
   const handleEditSubmit = async () => {
     // TODO: Implement profile update logic
-    setShowEditDialog(false);
+    setShowEditDialog(true);
   };
 
   const handleLoadMore = () => {
@@ -107,13 +145,11 @@ export default function Profile() {
     }
     return (
       <div className="space-y-4">
-        {posts.map((post) => {
-          return (
-            <Card key={post.id} className="p-4">
-              <ProfilePosts post={post} userData={userData} />
-            </Card>
-          );
-        })}
+        {posts.map((post) => (
+          <Card key={post.id} className="p-4">
+            <ProfilePosts post={post} userData={userData} />
+          </Card>
+        ))}
         {hasMore && (
           <div className="flex justify-center pt-4">
             <Button
@@ -136,26 +172,26 @@ export default function Profile() {
     );
   };
 
-  const getLikedPosts = async () => {
+  const getLikedPosts = () => {
     if (!user) return;
-    let tempLikedPosts = [];
-    try {
-      const querySnapshot = await getDocs(
-        collection(db, "users", user.uid, "postlikes")
-      );
-      for (const docSnapshot of querySnapshot.docs) {
-        const postRef = doc(db, "posts", docSnapshot.id);
-        const postDoc = await getDoc(postRef);
-        if (postDoc.exists()) {
-          tempLikedPosts.push(postDoc.data());
-        } else {
-          console.log("Post does not exist:", docSnapshot.id);
-        }
+    const unsubscribe = onSnapshot(
+      collection(db, "users", user.uid, "postlikes"),
+      async (querySnapshot) => {
+        const postIds = querySnapshot.docs.map((doc) => doc.id);
+        const postDocs = await Promise.all(
+          postIds.map((id) => getDoc(doc(db, "posts", id)))
+        );
+        const tempLikedPosts = postDocs
+          .filter((doc) => doc.exists())
+          .map((doc) => ({ ...doc.data(), id: doc.id }));
+        console.log("tempLikedPosts", tempLikedPosts);
+        setLikedPosts(tempLikedPosts);
+      },
+      (error) => {
+        console.error("Error fetching liked posts:", error);
       }
-      setLikedPosts(tempLikedPosts);
-    } catch (error) {
-      console.error("Error fetching liked posts:", error);
-    }
+    );
+    return () => unsubscribe(); // Cleanup subscription on unmount
   };
 
   useEffect(() => {
@@ -164,41 +200,43 @@ export default function Profile() {
 
   return (
     <div className="flex items-center justify-center w-full">
-      <div className="max-w-7xl w-full grid grid-cols-1 gap-0 py-8 lg:grid-cols-[300px_minmax(0,1fr)_300px] lg:gap-0.5">
-        <aside className="hidden lg:block">
+      <div className="max-w-7xl w-full flex justify-center gap-6">
+        {/* <aside className="hidden lg:block">
           <div className="sticky top-20">
             <Sidebar />
           </div>
-        </aside>
-        <main className="max-w-[580px] mx-auto w-full px-2">
+        </aside> */}
+        <main className="mx-auto w-full md:w-4/6 px-2 mt-[15px]">
           <div className="grid grid-cols-1 gap-6">
             <div className="w-full">
               <Card className="bg-card">
                 <CardContent className="pt-6">
                   <div className="flex flex-col items-center text-center">
-                    <Avatar className="w-24 h-24">
+                    <Avatar className="w-24 h-24 border">
                       <AvatarImage
                         src={userData?.profilePic || "/avatar.png"}
                       />
                     </Avatar>
                     <h1 className="mt-4 text-2xl font-bold">
-                      {user?.displayName || "User"}
+                      {userData?.name}
                     </h1>
-                    <p className="text-muted-foreground">{user?.email}</p>
+                    <p className="text-muted-foreground">
+                      @{userData?.username}
+                    </p>
                     <p className="mt-2 text-sm">
                       {userData?.bio || "No bio yet"}
                     </p>
                     <div className="w-full mt-6">
                       <div className="flex justify-between mb-4">
                         <div>
-                          <div className="font-semibold">0</div>
+                          <div className="font-semibold">{followingCount}</div>
                           <div className="text-sm text-muted-foreground">
                             Following
                           </div>
                         </div>
                         <Separator orientation="vertical" />
                         <div>
-                          <div className="font-semibold">0</div>
+                          <div className="font-semibold">{followersCount}</div>
                           <div className="text-sm text-muted-foreground">
                             Followers
                           </div>
@@ -210,16 +248,38 @@ export default function Profile() {
                             Posts
                           </div>
                         </div>
+                        <Separator orientation="vertical" />
+                        <div>
+                          <div className="font-semibold">
+                            {userData?.photos?.length || 0}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            Photos
+                          </div>
+                        </div>
                       </div>
                     </div>
                     {userId === user?.uid && (
-                      <Button
-                        className="w-full mt-4"
-                        onClick={() => setShowEditDialog(true)}
-                      >
-                        <EditIcon className="w-4 h-4 mr-2" />
-                        Edit Profile
-                      </Button>
+                      <>
+                        <Link
+                          className="w-full mt-4 flex items-center justify-center gap-2 bg-black/90 px-4 py-2 rounded-md text-white hover:bg-black transition-all ease-in-out duration-200"
+                          // onClick={() => {
+                          //   setIsModalOpen(true);
+                          //   console.log("Edit button clicked", userData);
+                          // }}
+                          href="/profile/settings"
+                        >
+                          <EditIcon className="w-4 h-4 mr-2" />
+                          Edit Profile
+                        </Link>
+                        {userData && (
+                          <ProfileEditModal
+                            isOpen={isModalOpen}
+                            onClose={() => setIsModalOpen(false)}
+                            currentUser={userData}
+                          />
+                        )}
+                      </>
                     )}
                     <div className="w-full mt-6 space-y-2 text-sm">
                       <div className="flex items-center text-muted-foreground">
@@ -270,25 +330,99 @@ export default function Profile() {
                   <HeartIcon className="w-5 h-5" />
                   Likes
                 </TabsTrigger>
+                <TabsTrigger
+                  value="photos"
+                  className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 font-semibold"
+                >
+                  <Images className="w-5 h-5" />
+                  Photos
+                </TabsTrigger>
+                <TabsTrigger
+                  value="products"
+                  className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 font-semibold"
+                >
+                  <SquareChartGantt className="w-5 h-5" />
+                  Products
+                </TabsTrigger>
               </TabsList>
               <TabsContent value="posts" className="p-6">
                 {renderPosts()}
               </TabsContent>
               <TabsContent value="likes" className="p-6">
                 <div className="space-y-4">
-                  {likedPosts.map((post) => {
-                    return (
-                      <Card key={post.id} className="p-4">
-                        <ProfilePosts post={post} userData={userData} />
-                      </Card>
-                    );
-                  })}
+                  {likedPosts.map((post, index) => (
+                    <Card key={index} className="p-4">
+                      <ProfilePosts post={post} userData={userData} />
+                    </Card>
+                  ))}
                 </div>
+              </TabsContent>
+              <TabsContent value="photos" className="p-6">
+                {userData?.photos && userData.photos.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-4">
+                    {userData.photos.map((photo, index) => (
+                      <Dialog key={index}>
+                        {/* Trigger for the Dialog */}
+                        <DialogTrigger asChild>
+                          <div>
+                            <img
+                              src={photo.photoUrl}
+                              alt={photo.title}
+                              className="w-full h-auto rounded-lg rounded-b-none"
+                            />
+                            <div className="bg-black bg-opacity-90 border-t-2 border-white text-white p-2 rounded-b-lg">
+                              <p>{photo.title}</p>
+                              <p>
+                                {new Date(photo.addedOn).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                        </DialogTrigger>
+                        {/* Dialog Content */}
+                        <DialogContent className="w-full max-w-3xl p-4 flex flex-col gap-2 justify-center items-center">
+                          <DialogTitle>{photo.title}</DialogTitle>
+                          <DialogDescription>
+                            {new Date(photo.addedOn).toLocaleDateString()}
+                          </DialogDescription>
+                          <img
+                            src={photo.photoUrl}
+                            alt="Full View"
+                            className="max-w-full rounded-lg max-h-[80svh] max-w-[80vw]]"
+                          />
+                        </DialogContent>
+                      </Dialog>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <p className="text-muted-foreground">No Photos Added Yet</p>
+                    <Button
+                      className="mt-2"
+                      onClick={() => {
+                        /* Add photo logic */
+                      }}
+                    >
+                      Add Photo
+                    </Button>
+                  </div>
+                )}
+              </TabsContent>
+              <TabsContent value="products" className="p-6">
+                {/* <div className="space-y-4">
+                  {likedPosts.map((post, index) => (
+                    <Card key={index} className="p-4">
+                      <ProfilePosts post={post} userData={userData} />
+                    </Card>
+                  ))}
+                </div> */}
+                {userData && user && (
+                  <ShowProductsTabContent userId={userId} userData={userData} />
+                )}
               </TabsContent>
             </Tabs>
           </div>
         </main>
-        <aside className="hidden lg:block">
+        <aside className="hidden lg:block w-2/6">
           <WhoToFollow />
         </aside>
       </div>

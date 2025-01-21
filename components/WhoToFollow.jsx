@@ -15,96 +15,84 @@ import {
 } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 export default function WhoToFollow() {
   const [users, setUsers] = useState([]);
   const [following, setFollowing] = useState(new Set());
-  const [isLoading, setIsLoading] = useState({});
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      const querySnapshot = await getDocs(collection(db, "users"));
-      const usersList = [];
-      querySnapshot.forEach((doc) => {
-        if (doc.id !== auth.currentUser?.uid) {
-          // Don't show current user
-          usersList.push({ id: doc.id, ...doc.data() });
-        }
-      });
-      setUsers(usersList);
-    };
-    fetchUsers();
-  }, []);
+    if (!auth.currentUser) return;
 
-  // Listen to current user's following collection
-  useEffect(() => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) return;
+    const unsubscribeUsers = onSnapshot(
+      query(
+        collection(db, "users"),
+        where("uid", "not-in", [auth.currentUser.uid])
+      ),
+      (snapshot) => {
+        const usersList = [];
+        snapshot.forEach((doc) =>
+          usersList.push({ id: doc.id, ...doc.data() })
+        );
+        setUsers(usersList);
+      }
+    );
 
-    const unsubscribe = onSnapshot(
-      collection(db, "users", currentUser.uid, "following"),
+    const unsubscribeFollowing = onSnapshot(
+      collection(db, "users", auth.currentUser.uid, "following"),
       (snapshot) => {
         const followingSet = new Set();
-        snapshot.forEach((doc) => {
-          followingSet.add(doc.data().uid);
-        });
+        snapshot.forEach((doc) => followingSet.add(doc.data().uid));
         setFollowing(followingSet);
       }
     );
 
-    return () => unsubscribe();
-  }, []);
+    return () => {
+      unsubscribeUsers();
+      unsubscribeFollowing();
+    };
+  }, [auth.currentUser]);
 
   const handleFollow = async (userId) => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) return;
-
-    setIsLoading((prev) => ({ ...prev, [userId]: true }));
-
+    if (!auth.currentUser) return;
+    setFollowing((prev) => new Set(prev).add(userId));
     try {
-      // Add to the target user's followers collection
-      await setDoc(doc(db, "users", userId, "followers", currentUser.uid), {
-        uid: currentUser.uid,
-        timestamp: new Date(),
-      });
-
-      // Add to the current user's following collection
-      await setDoc(doc(db, "users", currentUser.uid, "following", userId), {
-        uid: userId,
-        timestamp: new Date(),
-      });
-
+      await Promise.all([
+        setDoc(doc(db, "users", userId, "followers", auth.currentUser.uid), {
+          uid: auth.currentUser.uid,
+          timestamp: new Date(),
+        }),
+        setDoc(doc(db, "users", auth.currentUser.uid, "following", userId), {
+          uid: userId,
+          timestamp: new Date(),
+        }),
+      ]);
       console.log(`Successfully followed user with ID: ${userId}`);
     } catch (error) {
       console.error("Error following user: ", error);
-    } finally {
-      setIsLoading((prev) => ({ ...prev, [userId]: false }));
     }
   };
 
   const handleUnfollow = async (userId) => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) return;
-
-    setIsLoading((prev) => ({ ...prev, [userId]: true }));
-
+    if (!auth.currentUser) return;
+    setFollowing((prev) => {
+      const updatedFollowing = new Set(prev);
+      updatedFollowing.delete(userId);
+      return updatedFollowing;
+    });
     try {
-      // Remove from the target user's followers collection
-      await deleteDoc(doc(db, "users", userId, "followers", currentUser.uid));
-
-      // Remove from the current user's following collection
-      await deleteDoc(doc(db, "users", currentUser.uid, "following", userId));
-
+      await Promise.all([
+        deleteDoc(doc(db, "users", userId, "followers", auth.currentUser.uid)),
+        deleteDoc(doc(db, "users", auth.currentUser.uid, "following", userId)),
+      ]);
       console.log(`Successfully unfollowed user with ID: ${userId}`);
     } catch (error) {
       console.error("Error unfollowing user: ", error);
-    } finally {
-      setIsLoading((prev) => ({ ...prev, [userId]: false }));
     }
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 sticky top-[80px]">
       <Card>
         <CardHeader>
           <CardTitle className="text-xl">Who to Follow</CardTitle>
@@ -114,32 +102,41 @@ export default function WhoToFollow() {
           <div className="flex flex-col items-center gap-2">
             {users.map((user) => (
               <div
-                className="flex items-center justify-between gap-2 border p-3 rounded-full w-full"
+                className="flex items-center justify-between gap-4 border p-3 rounded-md w-full"
                 key={user.id}
               >
-                <div className="flex items-center gap-2">
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={user.profilePic || "/avatar.png"} />
-                  </Avatar>
-                  <div className="grid gap-0.5 text-sm">
-                    <span className="font-medium">{user.name}</span>
-                    <span className="text-muted-foreground">
-                      @{user.username}
-                    </span>
+                {/* <Avatar className="h-10 w-10">
+                  <AvatarImage src={user.profilePic || "/avatar.png"} />
+                </Avatar> */}
+                <div className="flex flex-col justify-center w-full gap-2">
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/${user.username}?user=${user.id}`}
+                      className="grid gap-0.5 text-sm"
+                    >
+                      <span className="font-medium">{user.name}</span>
+                      <span className="text-muted-foreground">
+                        @{user.username}
+                      </span>
+                    </Link>
                   </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className={`${
+                      following.has(user.id)
+                        ? "bg-red-500 text-primary-foreground hover:bg-red-400 hover:text-white"
+                        : ""
+                    }`}
+                    onClick={() =>
+                      following.has(user.id)
+                        ? handleUnfollow(user.id)
+                        : handleFollow(user.id)
+                    }
+                  >
+                    {following.has(user.id) ? "Unfollow" : "Follow"}
+                  </Button>
                 </div>
-                <Button
-                  size="sm"
-                  variant={following.has(user.id) ? "destructive" : "outline"}
-                  onClick={() =>
-                    following.has(user.id)
-                      ? handleUnfollow(user.id)
-                      : handleFollow(user.id)
-                  }
-                  disabled={isLoading[user.id]}
-                >
-                  {following.has(user.id) ? "Unfollow" : "Follow"}
-                </Button>
               </div>
             ))}
           </div>
