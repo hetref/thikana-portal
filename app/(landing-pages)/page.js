@@ -1,12 +1,15 @@
-import TopNavbar from "@/components/TopNavbar";
+import SparklesText from "@/components/ui/sparkles-text";
+import { TextGenerateEffect } from "@/components/ui/text-generate-effect";
 
 export default function Home() {
   return (
-    <div>
-      {/* <TopNavbar /> */}
-      <div className="flex h-[300px] flex-col items-center justify-center gap-6 text-xl font-semibold p-6 md:p-10">
-        Landing Page
+    <div className="relative min-h-screen overflow-hidden">
+      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen text-center text-white">
+        <SparklesText text="Thikana Portal" />
+        <TextGenerateEffect words="Aurora Text Effect" />
       </div>
     </div>
   );
+
 }
+

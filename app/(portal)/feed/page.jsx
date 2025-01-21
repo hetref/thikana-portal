@@ -16,6 +16,7 @@ import {
   arrayRemove,
   increment,
 } from "firebase/firestore";
+import Chatbot from "@/components/Chatbot";
 
 const FeedPage = () => {
   const [posts, setPosts] = useState([]);
@@ -186,6 +187,11 @@ const FeedPage = () => {
           <aside className="hidden lg:block">
             <div className="sticky top-20">
               <WhoToFollow />
+            </div>
+          </aside>
+          <aside>
+            <div className="fixed bottom-4 right-4">
+              <Chatbot />
             </div>
           </aside>
         </div>

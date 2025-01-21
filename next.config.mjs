@@ -5,11 +5,9 @@ const nextConfig = {
       {
         protocol: "https",
         hostname: "firebasestorage.googleapis.com",
-        port: "",
-        pathname: "/v0/b/**", // Match the standard Firebase Storage paths
-      },
-    ],
-  },
+      }
+    ]
+  }
 };
 
 export default nextConfig;

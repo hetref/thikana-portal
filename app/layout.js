@@ -1,6 +1,9 @@
 import { ThemeProvider } from "@/components/theme-provider"
 import { geistSans } from "@/lib/fonts"
 import "@/app/globals.css"
+import Chatbot from "@/components/Chatbot"
+import { Toaster } from "react-hot-toast"
+import Script from "next/script"
 
 export const metadata = {
   title: "Thikana",
@@ -15,7 +18,10 @@ export default function RootLayout({ children }) {
           <div className="relative flex min-h-screen flex-col">
             <main className="flex-1">{children}</main>
           </div>
+          <Chatbot />
+          <Toaster />
         </ThemeProvider>
+        <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" />
       </body>
     </html>
   )

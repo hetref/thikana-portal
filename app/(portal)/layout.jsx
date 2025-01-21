@@ -5,14 +5,15 @@ import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { get, ref } from "firebase/database";
 import { doc, getDoc } from "firebase/firestore";
-import { redirect } from "next/navigation";
+import { redirect, useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 
 const layout = ({ children }) => {
+  const router = useRouter();
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        redirect("/");
+        router.push("/");
       }
     });
 
