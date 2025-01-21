@@ -11,6 +11,8 @@ import useGetUser from "@/hooks/useGetUser";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { collection, onSnapshot } from "firebase/firestore";
+import { sendEmailVerification } from "firebase/auth";
+import toast from "react-hot-toast";
 
 function DefaultSidebar() {
   return (
@@ -68,7 +70,22 @@ export default function Sidebar() {
     };
   }, [user]);
 
-  if (!user) return <DefaultSidebar />;
+  const verifyEmailHandler = async () => {
+    await sendEmailVerification(auth.currentUser)
+      .then(() => {
+        toast.success("Verification email sent!");
+      })
+      .catch((error) => {
+        toast.error("Error sending verification email: " + error.code);
+      });
+  };
+
+  if (!user)
+    return (
+      <div>
+        <h2>Loading ...</h2>
+      </div>
+    );
 
   return (
     <div className="sticky top-20">
@@ -76,7 +93,7 @@ export default function Sidebar() {
         <CardContent className="pt-6">
           <div className="flex flex-col items-center text-center">
             <Link
-              href={`/${user.username}?user=${user.uid}`}
+              href="/profile"
               className="flex flex-col items-center justify-center"
             >
               <Avatar className="w-20 h-20 border">
@@ -92,9 +109,16 @@ export default function Sidebar() {
                 </p>
               </div>
             </Link>
-            <p className="mt-3 text-sm text-muted-foreground">
-              {user.emailVerified ? "Verified User" : "Email not verified"}
-            </p>
+            {!auth?.currentUser.emailVerified && (
+              <>
+                <p className="mt-3 text-sm text-muted-foreground">
+                  <p>Email not verified</p>
+                  <Button onClick={verifyEmailHandler} variant="ghost">
+                    Verify Email
+                  </Button>
+                </p>
+              </>
+            )}
             <div className="w-full">
               <Separator className="my-4" />
               <div className="flex justify-center gap-6">

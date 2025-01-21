@@ -40,18 +40,13 @@ export default function ProfileEditModal({ isOpen, onClose, currentUser }) {
     },
   });
 
-  console.log("CURRENTUYSER", currentUser);
-
   const onSubmit = async (data) => {
     try {
       let profileImageUrl = currentUser?.profileImage;
-      let bannerImageUrl = currentUser?.bannerImage;
       let coverImageUrl = currentUser?.coverImage;
-
       if (profileImageFile) {
         profileImageUrl = await uploadImage(profileImageFile);
       }
-
       if (isBusinessUser) {
         if (coverImageFile) {
           coverImageUrl = await uploadImage(coverImageFile);
@@ -59,14 +54,12 @@ export default function ProfileEditModal({ isOpen, onClose, currentUser }) {
       } else {
         coverImageUrl = null;
       }
-
       const updatedData = {
         ...data,
         ...(profileImageUrl ? { profilePic: profileImageUrl } : {}),
         ...(coverImageUrl ? { coverPic: coverImageUrl } : {}),
       };
       console.log("UPDATEDDATA", updatedData);
-
       await updateProfile(updatedData);
       onClose();
     } catch (error) {
@@ -82,7 +75,6 @@ export default function ProfileEditModal({ isOpen, onClose, currentUser }) {
   async function uploadImage(file, onProgress) {
     const storageRef = ref(storage, `${currentUser.uid}/profilePhoto`);
     const uploadTask = uploadBytesResumable(storageRef, file);
-
     return new Promise((resolve, reject) => {
       uploadTask.on(
         "state_changed",
