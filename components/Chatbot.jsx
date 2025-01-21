@@ -29,7 +29,7 @@ function SuggestionBar({ suggestions, onClickSuggestion }) {
       {suggestions.map((suggestion, index) => (
         <Badge
           key={index}
-          className="cursor-pointer hover:bg-gray-200"
+          className="cursor-pointer hover:bg-gray-500/45 p-1"
           onClick={() => onClickSuggestion(suggestion)}
         >
           {suggestion}
@@ -95,7 +95,7 @@ export default function Chatbot() {
         } else if (lastMessage.content.includes("pricing")) {
           setSuggestions(["View plans", "Request custom quote"]);
         } else {
-          setSuggestions(["Tell me more", "Show options", "Contact support"]);
+          setSuggestions(["Tell me more", "Show options", "Contact support", "Features of Thikana"]);
         }
       }
     }
