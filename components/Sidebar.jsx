@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { collection, onSnapshot } from "firebase/firestore";
 import { sendEmailVerification } from "firebase/auth";
-import toast from "react-hot-toast";
+// import toast from "react-hot-toast";
 
 function DefaultSidebar() {
   return (
