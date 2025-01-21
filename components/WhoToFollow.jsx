@@ -92,7 +92,7 @@ export default function WhoToFollow() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 sticky top-[80px]">
       <Card>
         <CardHeader>
           <CardTitle className="text-xl">Who to Follow</CardTitle>
@@ -102,34 +102,41 @@ export default function WhoToFollow() {
           <div className="flex flex-col items-center gap-2">
             {users.map((user) => (
               <div
-                className="flex items-center justify-between gap-2 border p-3 rounded-full w-full"
+                className="flex items-center justify-between gap-4 border p-3 rounded-md w-full"
                 key={user.id}
               >
-                <div className="flex items-center gap-2">
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={user.profilePic || "/avatar.png"} />
-                  </Avatar>
-                  <Link
-                    href={`/${user.username}?user=${user.id}`}
-                    className="grid gap-0.5 text-sm"
+                {/* <Avatar className="h-10 w-10">
+                  <AvatarImage src={user.profilePic || "/avatar.png"} />
+                </Avatar> */}
+                <div className="flex flex-col justify-center w-full gap-2">
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/${user.username}?user=${user.id}`}
+                      className="grid gap-0.5 text-sm"
+                    >
+                      <span className="font-medium">{user.name}</span>
+                      <span className="text-muted-foreground">
+                        @{user.username}
+                      </span>
+                    </Link>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className={`${
+                      following.has(user.id)
+                        ? "bg-red-500 text-primary-foreground hover:bg-red-400 hover:text-white"
+                        : ""
+                    }`}
+                    onClick={() =>
+                      following.has(user.id)
+                        ? handleUnfollow(user.id)
+                        : handleFollow(user.id)
+                    }
                   >
-                    <span className="font-medium">{user.name}</span>
-                    <span className="text-muted-foreground">
-                      @{user.username}
-                    </span>
-                  </Link>
+                    {following.has(user.id) ? "Unfollow" : "Follow"}
+                  </Button>
                 </div>
-                <Button
-                  size="sm"
-                  variant={following.has(user.id) ? "destructive" : "outline"}
-                  onClick={() =>
-                    following.has(user.id)
-                      ? handleUnfollow(user.id)
-                      : handleFollow(user.id)
-                  }
-                >
-                  {following.has(user.id) ? "Unfollow" : "Follow"}
-                </Button>
               </div>
             ))}
           </div>

@@ -27,6 +27,7 @@ import {
   MapPinIcon,
   Loader2Icon,
   Images,
+  SquareChartGantt,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import WhoToFollow from "@/components/WhoToFollow";
@@ -43,6 +44,8 @@ import {
 import ProfilePosts from "@/components/ProfilePosts";
 import ProfileEditModal from "@/components/ProfileEditModal";
 import Chatbot from "@/components/Chatbot";
+import Link from "next/link";
+import ShowProductsTabContent from "@/components/profile/ShowProductsTabContent";
 
 export default function Profile() {
   const router = useRouter();
@@ -197,13 +200,13 @@ export default function Profile() {
 
   return (
     <div className="flex items-center justify-center w-full">
-      <div className="max-w-7xl w-full grid grid-cols-1 gap-0 py-8 lg:grid-cols-[300px_minmax(0,1fr)_300px] lg:gap-0.5">
-        <aside className="hidden lg:block">
+      <div className="max-w-7xl w-full flex justify-center gap-6">
+        {/* <aside className="hidden lg:block">
           <div className="sticky top-20">
             <Sidebar />
           </div>
-        </aside>
-        <main className="max-w-[580px] mx-auto w-full px-2">
+        </aside> */}
+        <main className="mx-auto w-full md:w-4/6 px-2 mt-[15px]">
           <div className="grid grid-cols-1 gap-6">
             <div className="w-full">
               <Card className="bg-card">
@@ -258,16 +261,17 @@ export default function Profile() {
                     </div>
                     {userId === user?.uid && (
                       <>
-                        <Button
-                          className="w-full mt-4"
-                          onClick={() => {
-                            setIsModalOpen(true);
-                            console.log("Edit button clicked", userData);
-                          }}
+                        <Link
+                          className="w-full mt-4 flex items-center justify-center gap-2 bg-black/90 px-4 py-2 rounded-md text-white hover:bg-black transition-all ease-in-out duration-200"
+                          // onClick={() => {
+                          //   setIsModalOpen(true);
+                          //   console.log("Edit button clicked", userData);
+                          // }}
+                          href="/profile/settings"
                         >
                           <EditIcon className="w-4 h-4 mr-2" />
                           Edit Profile
-                        </Button>
+                        </Link>
                         {userData && (
                           <ProfileEditModal
                             isOpen={isModalOpen}
@@ -333,6 +337,13 @@ export default function Profile() {
                   <Images className="w-5 h-5" />
                   Photos
                 </TabsTrigger>
+                <TabsTrigger
+                  value="products"
+                  className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 font-semibold"
+                >
+                  <SquareChartGantt className="w-5 h-5" />
+                  Products
+                </TabsTrigger>
               </TabsList>
               <TabsContent value="posts" className="p-6">
                 {renderPosts()}
@@ -396,10 +407,20 @@ export default function Profile() {
                   </div>
                 )}
               </TabsContent>
+              <TabsContent value="products" className="p-6">
+                {/* <div className="space-y-4">
+                  {likedPosts.map((post, index) => (
+                    <Card key={index} className="p-4">
+                      <ProfilePosts post={post} userData={userData} />
+                    </Card>
+                  ))}
+                </div> */}
+                <ShowProductsTabContent userId={userId} />
+              </TabsContent>
             </Tabs>
           </div>
         </main>
-        <aside className="hidden lg:block">
+        <aside className="hidden lg:block w-2/6">
           <WhoToFollow />
         </aside>
       </div>

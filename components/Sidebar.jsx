@@ -1,10 +1,9 @@
 "use client";
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { MapPinIcon, LinkIcon } from "lucide-react";
+import { MapPinIcon, LinkIcon, LoaderCircle } from "lucide-react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebase";
 import useGetUser from "@/hooks/useGetUser";
@@ -44,15 +43,16 @@ function DefaultSidebar() {
 }
 
 export default function Sidebar() {
-  const user = useGetUser(auth.currentUser?.uid || null);
+  const userId = auth.currentUser?.uid || null;
+  const user = useGetUser(userId);
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
 
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
 
-    const followersRef = collection(db, "users", user.uid, "followers");
-    const followingRef = collection(db, "users", user.uid, "following");
+    const followersRef = collection(db, "users", userId, "followers");
+    const followingRef = collection(db, "users", userId, "following");
 
     // Set up real-time listener for followers count
     const unsubscribeFollowers = onSnapshot(followersRef, (snapshot) => {
@@ -68,7 +68,7 @@ export default function Sidebar() {
       unsubscribeFollowers(); // Cleanup on unmount
       unsubscribeFollowing(); // Cleanup on unmount
     };
-  }, [user]);
+  }, [userId]);
 
   const verifyEmailHandler = async () => {
     await sendEmailVerification(auth.currentUser)
@@ -80,12 +80,14 @@ export default function Sidebar() {
       });
   };
 
-  if (!user)
+  if (!user) {
     return (
-      <div>
+      <div className="flex items-center justify-center">
         <h2>Loading ...</h2>
+        <LoaderCircle className="animate-spin" />
       </div>
     );
+  }
 
   return (
     <div className="sticky top-20">
