@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { MapPinIcon, LinkIcon } from "lucide-react";
+import { MapPinIcon, LinkIcon, LoaderCircle } from "lucide-react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebase";
 import useGetUser from "@/hooks/useGetUser";
@@ -82,8 +82,9 @@ export default function Sidebar() {
 
   if (!user)
     return (
-      <div>
+      <div className="flex items-center justify-center">
         <h2>Loading ...</h2>
+        <LoaderCircle className="animate-spin" />
       </div>
     );
 

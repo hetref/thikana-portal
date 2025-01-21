@@ -31,21 +31,21 @@ const CreatePost = () => {
     setIsGenerating(true);
     try {
       const formData = new FormData();
-      formData.append('type', type);
-      formData.append('prompt', type === "description" ? title : "");
+      formData.append("type", type);
+      formData.append("prompt", type === "description" ? title : "");
       if (image) {
-        formData.append('image', image);
+        formData.append("image", image);
       }
-  
+
       const response = await fetch("/api/generate-content", {
         method: "POST",
         body: formData,
       });
-  
+
       const data = await response.json();
-      
+
       if (data.error) throw new Error(data.error);
-  
+
       if (type === "title") {
         setTitle(data.generated);
       } else {

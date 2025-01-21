@@ -8,7 +8,7 @@ import { auth } from "@/lib/firebase";
 import { authenticatedItems, unauthenticatedItems } from "@/constants/navLinks";
 import Image from "next/image";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { redirect } from "next/navigation";
+import { redirect, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import {
@@ -22,6 +22,8 @@ import AddPhotoModal from "./AddPhotoModal";
 export default function TopNavbar({ type = "unauthenticated" }) {
   const [user, setUser] = useState(null);
   const [isAddPhotoModalOpen, setIsAddPhotoModalOpen] = useState(false);
+
+  const router = useRouter();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -38,7 +40,7 @@ export default function TopNavbar({ type = "unauthenticated" }) {
   const logoutHandler = async () => {
     try {
       await signOut(auth);
-      redirect("/");
+      router.push("/");
     } catch (error) {
       console.error("Logout Error:", error);
       throw error;
@@ -84,7 +86,10 @@ export default function TopNavbar({ type = "unauthenticated" }) {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem asChild>
-                    <Link href="/create" className="flex items-center gap-2">
+                    <Link
+                      href="/create-post"
+                      className="flex items-center gap-2"
+                    >
                       <span>Create Post</span>
                     </Link>
                   </DropdownMenuItem>
@@ -92,6 +97,14 @@ export default function TopNavbar({ type = "unauthenticated" }) {
                     onSelect={() => setIsAddPhotoModalOpen(true)}
                   >
                     <span>Add Photos</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link
+                      href="/add-product"
+                      className="flex items-center gap-2"
+                    >
+                      <span>Add Product</span>
+                    </Link>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -104,8 +117,7 @@ export default function TopNavbar({ type = "unauthenticated" }) {
               )}
             </>
           )}
-          {user &&
-            type === "unauthenticated" &&
+          {type === "unauthenticated" &&
             unauthenticatedItems.map((item) => (
               <Link
                 key={item.title}
