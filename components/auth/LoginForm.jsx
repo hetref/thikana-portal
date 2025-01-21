@@ -30,7 +30,7 @@ export function LoginForm() {
         const provider = new GoogleAuthProvider();
         const result = await signInWithPopup(auth, provider);
         console.log("User signed in with Google:", result.user);
-        redirect("/feed");
+        router.push("/feed");
       } catch (error) {
         console.error("Google Sign In Error:", error);
         throw error;
