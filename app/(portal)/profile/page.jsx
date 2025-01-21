@@ -27,6 +27,7 @@ import {
   MapPinIcon,
   Loader2Icon,
   Images,
+  SquareChartGantt,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import WhoToFollow from "@/components/WhoToFollow";
@@ -44,6 +45,7 @@ import ProfilePosts from "@/components/ProfilePosts";
 import ProfileEditModal from "@/components/ProfileEditModal";
 import Chatbot from "@/components/Chatbot";
 import Link from "next/link";
+import ShowProductsTabContent from "@/components/profile/ShowProductsTabContent";
 
 export default function Profile() {
   const router = useRouter();
@@ -335,6 +337,13 @@ export default function Profile() {
                   <Images className="w-5 h-5" />
                   Photos
                 </TabsTrigger>
+                <TabsTrigger
+                  value="products"
+                  className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 font-semibold"
+                >
+                  <SquareChartGantt className="w-5 h-5" />
+                  Products
+                </TabsTrigger>
               </TabsList>
               <TabsContent value="posts" className="p-6">
                 {renderPosts()}
@@ -397,6 +406,16 @@ export default function Profile() {
                     </Button>
                   </div>
                 )}
+              </TabsContent>
+              <TabsContent value="products" className="p-6">
+                {/* <div className="space-y-4">
+                  {likedPosts.map((post, index) => (
+                    <Card key={index} className="p-4">
+                      <ProfilePosts post={post} userData={userData} />
+                    </Card>
+                  ))}
+                </div> */}
+                <ShowProductsTabContent userId={userId} />
               </TabsContent>
             </Tabs>
           </div>
