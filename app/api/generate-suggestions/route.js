@@ -39,5 +39,5 @@ export async function POST(request) {
   const response = stream?.toDataStreamResponse();
   const result = Array.isArray(response) ? response.join(' ') : response;
 
-  return result;
+  return new Response(result);
 }
