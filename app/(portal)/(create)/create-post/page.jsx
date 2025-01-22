@@ -6,6 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
+import { doc, setDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+import { v4 as uuidv4 } from "uuid";
+import { useRouter } from "next/navigation";
 
 const CreatePost = () => {
   const [title, setTitle] = useState("");
@@ -14,7 +19,7 @@ const CreatePost = () => {
   const [preview, setPreview] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-
+  const router = useRouter();
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file && file.type.startsWith("image/")) {
@@ -61,28 +66,48 @@ const CreatePost = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     if (!title || !description || !image) {
       alert("All fields are required!");
       return;
     }
 
     setIsLoading(true);
+
+    const storage = getStorage();
+    const fileName = `${Date.now()}-${title}`;
+    const storageRef = ref(
+      storage,
+      `${auth.currentUser.uid}/posts/${fileName}`
+    );
+
     try {
-      // Implement your post creation logic here
-      console.log({ title, description, image });
+      // Upload the image to Firebase Storage
+      await uploadBytes(storageRef, image);
+      const downloadURL = await getDownloadURL(storageRef);
+
+      // Save the post data to Firestore
+      await setDoc(doc(db, "posts", uuidv4()), {
+        title,
+        description,
+        image: downloadURL,
+        uid: auth.currentUser.uid,
+        createdAt: new Date(),
+        likes: 0,
+        comments: [],
+        imageRef: fileName,
+        user: `/users/${auth.currentUser.uid}`,
+      });
+
       alert("Post created successfully!");
-      setTitle("");
-      setDescription("");
-      setImage(null);
-      setPreview(null);
+      router.push("/");
     } catch (error) {
       console.error("Error creating post:", error);
-      alert("Failed to create post. Please try again.");
+      alert("Failed to create the post. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
-
   return (
     <Card className="max-w-2xl mx-auto my-8">
       <CardHeader>
