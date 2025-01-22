@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Check, CreditCard } from "lucide-react";
 import { ThemeProvider } from "next-themes";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import toast from "react-hot-toast";
 import { onAuthStateChanged } from "firebase/auth";
@@ -34,12 +34,12 @@ export default function PricingPage() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        const fetchCurrentPlan = async () => {
-          try {
-            const userId = user.uid;
-            const userDocRef = doc(db, "users", userId);
-            const userDoc = await getDoc(userDocRef);
+        const userId = user.uid;
+        const userDocRef = doc(db, "users", userId);
 
+        const unsubscribeSnapshot = onSnapshot(
+          userDocRef,
+          (userDoc) => {
             if (userDoc.exists()) {
               const userData = userDoc.data();
               console.log("CURRENT PLAN: ", userData.plan);
@@ -48,18 +48,20 @@ export default function PricingPage() {
             } else {
               toast.error("User not found");
             }
-          } catch (error) {
+          },
+          (error) => {
             console.error("Error fetching current plan:", error);
           }
-        };
+        );
 
-        fetchCurrentPlan();
+        // Cleanup snapshot listener on unmount
+        return () => unsubscribeSnapshot();
       } else {
         console.log("No user is signed in.");
       }
     });
 
-    // Cleanup subscription on unmount
+    // Cleanup auth state listener on unmount
     return () => unsubscribe();
   }, []);
 
@@ -416,20 +418,27 @@ export default function PricingPage() {
                       }`}
                       variant={tier.highlight ? "default" : "outline"}
                       onClick={tier.cta.onClick}
-                      disabled={currentPlan === tier.id}
+                      disabled={
+                        currentPlan === tier.id &&
+                        userData.subscriptionStatus === "active"
+                      }
                     >
-                      {currentPlan === tier.id ? "Current Plan" : tier.cta.text}
+                      {currentPlan === tier.id &&
+                      userData.subscriptionStatus === "active"
+                        ? "Current Plan"
+                        : tier.cta.text}
                     </Button>
-                    {currentPlan === tier.id && (
-                      <Button
-                        className="mt-2 w-full bg-red-500 text-white hover:bg-red-600"
-                        onClick={() =>
-                          handleCancelSubscription(userData.subscriptionId)
-                        }
-                      >
-                        Cancel Subscription
-                      </Button>
-                    )}
+                    {currentPlan === tier.id &&
+                      userData.subscriptionStatus === "active" && (
+                        <Button
+                          className="mt-2 w-full bg-red-500 text-white hover:bg-red-600"
+                          onClick={() =>
+                            handleCancelSubscription(userData.subscriptionId)
+                          }
+                        >
+                          Cancel Subscription
+                        </Button>
+                      )}
                   </motion.div>
                 )}
               </motion.div>
