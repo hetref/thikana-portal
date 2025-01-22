@@ -43,7 +43,7 @@ export default function PricingPage() {
             if (userDoc.exists()) {
               const userData = userDoc.data();
               console.log("CURRENT PLAN: ", userData.plan);
-              setCurrentPlan(userData.plan); // Assuming 'currentPlan' is the field name
+              setCurrentPlan(userData.plan || "free"); // Assuming 'currentPlan' is the field name
               setUserData(userData);
             } else {
               toast.error("User not found");
