@@ -3,7 +3,7 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { initialMessage } from "@/data/thikana";
 
 const google = createGoogleGenerativeAI({
-  apiKey: 'AIzaSyDOmYsvQ8Vci4swqN5kFvJh0bJPxl8OXAU',
+  apiKey: "AIzaSyDOmYsvQ8Vci4swqN5kFvJh0bJPxl8OXAU",
 });
 
 export const runtime = "edge";
@@ -14,7 +14,7 @@ const buildGoogleGenAIPrompt = (messages) => [
   {
     id: generateId(),
     role: "user",
-    content: initialMessage.content
+    content: initialMessage.content,
   },
   ...messages.map((message) => ({
     id: message.id || generateId(),

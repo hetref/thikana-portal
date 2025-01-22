@@ -1,5 +1,4 @@
-import TopNavbar from "../../components/TopNavbar";
-
+import TopNavbar from "@/components/TopNavbar";
 const LandingPageLayout = ({ children }) => {
   return (
     <div>
