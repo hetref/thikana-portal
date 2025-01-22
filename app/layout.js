@@ -21,7 +21,7 @@ export default function RootLayout({ children }) {
           <Chatbot />
           <Toaster />
         </ThemeProvider>
-        <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" />
+        <Script src="https://checkout.razorpay.com/v1/checkout.js" />
       </body>
     </html>
   )

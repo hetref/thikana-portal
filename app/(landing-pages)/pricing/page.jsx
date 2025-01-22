@@ -265,7 +265,7 @@ export default function PricingPage() {
       };
 
       // Ensure Razorpay is loaded
-      const rzp = new window.Razorpay(options);
+      const rzp = new Razorpay(options);
       rzp.open();
     } catch (error) {
       console.error("Subscription Error:", error);
