@@ -89,7 +89,7 @@ async function updateSubscriptionStatus(subscription, status) {
 
   console.log("UserID", userId);
 
-  await updateDoc(doc(db, "businesses", userId), {
+  await updateDoc(doc(db, "users", userId), {
     updatedAt: new Date(),
     subscriptionStatus: status,
   });
