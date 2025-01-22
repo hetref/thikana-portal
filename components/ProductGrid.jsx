@@ -3,7 +3,7 @@ import { useState } from "react";
 import { ProductCard } from "@/components/ProductCard";
 import { ProductDialog } from "@/components/ProductDialog";
 
-export function ProductGrid({ products, userId }) {
+export function ProductGrid({ products, userId, userData }) {
   const [selectedProduct, setSelectedProduct] = useState(null);
 
   return (
@@ -23,6 +23,7 @@ export function ProductGrid({ products, userId }) {
           isOpen={!!selectedProduct}
           onClose={() => setSelectedProduct(null)}
           userId={userId}
+          userData={userData}
         />
       )}
     </>

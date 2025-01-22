@@ -54,7 +54,7 @@ const AddProductPage = () => {
       // Upload image to Firebase Storage
       const storageRef = ref(
         storage,
-        `products/${user.uid}/${data.image.name}`
+        `${user.uid}/products/${data.image.name}`
       );
       await uploadBytes(storageRef, data.image);
       const imageUrl = await getDownloadURL(storageRef);

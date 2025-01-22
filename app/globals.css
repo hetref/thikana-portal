@@ -78,3 +78,44 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* temp css below can delete later */
+/* styles/globals.css */
+/* .container {
+  padding: 20px;
+  text-align: center;
+}
+
+.posts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.post-card {
+  padding: 15px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.post-image {
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+} */
+
+/* button {
+  margin-top: 10px;
+  padding: 10px 20px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #45a049;
+} */

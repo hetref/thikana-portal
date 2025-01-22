@@ -3,7 +3,6 @@
 import TopNavbar from "@/components/TopNavbar";
 import Footer from "@/components/Footer"
 import { motion, AnimatePresence } from "framer-motion"
-
 const LandingPageLayout = ({ children }) => {
   return (
     <AnimatePresence mode="wait">

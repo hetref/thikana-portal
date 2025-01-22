@@ -1,5 +1,6 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+
+import { useState, useEffect, useRef, use } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -29,7 +30,7 @@ function SuggestionBar({ suggestions, onClickSuggestion }) {
       {suggestions.map((suggestion, index) => (
         <Badge
           key={index}
-          className="cursor-pointer hover:bg-gray-500/45 p-1"
+          className="cursor-pointer hover:bg-gray-200"
           onClick={() => onClickSuggestion(suggestion)}
         >
           {suggestion}
@@ -53,7 +54,7 @@ export default function Chatbot() {
     reload,
     error,
   } = useChat({ api: "/api/gemini" });
-  const scrollRef = useRef(null);
+  const scrollref = useRef(null);
   const [suggestions, setSuggestions] = useState([]);
 
   useEffect(() => {
@@ -62,30 +63,32 @@ export default function Chatbot() {
         setShowChatIcon(true);
       } else {
         setShowChatIcon(false);
-        // setIsChatOpen(false);
+        setIsChatOpen(false);
       }
     };
+
     handleScroll();
+
     window.addEventListener("scroll", handleScroll);
     return () => {
       window.removeEventListener("scroll", handleScroll);
     };
   }, []);
-
   const toggleChat = () => {
     setIsChatOpen(!isChatOpen);
   };
 
   useEffect(() => {
-    if (isChatOpen && scrollRef.current) {
-      scrollRef.current.scrollIntoView({ behavior: "smooth" });
+    if (scrollref.current) {
+      scrollref.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [isChatOpen, messages]);
+  }, [messages]);
 
   useEffect(() => {
     if (messages.length > 0) {
       const lastMessage = messages[messages.length - 1];
       if (lastMessage.role === "user") {
+        // Add custom logic for generating suggestions
         if (lastMessage.content.includes("help")) {
           setSuggestions([
             "How to get started?",
@@ -95,39 +98,53 @@ export default function Chatbot() {
         } else if (lastMessage.content.includes("pricing")) {
           setSuggestions(["View plans", "Request custom quote"]);
         } else {
-          setSuggestions(["Tell me more", "Show options", "Contact support", "Features of Thikana"]);
+          setSuggestions(["Tell me more", "Show options", "Contact support"]);
         }
       }
     }
   }, [messages]);
 
   const handleSuggestionClick = (suggestion) => {
+    // Directly send suggestion as user input
     handleInputChange({ target: { value: suggestion } });
     handleSubmit();
   };
 
   return (
-    <div style={{ zIndex: "9999999" }}>
+    <div>
       <AnimatePresence>
-        <motion.div className="fixed bottom-4 right-4 z-80">
+        {/* {showChatIcon && ( */}
+        <motion.div
+          // initial={{ opacity: 0, y: 100 }}
+          // animate={{ opacity: 1, y: 0 }}
+          // exit={{ opacity: 0, y: 100 }}
+          // transition={{ duration: 0.2 }}
+          className="fixed bottom-4 right-4 z-80"
+        >
           <Button
             ref={chatIconRef}
             onClick={toggleChat}
             size="icon"
-            className="rounded-full size-14 p-2 shadow-lg font-bold"
-            placeholder="Chat with Thikana AI"
+            className="rounded-full size-14 p-2 shadow-lg"
           >
             {!isChatOpen ? (
-              <MessageCircle className="size-7 text-lg" />
+              <MessageCircle className="size-7" />
             ) : (
               <ArrowDownCircleIcon />
             )}
           </Button>
         </motion.div>
+        {/* )} */}
       </AnimatePresence>
       <AnimatePresence>
         {isChatOpen && (
-          <motion.div className="fixed bottom-20 right-4 z-50 w-[95%] md:w-[500px]">
+          <motion.div
+            // initial={{ opacity: 0, scale: 0.8 }}
+            // animate={{ opacity: 1, scale: 1 }}
+            // exit={{ opacity: 0, scale: 0.8 }}
+            // transition={{ duration: 0.2 }}
+            className="fixed bottom-20 right-4 z-50 w-[95%] md:w-[500px]"
+          >
             <Card className="border-2">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                 <CardTitle className="text-lg font-bold">
@@ -226,7 +243,7 @@ export default function Chatbot() {
                       </button>
                     </div>
                   )}
-                  <div ref={scrollRef}></div>
+                  <div ref={scrollref}></div>
                 </ScrollArea>
                 {suggestions.length > 0 && (
                   <SuggestionBar

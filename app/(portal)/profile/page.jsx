@@ -46,6 +46,7 @@ import ProfileEditModal from "@/components/ProfileEditModal";
 import Chatbot from "@/components/Chatbot";
 import Link from "next/link";
 import ShowProductsTabContent from "@/components/profile/ShowProductsTabContent";
+import Image from "next/image";
 
 export default function Profile() {
   const router = useRouter();
@@ -365,7 +366,9 @@ export default function Profile() {
                         {/* Trigger for the Dialog */}
                         <DialogTrigger asChild>
                           <div>
-                            <img
+                            <Image
+                              width={1000}
+                              height={1000}
                               src={photo.photoUrl}
                               alt={photo.title}
                               className="w-full h-auto rounded-lg rounded-b-none"
@@ -384,7 +387,9 @@ export default function Profile() {
                           <DialogDescription>
                             {new Date(photo.addedOn).toLocaleDateString()}
                           </DialogDescription>
-                          <img
+                          <Image
+                            width={1000}
+                            height={1000}
                             src={photo.photoUrl}
                             alt="Full View"
                             className="max-w-full rounded-lg max-h-[80svh] max-w-[80vw]]"
@@ -415,7 +420,9 @@ export default function Profile() {
                     </Card>
                   ))}
                 </div> */}
-                <ShowProductsTabContent userId={userId} />
+                {userData && user && (
+                  <ShowProductsTabContent userId={userId} userData={userData} />
+                )}
               </TabsContent>
             </Tabs>
           </div>

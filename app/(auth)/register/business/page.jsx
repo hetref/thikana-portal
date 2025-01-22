@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import classNames from "classnames";
 import {
   Card,
   CardContent,
@@ -12,7 +11,7 @@ import {
 import { GalleryVerticalEnd } from "lucide-react";
 import BusinessRegistration from "@/components/auth/BusinessRegistration";
 
-const BusinessRegistrationPage = ({ className }) => {
+const BusinessRegistrationPage = () => {
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted p-6 md:p-10">
       <div className="flex w-full max-w-sm flex-col gap-6">
@@ -22,7 +21,7 @@ const BusinessRegistrationPage = ({ className }) => {
           </div>
           Thikana
         </a>
-        <div className={classNames("flex flex-col gap-6", className)}>
+        <div className="flex flex-col gap-6">
           <Card>
             <CardHeader className="text-center">
               <CardTitle className="text-xl">Business Registration</CardTitle>

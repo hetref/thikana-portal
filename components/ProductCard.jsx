@@ -2,6 +2,8 @@ import Image from "next/image";
 import { Card, CardContent } from "@/components/ui/card";
 
 export function ProductCard({ product, onClick }) {
+  const handleDelete = async () => {};
+
   return (
     <Card
       className="cursor-pointer hover:shadow-lg transition-shadow"
@@ -20,6 +22,12 @@ export function ProductCard({ product, onClick }) {
           {product.description}
         </p>
         <p className="font-bold text-lg">₹{product.price.toFixed(2)}</p>
+        <button
+          onClick={handleDelete}
+          className="mt-4 bg-red-500 text-white py-2 px-4 rounded hover:bg-red-600"
+        >
+          Delete Product
+        </button>
       </CardContent>
     </Card>
   );

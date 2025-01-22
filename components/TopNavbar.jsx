@@ -10,7 +10,7 @@ import Image from "next/image";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { redirect, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Plus } from "lucide-react";
+import { Menu, X, Plus } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +21,7 @@ import AddPhotoModal from "./AddPhotoModal";
 
 const TopNavbar = ({ type = "unauthenticated" }) => {
   const [user, setUser] = useState(null);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAddPhotoModalOpen, setIsAddPhotoModalOpen] = useState(false);
 
   const router = useRouter();
@@ -50,17 +51,33 @@ const TopNavbar = ({ type = "unauthenticated" }) => {
   return (
     <header className="fixed top-0 w-full z-50 bg-white/80 dark:bg-black/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 transition-colors duration-300">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
-        <Link href="/" className="flex items-center gap-2 font-semibold w-fit">
+        <Link href="/" className="flex items-center gap-2 font-semibold">
           <Image
             src="/logo/black-logo.png"
             alt="Thikana Logo"
             width={150}
             height={64}
-            className="h-16 object-contain w-fit"
+            className="h-16 object-contain"
           />
         </Link>
 
-        <div className="flex items-center gap-6">
+        <button
+          className="flex items-center sm:hidden"
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
+        >
+          {isMenuOpen ? (
+            <X className="h-6 w-6" />
+          ) : (
+            <Menu className="h-6 w-6" />
+          )}
+        </button>
+
+        <div
+          className={`${
+            isMenuOpen ? "flex" : "hidden"
+          } flex-col sm:flex sm:flex-row sm:items-center gap-4 bg-background sm:bg-transparent 
+          sm:gap-6 fixed sm:relative top-14 sm:top-auto right-0 sm:right-auto w-full sm:w-auto p-6`}
+        >
           <ThemeToggle />
 
           {user &&
@@ -72,16 +89,17 @@ const TopNavbar = ({ type = "unauthenticated" }) => {
                 className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary"
               >
                 {item.icon && <item.icon className="h-5 w-5" />}
-                <span className="hidden sm:inline">{item.title}</span>
+                <span className="block">{item.title}</span>
               </Link>
             ))}
+
           {user && type === "authenticated" && (
             <>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary">
                     <Plus className="h-5 w-5" />
-                    <span className="hidden sm:inline">Create</span>
+                    <span className="block">Create</span>
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -117,7 +135,9 @@ const TopNavbar = ({ type = "unauthenticated" }) => {
               )}
             </>
           )}
-          {type === "unauthenticated" &&
+
+          {user &&
+            type === "unauthenticated" &&
             unauthenticatedItems.map((item) => (
               <Link
                 key={item.title}
@@ -125,18 +145,26 @@ const TopNavbar = ({ type = "unauthenticated" }) => {
                 className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary"
               >
                 {item.icon && <item.icon className="h-5 w-5" />}
-                <span className="hidden sm:inline">{item.title}</span>
+                <span className="block">{item.title}</span>
               </Link>
             ))}
 
           {/* Auth Buttons */}
           <div className="flex items-center gap-2">
             {user && type === "authenticated" ? (
-              <Button size="sm" onClick={logoutHandler}>
+              <Button
+                size="sm"
+                onClick={logoutHandler}
+                className="bg-primary hover:bg-primary-dark"
+              >
                 Sign out
               </Button>
             ) : (
-              <Button size="sm" asChild>
+              <Button
+                size="sm"
+                asChild
+                className="bg-primary hover:bg-primary-dark"
+              >
                 <Link href={user ? "/feed" : "/login"}>Get Started</Link>
               </Button>
             )}
