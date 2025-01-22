@@ -43,7 +43,7 @@ const ShowProductsTabContent = ({ userId, userData }) => {
 
   return (
     <div>
-      <Button asChild>
+      <Button asChild variant="outline" className="mb-4">
         <Link
           href="/profile/inventory"
           className="w-full flex items-center jsutify-center gap-2"

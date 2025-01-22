@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ShoppingCart } from "lucide-react";
 import { useState } from "react";
 import toast from "react-hot-toast";
+import { recordPurchase } from "@/lib/inventory-operations";
 
 export function ProductDialog({ product, isOpen, onClose, userId, userData }) {
   const [isLoading, setIsLoading] = useState(false);
@@ -39,9 +40,15 @@ export function ProductDialog({ product, isOpen, onClose, userId, userData }) {
       name: userData.name,
       description: "Buy Our Produt",
       order_id: order.id,
-      handler: function (response) {
-        toast.success("Payment successful!");
-        onClose();
+      handler: async function (response) {
+        try {
+          await recordPurchase(userId, product.id, 1, product.price);
+          toast.success("Payment successful!");
+          onClose();
+        } catch (error) {
+          console.error("Error recording purchase:", error);
+          toast.error("Failed to record purchase. Please contact support.");
+        }
       },
       prefill: {
         name: userData.name,
@@ -77,13 +84,13 @@ export function ProductDialog({ product, isOpen, onClose, userId, userData }) {
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{product.title}</DialogTitle>
+          <DialogTitle>{product.name}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 py-4 items-center justify-center w-full">
           <div className="w-full flex items-center justify-center">
             <Image
               src={product.imageUrl}
-              alt={product.title}
+              alt={product.name}
               width={300}
               height={300}
               className="w-64 h-64 object-cover rounded"
