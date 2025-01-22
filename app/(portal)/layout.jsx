@@ -10,14 +10,27 @@ import { redirect, useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 
 const layout = ({ children }) => {
+  const [userData, setUserData] = useState(null);
   const router = useRouter();
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) router.push("/");
+      if (user) {
+        setUserData(user);
+      } else {
+        setUserData(false);
+        router.push("/");
+      }
     });
 
     return () => unsubscribe();
   }, []);
+  if (userData === null) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <h2 className="font-semibold text-xl">Loading</h2>
+      </div>
+    );
+  }
 
   return (
     <div>

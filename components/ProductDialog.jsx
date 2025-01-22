@@ -79,14 +79,16 @@ export function ProductDialog({ product, isOpen, onClose, userId, userData }) {
         <DialogHeader>
           <DialogTitle>{product.title}</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <Image
-            src={product.imageUrl}
-            alt={product.title}
-            width={300}
-            height={300}
-            className="w-full h-64 object-cover rounded"
-          />
+        <div className="grid gap-4 py-4 items-center justify-center w-full">
+          <div className="w-full flex items-center justify-center">
+            <Image
+              src={product.imageUrl}
+              alt={product.title}
+              width={300}
+              height={300}
+              className="w-64 h-64 object-cover rounded"
+            />
+          </div>
           <p className="text-sm text-gray-600">{product.description}</p>
           <p className="font-bold text-lg">₹{product.price.toFixed(2)}</p>
           <div className="flex gap-4">

@@ -90,7 +90,7 @@ export default function Sidebar() {
   }
 
   return (
-    <div className="sticky top-20">
+    <div className="sticky top-20 mt-[15px]">
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col items-center text-center">
