@@ -18,6 +18,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { auth, db } from "@/lib/firebase";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import toast from "react-hot-toast";
+import ImageUpload from "./ImageUpload";
+import { storage } from "@/lib/firebase";
+import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 
 const basicInfoSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -34,6 +37,8 @@ const basicInfoSchema = z.object({
 export default function BasicInfoForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [profileImageFile, setProfileImageFile] = useState(null);
+  const [coverImageFile, setCoverImageFile] = useState(null);
   const user = auth.currentUser;
   const form = useForm({
     resolver: zodResolver(basicInfoSchema),
@@ -71,14 +76,59 @@ export default function BasicInfoForm() {
     fetchUserData();
   }, [user, form]);
 
+  async function updateProfile(userData) {
+    const userRef = doc(db, "users", user.uid);
+    await setDoc(userRef, userData, { merge: true });
+  }
+
+  async function uploadImage(file, onProgress) {
+    const storageRef = ref(storage, `${user.uid}/profilePhoto`);
+    const uploadTask = uploadBytesResumable(storageRef, file);
+    return new Promise((resolve, reject) => {
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => {
+          const progress =
+            (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          if (onProgress) {
+            onProgress(progress);
+          }
+        },
+        (error) => {
+          reject(error);
+        },
+        async () => {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          resolve(downloadURL);
+        }
+      );
+    });
+  }
+
   async function onSubmit(data) {
     setIsSubmitting(true);
     try {
       if (!user) {
         throw new Error("User not authenticated");
       }
-      const userDocRef = doc(db, "users", user.uid);
-      await setDoc(userDocRef, data, { merge: true });
+
+      let profileImageUrl = null;
+      let coverImageUrl = null;
+
+      if (profileImageFile) {
+        profileImageUrl = await uploadImage(profileImageFile);
+      }
+      if (coverImageFile) {
+        coverImageUrl = await uploadImage(coverImageFile);
+      }
+
+      const updatedData = {
+        ...data,
+        ...(profileImageUrl ? { profilePic: profileImageUrl } : {}),
+        ...(coverImageUrl ? { coverPic: coverImageUrl } : {}),
+      };
+
+      await updateProfile(updatedData);
       toast.success("Basic information updated successfully!");
     } catch (error) {
       console.error("Error updating basic information:", error);
@@ -95,6 +145,17 @@ export default function BasicInfoForm() {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <ImageUpload
+          label="Profile Image"
+          currentImage={form.getValues("profilePic")}
+          onImageChange={setProfileImageFile}
+        />
+        <ImageUpload
+          label="Cover Image"
+          currentImage={form.getValues("coverPic")}
+          onImageChange={setCoverImageFile}
+          isCover
+        />
         <FormField
           control={form.control}
           name="name"
