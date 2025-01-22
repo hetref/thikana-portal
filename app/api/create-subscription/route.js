@@ -15,7 +15,7 @@ export async function POST(req) {
       total_count: 12,
       notes: {
         userId,
-        note: "This is test note"
+        note: "This is test note."
       }
     });
 
