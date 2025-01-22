@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import AddPhotoModal from "./AddPhotoModal";
 
-export default function TopNavbar({ type = "unauthenticated" }) {
+const TopNavbar = ({ type = "unauthenticated" }) => {
   const [user, setUser] = useState(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAddPhotoModalOpen, setIsAddPhotoModalOpen] = useState(false);
@@ -49,7 +49,7 @@ export default function TopNavbar({ type = "unauthenticated" }) {
   };
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="fixed top-0 w-full z-50 bg-white/80 dark:bg-black/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 transition-colors duration-300">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2 font-semibold">
           <Image
@@ -171,6 +171,8 @@ export default function TopNavbar({ type = "unauthenticated" }) {
           </div>
         </div>
       </div>
-    </nav>
+    </header>
   );
-}
+};
+
+export default TopNavbar;
