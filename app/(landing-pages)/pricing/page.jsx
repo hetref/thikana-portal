@@ -234,7 +234,6 @@ export default function PricingPage() {
 
       const options = {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-        key_id: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
         subscription_id: subscription.id,
         name: "Thikana",
         description:
@@ -257,7 +256,9 @@ export default function PricingPage() {
               userId: auth.currentUser.uid,
             }),
           });
-          toast.success("Subscription successful!");
+
+          // Display success message
+          toast.success("Subscription successful! Thank you for your payment.");
         },
         theme: {
           color: "#000000",
