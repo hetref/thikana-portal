@@ -41,11 +41,11 @@ function PostCard({ post, author }) {
     <Card className="max-w-md mx-auto">
       <CardHeader className="flex flex-row items-center space-x-4 p-4">
         <Avatar>
-          <AvatarImage src={author.profilePic} alt={author.name} />
-          <AvatarFallback>{author.name.charAt(0)}</AvatarFallback>
+          <AvatarImage src={author.profilePic} alt={"yash"} />
+          <AvatarFallback>{"yash".charAt(0)}</AvatarFallback>
         </Avatar>
         <div className="flex-1 space-y-1">
-          <p className="text-sm font-medium leading-none">{author.name}</p>
+          <p className="text-sm font-medium leading-none">{"yash"}</p>
           <p className="text-sm text-muted-foreground">@{author.username}</p>
         </div>
         <Button variant="ghost" size="icon">

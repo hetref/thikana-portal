@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import WhoToFollow from "@/components/WhoToFollow";
-import PostCard from "@/components/PostCard";
+// import PostCard from "@/components/PostCard";
 import { auth, db } from "@/lib/firebase";
 import {
   collection,
@@ -17,6 +17,11 @@ import {
   increment,
 } from "firebase/firestore";
 import Chatbot from "@/components/Chatbot";
+import PostCard from "@/components/PostCard";
+
+// In your FeedPage component, add this function:
+
+// Replace your existing useEffect with:
 
 const FeedPage = () => {
   const [posts, setPosts] = useState([]);
@@ -26,6 +31,62 @@ const FeedPage = () => {
   const currentUserId = auth.currentUser?.uid;
 
   // Function to update user's recent interactions
+  const fetchRecommendations = async () => {
+    if (!currentUserId) return;
+
+    try {
+      const response = await fetch(
+        `http://localhost:8000/recommendations/${currentUserId}`,
+        {
+          method: "GET",
+          credentials: "include", // Include credentials if needed
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Transform recommendations into the format expected by your PostCard component
+      const recommendedPosts = await Promise.all(
+        data.recommendations.map(async (post) => {
+          // Fetch author details if needed
+          const authorRef = doc(db, "users", post.uid);
+          const authorDoc = await getDoc(authorRef);
+          const authorData = authorDoc.data();
+
+          // Check if post is liked
+          const likeDocRef = doc(db, "users", currentUserId, "likes", post.id);
+          const likeDoc = await getDoc(likeDocRef);
+
+          return {
+            postId: post.id,
+            ...post,
+            author: authorData,
+            isLiked: likeDoc.exists(),
+          };
+        })
+      );
+
+      setPosts(recommendedPosts);
+    } catch (error) {
+      console.error("Error fetching recommendations:", error);
+      // Handle error appropriately
+    }
+  };
+
+  // Use in useEffect
+  useEffect(() => {
+    if (currentUserId) {
+      fetchRecommendations();
+    }
+  }, [currentUserId]);
   const updateRecentInteractions = async (postId, interactionType) => {
     if (!currentUserId) return;
 
