@@ -78,7 +78,7 @@ body {
 
 /* temp css below can delete later */
 /* styles/globals.css */
-.container {
+/* .container {
   padding: 20px;
   text-align: center;
 }
@@ -101,9 +101,9 @@ body {
   width: 100%;
   height: auto;
   border-radius: 10px;
-}
+} */
 
-button {
+/* button {
   margin-top: 10px;
   padding: 10px 20px;
   background-color: #4CAF50;
@@ -115,4 +115,4 @@ button {
 
 button:hover {
   background-color: #45a049;
-}
+} */
