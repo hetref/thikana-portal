@@ -143,7 +143,7 @@ export default function PricingPage() {
               );
               return;
             }
-            await handleSubscription("standard", "plan_PmDi4HaCGHWd6p");
+            await handleSubscription("standard", "plan_PmSImdYVH1GUs7");
           }
         },
       },
@@ -185,7 +185,7 @@ export default function PricingPage() {
               );
               return;
             }
-            await handleSubscription("premium", "plan_PmDiqWXbk7FWZC");
+            await handleSubscription("premium", "plan_PmSJ7n2ECeDM5H");
           }
         },
       },

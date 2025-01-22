@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { MapPinIcon, LinkIcon, LoaderCircle } from "lucide-react";
+import { MapPinIcon, LinkIcon, LoaderCircle, TicketCheck } from "lucide-react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebase";
 import useGetUser from "@/hooks/useGetUser";
@@ -145,6 +145,16 @@ export default function Sidebar() {
                 <LinkIcon className="w-4 h-4 mr-2 shrink-0" />
                 {user.website || "No website"}
               </div>
+              <Link
+                href="/pricing"
+                className="flex items-center text-muted-foreground font-semibold"
+              >
+                <TicketCheck className="w-4 h-4 mr-2 shrink-0" />
+                {(user.plan &&
+                  user.subscriptionStatus === "active" &&
+                  user.plan.charAt(0).toUpperCase() + user.plan.slice(1)) ||
+                  "Free"}
+              </Link>
             </div>
           </div>
         </CardContent>
