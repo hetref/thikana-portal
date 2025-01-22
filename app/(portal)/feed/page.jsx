@@ -29,17 +29,18 @@ const FeedPage = () => {
   const [page, setPage] = useState(1);
   const [author, setAuthor] = useState(null);
   const currentUserId = auth.currentUser?.uid;
-
+  const [hasMore, setHasMore] = useState(true);
   // Function to update user's recent interactions
-  const fetchRecommendations = async () => {
+  const fetchRecommendations = async (pageNum) => {
     if (!currentUserId) return;
 
     try {
+      setLoading(true);
       const response = await fetch(
-        `http://localhost:8000/recommendations/${currentUserId}`,
+        `http://localhost:8000/recommendations/${currentUserId}?page=${pageNum}&limit=10`,
         {
           method: "GET",
-          credentials: "include", // Include credentials if needed
+          credentials: "include",
           headers: {
             Accept: "application/json",
             "Content-Type": "application/json",
@@ -56,7 +57,7 @@ const FeedPage = () => {
       // Transform recommendations into the format expected by your PostCard component
       const recommendedPosts = await Promise.all(
         data.recommendations.map(async (post) => {
-          // Fetch author details if needed
+          // Fetch author details
           const authorRef = doc(db, "users", post.uid);
           const authorDoc = await getDoc(authorRef);
           const authorData = authorDoc.data();
@@ -74,19 +75,23 @@ const FeedPage = () => {
         })
       );
 
-      setPosts(recommendedPosts);
+      setPosts((prev) =>
+        pageNum === 1 ? recommendedPosts : [...prev, ...recommendedPosts]
+      );
+      setHasMore(data.hasMore);
     } catch (error) {
       console.error("Error fetching recommendations:", error);
-      // Handle error appropriately
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Use in useEffect
   useEffect(() => {
     if (currentUserId) {
-      fetchRecommendations();
+      fetchRecommendations(1);
     }
   }, [currentUserId]);
+
   const updateRecentInteractions = async (postId, interactionType) => {
     if (!currentUserId) return;
 
@@ -209,7 +214,11 @@ const FeedPage = () => {
   };
 
   const loadMore = () => {
-    setPage((prev) => prev + 1);
+    if (!loading && hasMore) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      fetchRecommendations(nextPage);
+    }
   };
 
   if (loading && posts.length === 0) {
@@ -232,18 +241,20 @@ const FeedPage = () => {
               <PostCard
                 key={post.postId}
                 post={post}
-                author={post.author} // Pass author directly
+                author={post.author}
                 onLike={() => handlePostLike(post)}
                 onView={() => handlePostView(post.postId)}
               />
             ))}
-            <button
-              onClick={loadMore}
-              disabled={loading}
-              className="w-full py-2 mt-4 text-blue-600 hover:text-blue-800 disabled:opacity-50"
-            >
-              {loading ? "Loading..." : "Load More"}
-            </button>
+            {hasMore && (
+              <button
+                onClick={loadMore}
+                disabled={loading}
+                className="w-full py-2 mt-4 text-blue-600 hover:text-blue-800 disabled:opacity-50"
+              >
+                {loading ? "Loading..." : "Load More"}
+              </button>
+            )}
           </main>
           <aside className="hidden lg:block">
             <div className="sticky top-20">
