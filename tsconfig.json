@@ -1,5 +1,10 @@
 {
   "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"],
+      "@/components/*": ["./components/*"]
+    },
     "target": "ES2017",
     "lib": [
       "dom",
@@ -27,8 +32,9 @@
     "next-env.d.ts",
     ".next/types/**/*.ts",
     "**/*.ts",
-    "**/*.tsx"
-, "lib/data.js"  ],
+    "**/*.tsx",
+    "lib/data.js"
+  ],
   "exclude": [
     "node_modules"
   ]
