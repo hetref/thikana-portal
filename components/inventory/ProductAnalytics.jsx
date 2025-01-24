@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getProductAnalytics } from "@/lib/inventory-operations";
+import { getProduct } from "@/lib/inventory-operations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   BarChart,
@@ -20,7 +20,7 @@ export default function ProductAnalytics({ userId, productId }) {
   useEffect(() => {
     async function fetchAnalytics() {
       try {
-        const data = await getProductAnalytics(userId, productId);
+        const data = await getProduct(userId, productId);
         setAnalytics(data);
       } catch (error) {
         console.error("Error fetching product analytics:", error);

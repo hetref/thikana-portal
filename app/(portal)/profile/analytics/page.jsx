@@ -1,5 +1,4 @@
 "use client";
-
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
@@ -8,10 +7,6 @@ import {
   getMonthlyAnalytics,
   getYearlyAnalytics,
 } from "@/lib/inventory-operations";
-// import {
-//   products as staticProducts,
-//   userAnalytics as staticUserAnalytics,
-// } from "@/lib/static-data";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -57,40 +52,43 @@ export default function AdminDashboard() {
   const [timeFrame, setTimeFrame] = useState("monthly"); // New state for time frame
 
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const userId = auth.currentUser.uid;
-        const [
-          fetchedProducts,
-          fetchedUserAnalytics,
-          fetchedMonthlyAnalytics,
-          fetchedYearlyAnalytics,
-        ] = await Promise.all([
-          getProducts(userId),
-          getUserAnalytics(userId),
-          getMonthlyAnalytics(userId), // Fetch monthly analytics
-          getYearlyAnalytics(userId), // Fetch yearly analytics
-        ]);
-        setProducts(fetchedProducts);
-        setUserAnalytics(fetchedUserAnalytics);
-        setMonthlyAnalytics(fetchedMonthlyAnalytics); // Set monthly analytics
-        setYearlyAnalytics(fetchedYearlyAnalytics); // Set yearly analytics
-        console.log("FETCHED DATA", fetchedProducts, fetchedUserAnalytics);
-        console.log(
-          "Monthly Analytics:",
-          fetchedMonthlyAnalytics,
-          fetchedYearlyAnalytics
-        ); // Log monthly analytics
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        // setProducts(staticProducts);
-        // setUserAnalytics(staticUserAnalytics);
-        toast.error("Failed to fetch data. Using static data.");
-      } finally {
-        setLoading(false);
+    const userId = auth.currentUser.uid;
+
+    const unsubscribeProducts = getProducts(userId, (productsData) => {
+      setProducts(productsData);
+    });
+
+    const unsubscribeUserAnalytics = getUserAnalytics(
+      userId,
+      (analyticsData) => {
+        setUserAnalytics(analyticsData);
       }
-    }
-    fetchData();
+    );
+
+    const unsubscribeMonthlyAnalytics = getMonthlyAnalytics(
+      userId,
+      12,
+      (monthlyData) => {
+        setMonthlyAnalytics(monthlyData);
+      }
+    );
+
+    const unsubscribeYearlyAnalytics = getYearlyAnalytics(
+      userId,
+      5,
+      (yearlyData) => {
+        setYearlyAnalytics(yearlyData);
+      }
+    );
+
+    setLoading(false);
+
+    return () => {
+      unsubscribeProducts();
+      unsubscribeUserAnalytics();
+      unsubscribeMonthlyAnalytics();
+      unsubscribeYearlyAnalytics();
+    };
   }, []);
 
   const filteredProducts = products.filter((product) =>
@@ -108,7 +106,6 @@ export default function AdminDashboard() {
   }));
 
   const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8"];
-
   const currentData =
     timeFrame === "monthly" ? monthlyAnalytics : yearlyAnalytics; // Determine current data based on time frame
 
@@ -126,7 +123,6 @@ export default function AdminDashboard() {
 
   return (
     <div className="container mx-auto p-4">
-      {/* <h1 className="text-3xl font-bold mb-6">Admin Analytics Dashboard</h1> */}
       <div className="flex items-center justify-between gap-4 mb-6">
         <Link href="/profile/inventory">
           <Button variant="outline">
@@ -135,7 +131,6 @@ export default function AdminDashboard() {
         </Link>
         <h1 className="text-3xl font-bold">Admin Analytics Dashboard</h1>
       </div>
-
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <Card>
           <CardHeader>
@@ -176,7 +171,6 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
         <Card>
           <CardHeader>
@@ -231,7 +225,6 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
-
       <Card className="mb-8">
         <CardHeader>
           <CardTitle>Sales and Revenue Over Time</CardTitle>
@@ -275,7 +268,6 @@ export default function AdminDashboard() {
           </ResponsiveContainer>
         </CardContent>
       </Card>
-
       <Card>
         <CardHeader>
           <CardTitle>Product Analytics</CardTitle>
