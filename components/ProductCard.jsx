@@ -20,6 +20,7 @@ export function ProductCard({ product, onClick }) {
           {product.description}
         </p>
         <p className="font-bold text-lg">₹{product.price.toFixed(2)}</p>
+        <p>{product.quantity} available</p>
       </CardContent>
     </Card>
   );

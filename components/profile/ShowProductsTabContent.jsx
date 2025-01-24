@@ -5,42 +5,9 @@ import { ProductGrid } from "../ProductGrid";
 import { Button } from "../ui/button";
 import Link from "next/link";
 import { Blocks } from "lucide-react";
+import { getProducts } from "@/lib/inventory-operations";
 
 const ShowProductsTabContent = ({ userId, userData }) => {
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const productsRef = collection(db, "users", userId, "products");
-        const productsQuery = query(productsRef);
-        const querySnapshot = await getDocs(productsQuery);
-        const productsData = querySnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setProducts(productsData);
-      } catch (error) {
-        console.error("Error fetching products:", error);
-        setError("Failed to fetch products. Please try again.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProducts();
-  }, [userId]);
-
-  if (loading) {
-    return <div>Loading...</div>;
-  }
-
-  if (error) {
-    return <div>{error}</div>;
-  }
-
   return (
     <div>
       <Button asChild variant="outline" className="mb-4">
@@ -52,11 +19,12 @@ const ShowProductsTabContent = ({ userId, userData }) => {
           <Blocks className="w-6 h-6" />
         </Link>
       </Button>
-      {products.length === 0 ? (
+      {/* {products.length === 0 ? (
         <p>No products found.</p>
-      ) : (
-        <ProductGrid products={products} userId={userId} userData={userData} />
-      )}
+      ) : ( */}
+      {/* <ProductGrid products={products} userId={userId} userData={userData} /> */}
+      <ProductGrid userId={userId} userData={userData} />
+      {/* )} */}
     </div>
   );
 };

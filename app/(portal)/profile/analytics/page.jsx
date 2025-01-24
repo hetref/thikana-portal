@@ -2,7 +2,12 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { getProducts, getUserAnalytics } from "@/lib/inventory-operations";
+import {
+  getProducts,
+  getUserAnalytics,
+  getMonthlyAnalytics,
+  getYearlyAnalytics,
+} from "@/lib/inventory-operations";
 // import {
 //   products as staticProducts,
 //   userAnalytics as staticUserAnalytics,
@@ -30,26 +35,52 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
+  LineChart,
+  Line,
 } from "recharts";
 import toast from "react-hot-toast";
 import { auth } from "@/lib/firebase";
+import { ChevronLeft } from "lucide-react";
 
 export default function AdminDashboard() {
   const [products, setProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
-  const [userAnalytics, setUserAnalytics] = useState();
+  const [userAnalytics, setUserAnalytics] = useState({
+    totalProductsBought: 0,
+    totalSales: 0,
+    totalRevenue: 0,
+    averageOrderValue: 0,
+  });
+  const [monthlyAnalytics, setMonthlyAnalytics] = useState([]); // New state for monthly analytics
+  const [yearlyAnalytics, setYearlyAnalytics] = useState([]); // New state for yearly analytics
+  const [timeFrame, setTimeFrame] = useState("monthly"); // New state for time frame
 
   useEffect(() => {
     async function fetchData() {
       try {
         const userId = auth.currentUser.uid;
-        const [fetchedProducts, fetchedUserAnalytics] = await Promise.all([
+        const [
+          fetchedProducts,
+          fetchedUserAnalytics,
+          fetchedMonthlyAnalytics,
+          fetchedYearlyAnalytics,
+        ] = await Promise.all([
           getProducts(userId),
           getUserAnalytics(userId),
+          getMonthlyAnalytics(userId), // Fetch monthly analytics
+          getYearlyAnalytics(userId), // Fetch yearly analytics
         ]);
         setProducts(fetchedProducts);
         setUserAnalytics(fetchedUserAnalytics);
+        setMonthlyAnalytics(fetchedMonthlyAnalytics); // Set monthly analytics
+        setYearlyAnalytics(fetchedYearlyAnalytics); // Set yearly analytics
+        console.log("FETCHED DATA", fetchedProducts, fetchedUserAnalytics);
+        console.log(
+          "Monthly Analytics:",
+          fetchedMonthlyAnalytics,
+          fetchedYearlyAnalytics
+        ); // Log monthly analytics
       } catch (error) {
         console.error("Error fetching data:", error);
         // setProducts(staticProducts);
@@ -78,6 +109,9 @@ export default function AdminDashboard() {
 
   const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8"];
 
+  const currentData =
+    timeFrame === "monthly" ? monthlyAnalytics : yearlyAnalytics; // Determine current data based on time frame
+
   if (loading) {
     return <div>Loading...</div>;
   }
@@ -92,7 +126,15 @@ export default function AdminDashboard() {
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-3xl font-bold mb-6">Admin Analytics Dashboard</h1>
+      {/* <h1 className="text-3xl font-bold mb-6">Admin Analytics Dashboard</h1> */}
+      <div className="flex items-center justify-between gap-4 mb-6">
+        <Link href="/profile/inventory">
+          <Button variant="outline">
+            <ChevronLeft /> Inventory
+          </Button>
+        </Link>
+        <h1 className="text-3xl font-bold">Admin Analytics Dashboard</h1>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <Card>
@@ -119,7 +161,7 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold">
-              ${userAnalytics?.totalRevenue.toFixed(2)}
+              ₹{userAnalytics?.totalRevenue.toFixed(2)}
             </p>
           </CardContent>
         </Card>
@@ -129,7 +171,7 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold">
-              ${userAnalytics?.averageOrderValue.toFixed(2)}
+              ₹{userAnalytics?.averageOrderValue.toFixed(2)}
             </p>
           </CardContent>
         </Card>
@@ -190,6 +232,50 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle>Sales and Revenue Over Time</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex justify-center space-x-4 mb-4">
+            <Button
+              variant={timeFrame === "monthly" ? "default" : "outline"}
+              onClick={() => setTimeFrame("monthly")}
+            >
+              Monthly
+            </Button>
+            <Button
+              variant={timeFrame === "yearly" ? "default" : "outline"}
+              onClick={() => setTimeFrame("yearly")}
+            >
+              Yearly
+            </Button>
+          </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={currentData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey={timeFrame === "monthly" ? "month" : "year"} />
+              <YAxis yAxisId="left" />
+              <YAxis yAxisId="right" orientation="right" />
+              <Tooltip />
+              <Legend />
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="sales"
+                stroke="#8884d8"
+              />
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="revenue"
+                stroke="#82ca9d"
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Product Analytics</CardTitle>
@@ -220,9 +306,9 @@ export default function AdminDashboard() {
                   <TableCell>{product.category}</TableCell>
                   <TableCell>{product.purchaseCount}</TableCell>
                   <TableCell>{product.totalSales}</TableCell>
-                  <TableCell>${product.totalRevenue.toFixed(2)}</TableCell>
+                  <TableCell>₹{product.totalRevenue.toFixed(2)}</TableCell>
                   <TableCell>
-                    <Link href={`/analytics/${product.id}`}>
+                    <Link href={`/profile/analytics/${product.id}`}>
                       <Button variant="outline">View Details</Button>
                     </Link>
                   </TableCell>

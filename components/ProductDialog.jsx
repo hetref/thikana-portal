@@ -14,6 +14,9 @@ import { recordPurchase } from "@/lib/inventory-operations";
 
 export function ProductDialog({ product, isOpen, onClose, userId, userData }) {
   const [isLoading, setIsLoading] = useState(false);
+  const [quantity, setQuantity] = useState(1);
+
+  const totalPrice = () => (product.price * quantity).toFixed(2);
 
   const createRazorpayOrder = async (userId, amount) => {
     const response = await fetch("/api/create-product-order", {
@@ -42,7 +45,7 @@ export function ProductDialog({ product, isOpen, onClose, userId, userData }) {
       order_id: order.id,
       handler: async function (response) {
         try {
-          await recordPurchase(userId, product.id, 1, product.price);
+          await recordPurchase(userId, product.id, quantity, product.price);
           toast.success("Payment successful!");
           onClose();
         } catch (error) {
@@ -70,8 +73,8 @@ export function ProductDialog({ product, isOpen, onClose, userId, userData }) {
   const handleBuyNow = async () => {
     setIsLoading(true);
     try {
-      const order = await createRazorpayOrder(userId, product.price);
-      openRazorpayPaymentGateway(order, order.keyId, product.price);
+      const order = await createRazorpayOrder(userId, totalPrice());
+      openRazorpayPaymentGateway(order, order.keyId, totalPrice());
     } catch (error) {
       console.error("Error handling buy now:", error);
       toast.error("Failed to process payment. Please try again.");
@@ -97,18 +100,51 @@ export function ProductDialog({ product, isOpen, onClose, userId, userData }) {
             />
           </div>
           <p className="text-sm text-gray-600">{product.description}</p>
-          <p className="font-bold text-lg">₹{product.price.toFixed(2)}</p>
+          <p className="font-bold text-lg">₹{totalPrice()}</p>
+          {product.quantity > 0 && (
+            <div className="flex items-center">
+              <label htmlFor="quantity" className="mr-2">
+                Quantity:
+              </label>
+              <input
+                type="number"
+                id="quantity"
+                value={quantity}
+                min="1"
+                max={product.quantity}
+                onChange={(e) => setQuantity(Number(e.target.value))}
+                className="border rounded p-1 w-16"
+              />
+            </div>
+          )}
+          {product.quantity === 0 && (
+            <p className="text-sm text-gray-600">Out of stock</p>
+          )}
           <div className="flex gap-4">
-            <Button
-              className="flex-1"
-              onClick={handleBuyNow}
-              disabled={isLoading}
-            >
-              {isLoading ? "Processing..." : "Buy Now"}
-            </Button>
-            <Button variant="outline" className="flex-1">
-              <ShoppingCart className="mr-2 h-4 w-4" /> Add to Cart
-            </Button>
+            {product.quantity === 0 ? (
+              <>
+                <Button
+                  className="flex-1 w-full"
+                  // onClick={handleNotify}
+                  // disabled={isLoading}
+                >
+                  Notify Me
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  className="flex-1"
+                  onClick={handleBuyNow}
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Processing..." : "Buy Now"}
+                </Button>
+                <Button variant="outline" className="flex-1">
+                  <ShoppingCart className="mr-2 h-4 w-4" /> Add to Cart
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </DialogContent>

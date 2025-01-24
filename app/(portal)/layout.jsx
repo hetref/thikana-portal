@@ -35,7 +35,7 @@ const layout = ({ children }) => {
   return (
     <div>
       <TopNavbar type="authenticated" />
-      {children}
+      <div className="mt-[80px]">{children}</div>
     </div>
   );
 };
