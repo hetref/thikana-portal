@@ -13,20 +13,32 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function ProductAnalytics({ userId, productId }) {
   const [analytics, setAnalytics] = useState(null);
 
   useEffect(() => {
-    async function fetchAnalytics() {
-      try {
-        const data = await getProduct(userId, productId);
-        setAnalytics(data);
-      } catch (error) {
+    const productRef = doc(db, `users/${userId}/products`, productId);
+    const unsubscribe = onSnapshot(
+      productRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          setAnalytics({ id: docSnap.id, ...docSnap.data() });
+        } else {
+          setAnalytics(null);
+        }
+      },
+      (error) => {
         console.error("Error fetching product analytics:", error);
+        setAnalytics(null);
       }
-    }
-    fetchAnalytics();
+    );
+
+    return () => {
+      unsubscribe();
+    };
   }, [userId, productId]);
 
   if (!analytics) {
@@ -42,16 +54,24 @@ export default function ProductAnalytics({ userId, productId }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Product Analytics: {analytics.name}</CardTitle>
+        <CardTitle className="text-xl font-bold">
+          Product Analytics: {analytics.name}
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
           <div>
-            <p>Total Sales: {analytics.totalSales}</p>
-            <p>Total Revenue: ${analytics.totalRevenue.toFixed(2)}</p>
-            <p>Purchase Count: {analytics.purchaseCount}</p>
+            <p className="text-lg font-semibold">
+              Total Sales: {analytics.totalSales}
+            </p>
+            <p className="text-lg font-semibold">
+              Total Revenue: ₹{analytics.totalRevenue.toFixed(2)}
+            </p>
+            <p className="text-lg font-semibold">
+              Purchase Count: {analytics.purchaseCount}
+            </p>
           </div>
-          <ResponsiveContainer width="100%" height={300}>
+          {/* <ResponsiveContainer width="100%" height={300}>
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" />
@@ -60,7 +80,7 @@ export default function ProductAnalytics({ userId, productId }) {
               <Legend />
               <Bar dataKey="value" fill="#8884d8" />
             </BarChart>
-          </ResponsiveContainer>
+          </ResponsiveContainer> */}
         </div>
       </CardContent>
     </Card>

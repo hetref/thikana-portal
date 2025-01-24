@@ -283,6 +283,7 @@ export default function AdminDashboard() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>SR No.</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead>Purchase Count</TableHead>
@@ -292,8 +293,9 @@ export default function AdminDashboard() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredProducts.map((product) => (
+              {filteredProducts.map((product, index) => (
                 <TableRow key={product.id}>
+                  <TableCell>{index + 1}</TableCell>
                   <TableCell>{product.name}</TableCell>
                   <TableCell>{product.category}</TableCell>
                   <TableCell>{product.purchaseCount}</TableCell>

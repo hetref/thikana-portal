@@ -15,7 +15,7 @@ export default function ProductAnalyticsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchProduct() {
+    const fetchProduct = async () => {
       try {
         const userId = auth.currentUser?.uid; // Get the current user ID
         console.log("USER ID::", userId, productId);
@@ -31,7 +31,7 @@ export default function ProductAnalyticsPage() {
       } finally {
         setLoading(false);
       }
-    }
+    };
     fetchProduct();
   }, [productId]);
 
