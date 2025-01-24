@@ -45,6 +45,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
+import Link from "next/link";
 
 const InventoryPage = () => {
   const [products, setProducts] = useState([]);
@@ -288,11 +289,11 @@ const InventoryPage = () => {
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => {
-                        setCurrentProduct(product);
-                        setIsAnalyticsDialogOpen(true);
+                        // setCurrentProduct(product);
+                        // setIsAnalyticsDialogOpen(true);
                       }}
                     >
-                      View Analytics
+                      <Link href="/profile/analytics">Analytics</Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => handleDeleteProduct(product)}

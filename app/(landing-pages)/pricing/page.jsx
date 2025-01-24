@@ -234,7 +234,7 @@ export default function PricingPage() {
 
       const options = {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-        key_id: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        // key_id: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
         subscription_id: subscription.id,
         name: "Thikana",
         description:
@@ -259,13 +259,21 @@ export default function PricingPage() {
           });
           toast.success("Subscription successful!");
         },
+        prefill: {
+          name: userData.name,
+          email: userData.email,
+          contact: userData.phone,
+        },
+        notes: {
+          address: "Razorpay Corporate Office",
+        },
         theme: {
           color: "#000000",
         },
       };
 
       // Ensure Razorpay is loaded
-      const rzp = new Razorpay(options);
+      const rzp = new window.Razorpay(options);
       rzp.open();
     } catch (error) {
       console.error("Subscription Error:", error);
