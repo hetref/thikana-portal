@@ -198,7 +198,7 @@ export default function AddPhotoModal({ isOpen, onClose, userId }) {
           )}
           <Button
             type="submit"
-            className="w-full"
+            className="w-full bg-primary hover:bg-blend-darken"
             disabled={!imageFile || !title || isLoading}
           >
             {isLoading ? "Uploading..." : "Add Photo"}
