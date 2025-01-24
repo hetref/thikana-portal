@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ShoppingCart } from "lucide-react";
+import { Minus, Plus, ShoppingCart } from "lucide-react";
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { recordPurchase } from "@/lib/inventory-operations";
@@ -89,23 +89,32 @@ export function ProductDialog({ product, isOpen, onClose, userId, userData }) {
         <DialogHeader>
           <DialogTitle>{product.name}</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-4 items-center justify-center w-full">
+        <div className="flex flex-col gap-4 py-4 justify-center w-full">
           <div className="w-full flex items-center justify-center">
             <Image
               src={product.imageUrl}
               alt={product.name}
               width={300}
               height={300}
-              className="w-64 h-64 object-cover rounded"
+              className="w-full h-64 object-contain rounded"
             />
           </div>
-          <p className="text-sm text-gray-600">{product.description}</p>
-          <p className="font-bold text-lg">₹{totalPrice()}</p>
+          <p className="text-lg text-gray-800">{product.description}</p>
+          <p className="font-bold text-xl text-center">₹{totalPrice()}</p>
           {product.quantity > 0 && (
-            <div className="flex items-center">
-              <label htmlFor="quantity" className="mr-2">
+            <div className="flex items-center justify-center">
+              <label htmlFor="quantity" className="mr-2 text-lg">
                 Quantity:
               </label>
+              <button
+                type="button"
+                onClick={() =>
+                  setQuantity((prevQuantity) => Math.max(1, prevQuantity - 1))
+                }
+                className="border rounded p-1 mr-2"
+              >
+                <Minus />
+              </button>
               <input
                 type="number"
                 id="quantity"
@@ -113,12 +122,23 @@ export function ProductDialog({ product, isOpen, onClose, userId, userData }) {
                 min="1"
                 max={product.quantity}
                 onChange={(e) => setQuantity(Number(e.target.value))}
-                className="border rounded p-1 w-16"
+                className="border rounded p-1 w-[80px] text-center"
               />
+              <button
+                type="button"
+                onClick={() =>
+                  setQuantity((prevQuantity) =>
+                    Math.min(product.quantity, prevQuantity + 1)
+                  )
+                }
+                className="border rounded p-1 ml-2"
+              >
+                <Plus />
+              </button>
             </div>
           )}
           {product.quantity === 0 && (
-            <p className="text-sm text-gray-600">Out of stock</p>
+            <p className="text-sm text-gray-800 text-center">Out of stock</p>
           )}
           <div className="flex gap-4">
             {product.quantity === 0 ? (

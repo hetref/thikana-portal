@@ -73,13 +73,20 @@ export function ProductGrid({ userId, userData }) {
             key={product.id}
           >
             <CardContent className="p-4">
-              <Image
-                src={product.imageUrl}
-                alt={product.title}
-                width={200}
-                height={200}
-                className="w-full object-contain mb-4 rounded"
-              />
+              <div className="relative">
+                <Image
+                  src={product.imageUrl}
+                  alt={product.title}
+                  width={200}
+                  height={200}
+                  className="w-full object-contain mb-4 rounded"
+                />
+                {product.quantity === 0 && (
+                  <span className="w-full absolute top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] text-white text-center font-semibold text-lg bg-red-500/80">
+                    Out of Stock
+                  </span>
+                )}
+              </div>
               <h3 className="font-semibold text-lg mb-2 truncate">
                 {product.title}
               </h3>
