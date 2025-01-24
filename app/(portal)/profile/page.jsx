@@ -200,7 +200,7 @@ export default function Profile() {
   }, [user]);
 
   return (
-    <div className="flex items-center justify-center w-full">
+    <div className="flex items-center justify-center w-full mt-16">
       <div className="max-w-7xl w-full flex justify-center gap-6">
         {/* <aside className="hidden lg:block">
           <div className="sticky top-20">
