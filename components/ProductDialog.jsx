@@ -7,12 +7,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ShoppingCart } from "lucide-react";
+import { Minus, Plus, ShoppingCart } from "lucide-react";
 import { useState } from "react";
 import toast from "react-hot-toast";
+import { recordPurchase } from "@/lib/inventory-operations";
 
 export function ProductDialog({ product, isOpen, onClose, userId, userData }) {
   const [isLoading, setIsLoading] = useState(false);
+  const [quantity, setQuantity] = useState(1);
+
+  const totalPrice = () => (product.price * quantity).toFixed(2);
 
   const createRazorpayOrder = async (userId, amount) => {
     const response = await fetch("/api/create-product-order", {
@@ -39,9 +43,15 @@ export function ProductDialog({ product, isOpen, onClose, userId, userData }) {
       name: userData.name,
       description: "Buy Our Produt",
       order_id: order.id,
-      handler: function (response) {
-        toast.success("Payment successful!");
-        onClose();
+      handler: async function (response) {
+        try {
+          await recordPurchase(userId, product.id, quantity, product.price);
+          toast.success("Payment successful!");
+          onClose();
+        } catch (error) {
+          console.error("Error recording purchase:", error);
+          toast.error("Failed to record purchase. Please contact support.");
+        }
       },
       prefill: {
         name: userData.name,
@@ -63,8 +73,8 @@ export function ProductDialog({ product, isOpen, onClose, userId, userData }) {
   const handleBuyNow = async () => {
     setIsLoading(true);
     try {
-      const order = await createRazorpayOrder(userId, product.price);
-      openRazorpayPaymentGateway(order, order.keyId, product.price);
+      const order = await createRazorpayOrder(userId, totalPrice());
+      openRazorpayPaymentGateway(order, order.keyId, totalPrice());
     } catch (error) {
       console.error("Error handling buy now:", error);
       toast.error("Failed to process payment. Please try again.");
@@ -77,29 +87,84 @@ export function ProductDialog({ product, isOpen, onClose, userId, userData }) {
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{product.title}</DialogTitle>
+          <DialogTitle>{product.name}</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <Image
-            src={product.imageUrl}
-            alt={product.title}
-            width={300}
-            height={300}
-            className="w-full h-64 object-cover rounded"
-          />
-          <p className="text-sm text-gray-600">{product.description}</p>
-          <p className="font-bold text-lg">₹{product.price.toFixed(2)}</p>
+        <div className="flex flex-col gap-4 py-4 justify-center w-full">
+          <div className="w-full flex items-center justify-center">
+            <Image
+              src={product.imageUrl}
+              alt={product.name}
+              width={300}
+              height={300}
+              className="w-full h-64 object-contain rounded"
+            />
+          </div>
+          <p className="text-lg text-gray-800">{product.description}</p>
+          <p className="font-bold text-xl text-center">₹{totalPrice()}</p>
+          {product.quantity > 0 && (
+            <div className="flex items-center justify-center">
+              <label htmlFor="quantity" className="mr-2 text-lg">
+                Quantity:
+              </label>
+              <button
+                type="button"
+                onClick={() =>
+                  setQuantity((prevQuantity) => Math.max(1, prevQuantity - 1))
+                }
+                className="border rounded p-1 mr-2"
+              >
+                <Minus />
+              </button>
+              <input
+                type="number"
+                id="quantity"
+                value={quantity}
+                min="1"
+                max={product.quantity}
+                onChange={(e) => setQuantity(Number(e.target.value))}
+                className="border rounded p-1 w-[80px] text-center"
+              />
+              <button
+                type="button"
+                onClick={() =>
+                  setQuantity((prevQuantity) =>
+                    Math.min(product.quantity, prevQuantity + 1)
+                  )
+                }
+                className="border rounded p-1 ml-2"
+              >
+                <Plus />
+              </button>
+            </div>
+          )}
+          {product.quantity === 0 && (
+            <p className="text-sm text-gray-800 text-center">Out of stock</p>
+          )}
           <div className="flex gap-4">
-            <Button
-              className="flex-1"
-              onClick={handleBuyNow}
-              disabled={isLoading}
-            >
-              {isLoading ? "Processing..." : "Buy Now"}
-            </Button>
-            <Button variant="outline" className="flex-1">
-              <ShoppingCart className="mr-2 h-4 w-4" /> Add to Cart
-            </Button>
+            {product.quantity === 0 ? (
+              <>
+                <Button
+                  className="flex-1 w-full"
+                  // onClick={handleNotify}
+                  // disabled={isLoading}
+                >
+                  Notify Me
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  className="flex-1"
+                  onClick={handleBuyNow}
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Processing..." : "Buy Now"}
+                </Button>
+                <Button variant="outline" className="flex-1">
+                  <ShoppingCart className="mr-2 h-4 w-4" /> Add to Cart
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </DialogContent>

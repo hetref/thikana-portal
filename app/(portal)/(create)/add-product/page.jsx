@@ -24,7 +24,7 @@ import { useRouter } from "next/navigation";
 const productSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().min(1, "Description is required"),
-  price: z.number().min(1, "Price must be a positive number"),
+  price: z.string().min(1, "Price must be a positive number"),
   image: z
     .instanceof(File)
     .refine((file) => file.size <= 5000000, "Max file size is 5MB"),
@@ -51,6 +51,9 @@ const AddProductPage = () => {
         throw new Error("User not authenticated");
       }
 
+      // Convert price to a number
+      const price = parseFloat(data.price);
+
       // Upload image to Firebase Storage
       const storageRef = ref(
         storage,
@@ -64,7 +67,7 @@ const AddProductPage = () => {
       await addDoc(productsRef, {
         title: data.title,
         description: data.description,
-        price: data.price,
+        price: price,
         imageUrl: imageUrl,
       });
 

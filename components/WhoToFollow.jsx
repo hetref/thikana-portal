@@ -92,7 +92,7 @@ export default function WhoToFollow() {
   };
 
   return (
-    <div className="space-y-4 sticky top-[80px]">
+    <div className="space-y-4 sticky top-20 mt-[15px]">
       <Card>
         <CardHeader>
           <CardTitle className="text-xl">Who to Follow</CardTitle>

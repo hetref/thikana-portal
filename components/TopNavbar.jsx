@@ -136,8 +136,7 @@ const TopNavbar = ({ type = "unauthenticated" }) => {
             </>
           )}
 
-          {user &&
-            type === "unauthenticated" &&
+          {type === "unauthenticated" &&
             unauthenticatedItems.map((item) => (
               <Link
                 key={item.title}
