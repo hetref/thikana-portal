@@ -318,31 +318,31 @@ export default function Profile() {
               </Card>
             </div>
             <Tabs defaultValue="posts" className="w-full">
-              <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent">
+              <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent overflow-x-auto whitespace-nowrap sm:text-sm">
                 <TabsTrigger
                   value="posts"
-                  className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 font-semibold"
+                  className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 font-semibold text-sm sm:text-sm"
                 >
                   <FileTextIcon className="w-5 h-5" />
                   Posts
                 </TabsTrigger>
                 <TabsTrigger
                   value="likes"
-                  className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 font-semibold"
+                  className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 font-semibold text-sm sm:text-sm"
                 >
                   <HeartIcon className="w-5 h-5" />
                   Likes
                 </TabsTrigger>
                 <TabsTrigger
                   value="photos"
-                  className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 font-semibold"
+                  className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 font-semibold text-sm sm:text-sm"
                 >
                   <Images className="w-5 h-5" />
                   Photos
                 </TabsTrigger>
                 <TabsTrigger
                   value="products"
-                  className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 font-semibold"
+                  className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 font-semibold text-sm sm:text-sm"
                 >
                   <SquareChartGantt className="w-5 h-5" />
                   Products
