@@ -48,6 +48,8 @@ import Link from "next/link";
 import ShowProductsTabContent from "@/components/profile/ShowProductsTabContent";
 import Image from "next/image";
 
+// TODO: Fix the profile page for user view.
+
 export default function Profile() {
   const router = useRouter();
   const [user, setUser] = useState(null);

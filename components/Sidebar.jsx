@@ -11,7 +11,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { collection, onSnapshot } from "firebase/firestore";
 import { sendEmailVerification } from "firebase/auth";
-// import toast from "react-hot-toast";
+import { useIsBusinessUser } from "@/lib/business-user"; // Import the custom hook
+import toast from "react-hot-toast";
 
 function DefaultSidebar() {
   return (
@@ -47,10 +48,10 @@ export default function Sidebar() {
   const user = useGetUser(userId);
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
+  const { isBusinessUser, loading } = useIsBusinessUser(userId); // Use the custom hook
 
   useEffect(() => {
     if (!userId) return;
-
     const followersRef = collection(db, "users", userId, "followers");
     const followingRef = collection(db, "users", userId, "following");
 
@@ -80,7 +81,7 @@ export default function Sidebar() {
       });
   };
 
-  if (!user) {
+  if (!user || loading) {
     return (
       <div className="flex items-center justify-center">
         <h2>Loading ...</h2>
@@ -129,33 +130,37 @@ export default function Sidebar() {
                   <p className="text-xs text-muted-foreground">Following</p>
                 </div>
                 <Separator orientation="vertical" />
-                <div>
-                  <p className="font-medium">{followersCount || "0"}</p>
-                  <p className="text-xs text-muted-foreground">Followers</p>
-                </div>
+                {isBusinessUser && (
+                  <div>
+                    <p className="font-medium">{followersCount || "0"}</p>
+                    <p className="text-xs text-muted-foreground">Followers</p>
+                  </div>
+                )}
               </div>
               <Separator className="my-4" />
             </div>
-            <div className="w-full space-y-2 text-sm">
-              <div className="flex items-center text-muted-foreground">
-                <MapPinIcon className="w-4 h-4 mr-2" />
-                {user.location || "No location"}
+            {isBusinessUser && (
+              <div className="w-full space-y-2 text-sm">
+                <div className="flex items-center text-muted-foreground">
+                  <MapPinIcon className="w-4 h-4 mr-2" />
+                  {user.location || "No location"}
+                </div>
+                <div className="flex items-center text-muted-foreground">
+                  <LinkIcon className="w-4 h-4 mr-2 shrink-0" />
+                  {user.website || "No website"}
+                </div>
+                <Link
+                  href="/pricing"
+                  className="flex items-center text-muted-foreground font-semibold"
+                >
+                  <TicketCheck className="w-4 h-4 mr-2 shrink-0" />
+                  {(user.plan &&
+                    user.subscriptionStatus === "active" &&
+                    user.plan.charAt(0).toUpperCase() + user.plan.slice(1)) ||
+                    "Free"}
+                </Link>
               </div>
-              <div className="flex items-center text-muted-foreground">
-                <LinkIcon className="w-4 h-4 mr-2 shrink-0" />
-                {user.website || "No website"}
-              </div>
-              <Link
-                href="/pricing"
-                className="flex items-center text-muted-foreground font-semibold"
-              >
-                <TicketCheck className="w-4 h-4 mr-2 shrink-0" />
-                {(user.plan &&
-                  user.subscriptionStatus === "active" &&
-                  user.plan.charAt(0).toUpperCase() + user.plan.slice(1)) ||
-                  "Free"}
-              </Link>
-            </div>
+            )}
           </div>
         </CardContent>
       </Card>

@@ -46,6 +46,7 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
+import ImportProductModalPage from "@/components/inventory/ImportProductModal";
 
 const InventoryPage = () => {
   const [products, setProducts] = useState([]);
@@ -422,6 +423,7 @@ const InventoryPage = () => {
           )}
         </DialogContent>
       </Dialog>
+      {/* <ImportProductModalPage /> */}
     </div>
   );
 };
