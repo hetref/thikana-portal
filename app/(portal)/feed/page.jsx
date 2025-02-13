@@ -2,7 +2,6 @@
 import React, { useEffect, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import WhoToFollow from "@/components/WhoToFollow";
-// import PostCard from "@/components/PostCard";
 import { auth, db } from "@/lib/firebase";
 import {
   collection,
@@ -13,34 +12,38 @@ import {
   getDoc,
   updateDoc,
   arrayUnion,
-  arrayRemove,
+  deleteDoc,
   increment,
+  setDoc,
 } from "firebase/firestore";
 import Chatbot from "@/components/Chatbot";
 import PostCard from "@/components/PostCard";
-
-// In your FeedPage component, add this function:
-
-// Replace your existing useEffect with:
+import Image from "next/image";
 
 const FeedPage = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
-  const [author, setAuthor] = useState(null);
-  const currentUserId = auth.currentUser?.uid;
+  const [authors, setAuthors] = useState({});
   const [hasMore, setHasMore] = useState(true);
-  // Function to update user's recent interactions
+  const currentUserId = auth.currentUser?.uid;
+
   const fetchRecommendations = async (pageNum) => {
-    if (!currentUserId) return;
+    if (!currentUserId) {
+      setError("No user ID found. Please log in.");
+      setLoading(false);
+      return;
+    }
 
     try {
       setLoading(true);
+      setError(null);
+
       const response = await fetch(
-        `http://localhost:8000/recommendations/${currentUserId}?page=${pageNum}&limit=10`,
+        `https://thikana-recommendation-model.onrender.com/recommendations/${currentUserId}?limit=10`,
         {
           method: "GET",
-          credentials: "include",
           headers: {
             Accept: "application/json",
             "Content-Type": "application/json",
@@ -49,169 +52,90 @@ const FeedPage = () => {
       );
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(
+          `HTTP error! status: ${response.status}, message: ${errorText}`
+        );
       }
 
       const data = await response.json();
+      console.log("Received recommendations:", data);
 
-      // Transform recommendations into the format expected by your PostCard component
-      const recommendedPosts = await Promise.all(
+      if (!data.recommendations || !Array.isArray(data.recommendations)) {
+        throw new Error("Invalid recommendations format received");
+      }
+
+      // Fetch like status for each post
+      const likedPosts = new Set();
+      const likesSnapshot = await getDocs(
+        collection(db, "users", currentUserId, "likes")
+      );
+      likesSnapshot.forEach((doc) => likedPosts.add(doc.id));
+
+      // Fetch current likes count for each post
+      const postsWithLikes = await Promise.all(
         data.recommendations.map(async (post) => {
-          // Fetch author details
-          const authorRef = doc(db, "users", post.uid);
-          const authorDoc = await getDoc(authorRef);
-          const authorData = authorDoc.data();
+          if (!post.id) {
+            console.warn("Post missing ID:", post);
+            return null;
+          }
 
-          // Check if post is liked
-          const likeDocRef = doc(db, "users", currentUserId, "likes", post.id);
-          const likeDoc = await getDoc(likeDocRef);
+          const postRef = doc(db, "posts", post.id);
+          const postDoc = await getDoc(postRef);
 
+          if (!postDoc.exists()) {
+            console.warn(`Post ${post.id} not found in Firestore`);
+            return null;
+          }
+
+          const postData = postDoc.data();
+          const postAuthor = await getDoc(doc(db, "users", postData.uid));
+          const postAuthorData = postAuthor.data();
+          console.log("postAuthorData", postAuthorData);
           return {
-            postId: post.id,
             ...post,
-            author: authorData,
-            isLiked: likeDoc.exists(),
+            postId: post.id,
+            likes: postData.likes || 0,
+            isLiked: likedPosts.has(post.id),
+            authorName: postAuthorData.name,
+            authorUsername: postAuthorData.username,
+            authorProfileImage: postAuthorData.profilePic,
           };
         })
       );
 
+      // Filter out null posts
+      const validPosts = postsWithLikes.filter((post) => post !== null);
+
+      console.log("Processed posts:", validPosts);
+
       setPosts((prev) =>
-        pageNum === 1 ? recommendedPosts : [...prev, ...recommendedPosts]
+        pageNum === 1 ? validPosts : [...prev, ...validPosts]
       );
-      setHasMore(data.hasMore);
+      setHasMore(validPosts.length === 10);
     } catch (error) {
       console.error("Error fetching recommendations:", error);
+      setError(`Failed to load posts: ${error.message}`);
     } finally {
       setLoading(false);
     }
   };
-
   useEffect(() => {
     if (currentUserId) {
       fetchRecommendations(1);
+    } else {
+      console.log("No user ID available");
+      setLoading(true); //
     }
   }, [currentUserId]);
 
-  const updateRecentInteractions = async (postId, interactionType) => {
-    if (!currentUserId) return;
-
-    const userRef = doc(db, "users", currentUserId);
-    const userDoc = await getDoc(userRef);
-    const userData = userDoc.data();
-
-    // Get current interactions array
-    const arrayName = `last${interactionType}edPosts`;
-    let currentInteractions = userData?.recentInteractions?.[arrayName] || [];
-
-    // Add new interaction and keep only last 5
-    currentInteractions = [postId, ...currentInteractions.slice(0, 4)];
-
-    // Update the user document
-    await updateDoc(userRef, {
-      [`recentInteractions.${arrayName}`]: currentInteractions,
-    });
-
-    // If it's a like interaction, update business preferences
-    if (interactionType === "Like") {
-      const postDoc = await getDoc(doc(db, "posts", postId));
-      const businessType = postDoc.data()?.businessType;
-      if (businessType) {
-        await updateDoc(userRef, {
-          businessPreferences: arrayUnion(businessType),
-        });
-      }
-    }
-  };
-
-  // Function to handle post view
-  const handlePostView = async (postId) => {
-    if (!currentUserId) return;
-
-    // Update post view count
-    const postRef = doc(db, "posts", postId);
-    await updateDoc(postRef, {
-      "interactions.viewCount": increment(1),
-    });
-
-    // Update user's recent views
-    await updateRecentInteractions(postId, "View");
-  };
-
-  useEffect(() => {
-    const fetchPosts = async () => {
-      setLoading(true);
-      try {
-        // Fetch posts from Firestore
-        const postsRef = collection(db, "posts");
-        const postsQuery = query(postsRef, where("uid", "!=", currentUserId));
-        const querySnapshot = await getDocs(postsQuery);
-
-        const postsData = await Promise.all(
-          querySnapshot.docs.map(async (docu) => {
-            const postData = docu.data();
-            const postId = docu.id;
-
-            // Fetch author details
-            const authorRef = doc(db, "users", postData.uid);
-            const authorDoc = await getDoc(authorRef);
-            const authorData = authorDoc.data();
-
-            // Check if post is liked
-            const likeDocRef = doc(db, "users", currentUserId, "likes", postId);
-            const likeDoc = await getDoc(likeDocRef);
-
-            // Track view for each post
-            await handlePostView(postId);
-
-            // Return formatted post data
-            return {
-              postId,
-              ...postData,
-              author: authorData,
-              isLiked: likeDoc.exists(),
-            };
-          })
-        );
-
-        // Update state with fetched posts
-        setPosts((prev) => (page === 1 ? postsData : [...prev, ...postsData]));
-      } catch (error) {
-        console.error("Error fetching posts:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (currentUserId) {
-      fetchPosts();
-    }
-  }, [currentUserId, page]);
-
-  const handlePostLike = async (post) => {
-    if (!currentUserId) return;
-
-    const likeRef = doc(db, "users", currentUserId, "likes", post.postId);
-    const postRef = doc(db, "posts", post.postId);
-
-    if (post.isLiked) {
-      // Unlike
-      await updateDoc(postRef, { likes: increment(-1) });
-      await updateDoc(doc(db, "users", currentUserId), {
-        [`recentInteractions.lastLikedPosts`]: arrayRemove(post.postId),
-      });
-    } else {
-      // Like
-      await updateDoc(postRef, { likes: increment(1) });
-      await updateRecentInteractions(post.postId, "Like");
-    }
-
-    // Update posts state
-    setPosts((prevPosts) =>
-      prevPosts.map((p) =>
-        p.postId === post.postId ? { ...p, isLiked: !p.isLiked } : p
-      )
+  if (error) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <p className="text-red-500">{error}</p>
+      </div>
     );
-  };
+  }
 
   const loadMore = () => {
     if (!loading && hasMore) {
@@ -222,11 +146,19 @@ const FeedPage = () => {
   };
 
   if (loading && posts.length === 0) {
-    return <p>Loading posts...</p>;
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <p>Loading posts...</p>
+      </div>
+    );
   }
 
-  if (posts.length === 0) {
-    return <p>No posts found.</p>;
+  if (!loading && posts.length === 0) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <p>No posts found.</p>
+      </div>
+    );
   }
 
   return (
@@ -241,7 +173,6 @@ const FeedPage = () => {
               <PostCard
                 key={post.postId}
                 post={post}
-                author={post.author}
                 onLike={() => handlePostLike(post)}
                 onView={() => handlePostView(post.postId)}
               />

@@ -26,8 +26,8 @@ export default function WhoToFollow() {
 
     const unsubscribeUsers = onSnapshot(
       query(
-        collection(db, "users"),
-        where("uid", "not-in", [auth.currentUser.uid])
+        collection(db, "businesses"),
+        where("adminId", "not-in", [auth.currentUser.uid])
       ),
       (snapshot) => {
         const usersList = [];
