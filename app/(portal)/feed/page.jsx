@@ -42,7 +42,7 @@ const FeedPage = () => {
       console.log("Fetching recommendations for user:", currentUserId);
 
       const response = await fetch(
-        `http://localhost:8000/recommendations/${currentUserId}?limit=10`,
+        `https://thikana-recommendation-model.onrender.com/recommendations/${currentUserId}?limit=10`,
         {
           method: "GET",
           credentials: "include",
