@@ -89,11 +89,17 @@ const FeedPage = () => {
           }
 
           const postData = postDoc.data();
+          const postAuthor = await getDoc(doc(db, "users", postData.uid));
+          const postAuthorData = postAuthor.data();
+          console.log("postAuthorData", postAuthorData);
           return {
             ...post,
             postId: post.id,
             likes: postData.likes || 0,
             isLiked: likedPosts.has(post.id),
+            authorName: postAuthorData.name,
+            authorUsername: postAuthorData.username,
+            authorProfileImage: postAuthorData.profilePic,
           };
         })
       );
@@ -269,7 +275,6 @@ const FeedPage = () => {
               <PostCard
                 key={post.postId}
                 post={post}
-                author={post.author || authors[post.uid]}
                 onLike={() => handlePostLike(post)}
                 onView={() => handlePostView(post.postId)}
               />
