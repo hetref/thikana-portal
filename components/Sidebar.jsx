@@ -13,6 +13,7 @@ import { collection, onSnapshot } from "firebase/firestore";
 import { sendEmailVerification } from "firebase/auth";
 import { useIsBusinessUser } from "@/lib/business-user"; // Import the custom hook
 import toast from "react-hot-toast";
+import { userEmailStatus } from "@/utils/userStatus";
 
 function DefaultSidebar() {
   return (
@@ -112,14 +113,17 @@ export default function Sidebar() {
                 </p>
               </div>
             </Link>
-            {!auth?.currentUser.emailVerified && (
+            {userEmailStatus() === false && (
               <>
-                <p className="mt-3 text-sm text-muted-foreground">
+                <div className="mt-3 text-sm text-muted-foreground">
                   <p>Email not verified</p>
-                  <Button onClick={verifyEmailHandler} variant="ghost">
+                  <Button
+                    onClick={verifyEmailHandler}
+                    className="bg-emerald-800 mt-1"
+                  >
                     Verify Email
                   </Button>
-                </p>
+                </div>
               </>
             )}
             <div className="w-full">

@@ -48,6 +48,8 @@ import {
 import Link from "next/link";
 import ImportProductModalPage from "@/components/inventory/ImportProductModal";
 
+// TODO: Add Print invoice option.
+
 const InventoryPage = () => {
   const [products, setProducts] = useState([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);

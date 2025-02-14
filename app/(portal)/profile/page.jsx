@@ -47,6 +47,9 @@ import Chatbot from "@/components/Chatbot";
 import Link from "next/link";
 import ShowProductsTabContent from "@/components/profile/ShowProductsTabContent";
 import Image from "next/image";
+import { userEmailStatus } from "@/utils/userStatus";
+import toast from "react-hot-toast";
+import { sendEmailVerification } from "firebase/auth";
 
 // TODO: Fix the profile page for user view.
 
@@ -201,14 +204,22 @@ export default function Profile() {
     getLikedPosts();
   }, [user]);
 
+  const verifyEmailHandler = () => {
+    if (user) {
+      sendEmailVerification(user)
+        .then(() => {
+          toast.success("Email Verification Link Sent Sucessfully!");
+          console.log("Email verification sent");
+        })
+        .catch((error) => {
+          console.error("Error sending email verification:", error);
+        });
+    }
+  };
+
   return (
     <div className="flex items-center justify-center w-full">
       <div className="max-w-7xl w-full flex justify-center gap-6">
-        {/* <aside className="hidden lg:block">
-          <div className="sticky top-20">
-            <Sidebar />
-          </div>
-        </aside> */}
         <main className="mx-auto w-full md:w-4/6 px-2 mt-[15px]">
           <div className="grid grid-cols-1 gap-6">
             <div className="w-full">
@@ -317,116 +328,134 @@ export default function Profile() {
                 </CardContent>
               </Card>
             </div>
-            <Tabs defaultValue="posts" className="w-full">
-              <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent overflow-x-auto whitespace-nowrap sm:text-sm">
-                <TabsTrigger
-                  value="posts"
-                  className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 font-semibold text-sm sm:text-sm"
+            {userEmailStatus() === false && (
+              <div className="w-full text-center text-lg">
+                <p>Please verify your email to access the platform features.</p>
+                <Button
+                  onClick={verifyEmailHandler}
+                  className="bg-emerald-800 mt-3"
                 >
-                  <FileTextIcon className="w-5 h-5" />
-                  Posts
-                </TabsTrigger>
-                <TabsTrigger
-                  value="likes"
-                  className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 font-semibold text-sm sm:text-sm"
-                >
-                  <HeartIcon className="w-5 h-5" />
-                  Likes
-                </TabsTrigger>
-                <TabsTrigger
-                  value="photos"
-                  className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 font-semibold text-sm sm:text-sm"
-                >
-                  <Images className="w-5 h-5" />
-                  Photos
-                </TabsTrigger>
-                <TabsTrigger
-                  value="products"
-                  className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 font-semibold text-sm sm:text-sm"
-                >
-                  <SquareChartGantt className="w-5 h-5" />
-                  Products
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="posts" className="p-6">
-                {renderPosts()}
-              </TabsContent>
-              <TabsContent value="likes" className="p-6">
-                <div className="space-y-4">
-                  {likedPosts.map((post, index) => (
-                    <Card key={index} className="p-4">
-                      <ProfilePosts post={post} userData={userData} />
-                    </Card>
-                  ))}
-                </div>
-              </TabsContent>
-              <TabsContent value="photos" className="p-6">
-                {userData?.photos && userData.photos.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-4">
-                    {userData.photos.map((photo, index) => (
-                      <Dialog key={index}>
-                        {/* Trigger for the Dialog */}
-                        <DialogTrigger asChild>
-                          <div>
+                  Verify Email
+                </Button>
+              </div>
+            )}
+            {userEmailStatus() === true && (
+              <Tabs defaultValue="posts" className="w-full">
+                <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent overflow-x-auto whitespace-nowrap sm:text-sm">
+                  <TabsTrigger
+                    value="posts"
+                    className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 font-semibold text-sm sm:text-sm"
+                  >
+                    <FileTextIcon className="w-5 h-5" />
+                    Posts
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="likes"
+                    className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 font-semibold text-sm sm:text-sm"
+                  >
+                    <HeartIcon className="w-5 h-5" />
+                    Likes
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="photos"
+                    className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 font-semibold text-sm sm:text-sm"
+                  >
+                    <Images className="w-5 h-5" />
+                    Photos
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="products"
+                    className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 font-semibold text-sm sm:text-sm"
+                  >
+                    <SquareChartGantt className="w-5 h-5" />
+                    Products
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="posts" className="p-6">
+                  {renderPosts()}
+                </TabsContent>
+                <TabsContent value="likes" className="p-6">
+                  <div className="space-y-4">
+                    {likedPosts.map((post, index) => (
+                      <Card key={index} className="p-4">
+                        <ProfilePosts post={post} userData={userData} />
+                      </Card>
+                    ))}
+                  </div>
+                </TabsContent>
+                <TabsContent value="photos" className="p-6">
+                  {userData?.photos && userData.photos.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-4">
+                      {userData.photos.map((photo, index) => (
+                        <Dialog key={index}>
+                          {/* Trigger for the Dialog */}
+                          <DialogTrigger asChild>
+                            <div>
+                              <Image
+                                width={1000}
+                                height={1000}
+                                src={photo.photoUrl}
+                                alt={photo.title}
+                                className="w-full h-auto rounded-lg rounded-b-none"
+                              />
+                              <div className="bg-black bg-opacity-90 border-t-2 border-white text-white p-2 rounded-b-lg">
+                                <p>{photo.title}</p>
+                                <p>
+                                  {new Date(photo.addedOn).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                          </DialogTrigger>
+                          {/* Dialog Content */}
+                          <DialogContent className="w-full max-w-3xl p-4 flex flex-col gap-2 justify-center items-center">
+                            <DialogTitle>{photo.title}</DialogTitle>
+                            <DialogDescription>
+                              {new Date(photo.addedOn).toLocaleDateString()}
+                            </DialogDescription>
                             <Image
                               width={1000}
                               height={1000}
                               src={photo.photoUrl}
-                              alt={photo.title}
-                              className="w-full h-auto rounded-lg rounded-b-none"
+                              alt="Full View"
+                              className="max-w-full rounded-lg max-h-[80svh] max-w-[80vw]]"
                             />
-                            <div className="bg-black bg-opacity-90 border-t-2 border-white text-white p-2 rounded-b-lg">
-                              <p>{photo.title}</p>
-                              <p>
-                                {new Date(photo.addedOn).toLocaleDateString()}
-                              </p>
-                            </div>
-                          </div>
-                        </DialogTrigger>
-                        {/* Dialog Content */}
-                        <DialogContent className="w-full max-w-3xl p-4 flex flex-col gap-2 justify-center items-center">
-                          <DialogTitle>{photo.title}</DialogTitle>
-                          <DialogDescription>
-                            {new Date(photo.addedOn).toLocaleDateString()}
-                          </DialogDescription>
-                          <Image
-                            width={1000}
-                            height={1000}
-                            src={photo.photoUrl}
-                            alt="Full View"
-                            className="max-w-full rounded-lg max-h-[80svh] max-w-[80vw]]"
-                          />
-                        </DialogContent>
-                      </Dialog>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center">
-                    <p className="text-muted-foreground">No Photos Added Yet</p>
-                    <Button
-                      className="mt-2"
-                      onClick={() => {
-                        /* Add photo logic */
-                      }}
-                    >
-                      Add Photo
-                    </Button>
-                  </div>
-                )}
-              </TabsContent>
-              <TabsContent value="products" className="p-6">
-                {/* <div className="space-y-4">
+                          </DialogContent>
+                        </Dialog>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center">
+                      <p className="text-muted-foreground">
+                        No Photos Added Yet
+                      </p>
+                      <Button
+                        className="mt-2"
+                        onClick={() => {
+                          /* Add photo logic */
+                        }}
+                      >
+                        Add Photo
+                      </Button>
+                    </div>
+                  )}
+                </TabsContent>
+                <TabsContent value="products" className="p-6">
+                  {/* <div className="space-y-4">
                   {likedPosts.map((post, index) => (
                     <Card key={index} className="p-4">
                       <ProfilePosts post={post} userData={userData} />
                     </Card>
                   ))}
                 </div> */}
-                {userData && user && (
-                  <ShowProductsTabContent userId={userId} userData={userData} />
-                )}
-              </TabsContent>
-            </Tabs>
+                  {userData && user && (
+                    <ShowProductsTabContent
+                      userId={userId}
+                      userData={userData}
+                    />
+                  )}
+                </TabsContent>
+              </Tabs>
+            )}
           </div>
         </main>
         <aside className="hidden lg:block w-2/6">
