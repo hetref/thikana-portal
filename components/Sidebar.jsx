@@ -147,15 +147,45 @@ export default function Sidebar() {
               <div className="w-full space-y-2 text-sm">
                 <div className="flex items-center text-muted-foreground">
                   <MapPinIcon className="w-4 h-4 mr-2" />
-                  {user.location || "No location"}
+                  {/* {user.location || "No location"} */}
+
+                  {user?.location ? (
+                    <a
+                      href={user.location}
+                      className="hover:underline"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {user.location}
+                    </a>
+                  ) : (
+                    "No location"
+                  )}
                 </div>
                 <div className="flex items-center text-muted-foreground">
                   <LinkIcon className="w-4 h-4 mr-2 shrink-0" />
-                  {user.website || "No website"}
+                  {/* {user.website || "No website"} */}
+
+                  {user?.website ? (
+                    <a
+                      href={
+                        user.website.startsWith("http")
+                          ? user.website
+                          : `https://${user.website}`
+                      }
+                      className="hover:underline"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {user.website}
+                    </a>
+                  ) : (
+                    "No website"
+                  )}
                 </div>
                 <Link
                   href="/pricing"
-                  className="flex items-center text-muted-foreground font-semibold"
+                  className="flex items-center text-muted-foreground font-semibold w-fit"
                 >
                   <TicketCheck className="w-4 h-4 mr-2 shrink-0" />
                   {(user.plan &&

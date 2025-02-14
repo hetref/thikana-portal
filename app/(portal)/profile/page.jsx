@@ -28,6 +28,10 @@ import {
   Loader2Icon,
   Images,
   SquareChartGantt,
+  Globe,
+  Contact,
+  Info,
+  MapPin,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import WhoToFollow from "@/components/WhoToFollow";
@@ -50,6 +54,7 @@ import Image from "next/image";
 import { userEmailStatus } from "@/utils/userStatus";
 import toast from "react-hot-toast";
 import { sendEmailVerification } from "firebase/auth";
+import MoreInformationDialog from "@/components/profile/MoreInformationDialog";
 
 // TODO: Fix the profile page for user view.
 
@@ -63,15 +68,8 @@ export default function Profile() {
   const userData = useGetUser(userId);
   const { posts, loading, fetchMorePosts, hasMore, error } =
     useGetUserPosts(userId);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showLocationIFrame, setShowLocationIFrame] = useState(false);
   console.log("USERDATA", userData);
-  const [showEditDialog, setShowEditDialog] = useState(false);
-  const [editForm, setEditForm] = useState({
-    name: "",
-    bio: "",
-    location: "",
-    website: "",
-  });
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((authUser) => {
@@ -83,17 +81,6 @@ export default function Profile() {
     });
     return () => unsubscribe();
   }, [router]);
-
-  useEffect(() => {
-    if (userData) {
-      setEditForm({
-        name: userData?.username || "",
-        bio: userData?.bio || "",
-        location: userData?.location || "",
-        website: userData?.website || "",
-      });
-    }
-  }, [userData]);
 
   useEffect(() => {
     if (!userId) return;
@@ -115,11 +102,6 @@ export default function Profile() {
       unsubscribeFollowing(); // Cleanup on unmount
     };
   }, [userId]);
-
-  const handleEditSubmit = async () => {
-    // TODO: Implement profile update logic
-    setShowEditDialog(true);
-  };
 
   const handleLoadMore = () => {
     if (hasMore && !loading) {
@@ -226,19 +208,33 @@ export default function Profile() {
               <Card className="bg-card">
                 <CardContent className="pt-6">
                   <div className="flex flex-col items-center text-center">
-                    <Avatar className="w-24 h-24 border">
-                      <AvatarImage
-                        src={userData?.profilePic || "/avatar.png"}
+                    <div className="relative mb-12">
+                      {/* <Avatar className="w-full h-full border">
+                        <AvatarImage
+                          src={userData?.coverPic || "/avatar.png"}
+                        />
+                      </Avatar> */}
+                      <Image
+                        src={userData?.coverPic || "/coverimg.png"}
+                        width={2000}
+                        height={2000}
+                        alt="Cover Image"
+                        className="w-full h-full object-cover"
                       />
-                    </Avatar>
+                      <Avatar className="w-24 h-24 border absolute left-[50%] -translate-x-1/2 -translate-y-1/2">
+                        <AvatarImage
+                          src={userData?.profilePic || "/avatar.png"}
+                        />
+                      </Avatar>
+                    </div>
                     <h1 className="mt-4 text-2xl font-bold">
-                      {userData?.name}
+                      {userData?.businessName || "Business Name"}
                     </h1>
-                    <p className="text-muted-foreground">
-                      @{userData?.username}
-                    </p>
+                    <h3 className="text-base font-semibold">
+                      Owner - {userData?.name || "Name"}
+                    </h3>
                     <p className="mt-2 text-sm">
-                      {userData?.bio || "No bio yet"}
+                      {userData?.bio || "Amazing Bio..."}
                     </p>
                     <div className="w-full mt-6">
                       <div className="flex justify-between mb-4">
@@ -273,14 +269,55 @@ export default function Profile() {
                         </div>
                       </div>
                     </div>
-                    {userId === user?.uid && (
+                    {/* {userId === user?.uid && ( */}
+                    {/* <> */}
+                    <div className="flex items-center w-full gap-2">
+                      {userId === user?.uid && (
+                        <Link
+                          className="w-full flex items-center justify-center gap-2 bg-black/90 px-4 py-2 rounded-md text-white hover:bg-black transition-all ease-in-out duration-200"
+                          href="/profile/settings"
+                        >
+                          <EditIcon className="w-4 h-4 mr-2" />
+                          Edit Profile
+                        </Link>
+                      )}
+                      <Button variant="ghost" asChild>
+                        <Link href={userData?.website || "#"} target="_blank">
+                          <Globe className="w-4 h-4" />
+                        </Link>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        onClick={() =>
+                          setShowLocationIFrame(!showLocationIFrame)
+                        }
+                      >
+                        {/* <Link href={userData?.website || "#"} target="_blank"> */}
+                        <MapPinIcon className="w-4 h-4" />
+                        {/* </Link> */}
+                      </Button>
+                      {userData && (
+                        <MoreInformationDialog userData={userData} />
+                      )}
+                    </div>
+                    {showLocationIFrame && (
+                      <div className="w-full mt-4">
+                        <iframe
+                          src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d7544.081477968485!2d73.08964204800337!3d19.017926421940366!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3be7e9d390c16fad%3A0x45a26096b6c171fd!2sKamothe%2C%20Panvel%2C%20Navi%20Mumbai%2C%20Maharashtra!5e0!3m2!1sen!2sin!4v1739571469059!5m2!1sen!2sin"
+                          style={{ border: "0" }}
+                          allowFullScreen=""
+                          loading="lazy"
+                          referrerPolicy="no-referrer-when-downgrade"
+                          className="w-full h-[200px] rounded-lg"
+                        ></iframe>
+                      </div>
+                    )}
+                    {/* </> */}
+                    {/* )} */}
+                    {/* {userId === user?.uid && (
                       <>
                         <Link
                           className="w-full mt-4 flex items-center justify-center gap-2 bg-black/90 px-4 py-2 rounded-md text-white hover:bg-black transition-all ease-in-out duration-200"
-                          // onClick={() => {
-                          //   setIsModalOpen(true);
-                          //   console.log("Edit button clicked", userData);
-                          // }}
                           href="/profile/settings"
                         >
                           <EditIcon className="w-4 h-4 mr-2" />
@@ -294,11 +331,22 @@ export default function Profile() {
                           />
                         )}
                       </>
-                    )}
-                    <div className="w-full mt-6 space-y-2 text-sm">
+                    )} */}
+                    {/* <div className="w-full mt-6 space-y-2 text-sm">
                       <div className="flex items-center text-muted-foreground">
                         <MapPinIcon className="w-4 h-4 mr-2" />
-                        {userData?.location || "No location"}
+                        {userData?.location ? (
+                          <a
+                            href={userData?.location || "#"}
+                            className="hover:underline"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            {userData.location}
+                          </a>
+                        ) : (
+                          "No location"
+                        )}
                       </div>
                       <div className="flex items-center text-muted-foreground">
                         <LinkIcon className="w-4 h-4 mr-2" />
@@ -323,7 +371,7 @@ export default function Profile() {
                         <CalendarIcon className="w-4 h-4 mr-2" />
                         Joined {formattedDate}
                       </div>
-                    </div>
+                    </div> */}
                   </div>
                 </CardContent>
               </Card>
