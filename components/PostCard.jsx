@@ -32,6 +32,8 @@ function PostCard({ post, onLike, onView }) {
     <Card className="max-w-md mx-auto" onClick={onView}>
       <CardHeader className="flex flex-row items-center space-x-4 p-4">
         <Avatar>
+          <AvatarImage src={author?.profilePic} alt={"yash"} />
+          <AvatarFallback>{"yash".charAt(0)}</AvatarFallback>
           <AvatarImage
             src={post?.authorProfileImage || "/default-avatar.png"}
             alt={post?.authorName || "User"}
@@ -39,6 +41,8 @@ function PostCard({ post, onLike, onView }) {
           <AvatarFallback>{(post?.authorName || "U").charAt(0)}</AvatarFallback>
         </Avatar>
         <div className="flex-1 space-y-1">
+          <p className="text-sm font-medium leading-none">{"yash"}</p>
+          <p className="text-sm text-muted-foreground">@{author?.username}</p>
           <p className="text-sm font-medium leading-none">
             {post?.authorName || "Anonymous"}
           </p>

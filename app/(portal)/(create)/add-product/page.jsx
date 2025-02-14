@@ -24,7 +24,7 @@ import { useRouter } from "next/navigation";
 const productSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().min(1, "Description is required"),
-  price: z.number().min(1, "Price must be a positive number"),
+  price: z.string().min(1, "Price must be a positive number"),
   image: z
     .instanceof(File)
     .refine((file) => file.size <= 5000000, "Max file size is 5MB"),
@@ -51,6 +51,9 @@ const AddProductPage = () => {
         throw new Error("User not authenticated");
       }
 
+      // Convert price to a number
+      const price = parseFloat(data.price);
+
       // Upload image to Firebase Storage
       const storageRef = ref(
         storage,
@@ -64,7 +67,7 @@ const AddProductPage = () => {
       await addDoc(productsRef, {
         title: data.title,
         description: data.description,
-        price: data.price,
+        price: price,
         imageUrl: imageUrl,
       });
 
@@ -80,74 +83,101 @@ const AddProductPage = () => {
   };
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <FormField
-          control={form.control}
-          name="title"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Product Title</FormLabel>
-              <FormControl>
-                <Input placeholder="Enter product title" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Product Description</FormLabel>
-              <FormControl>
-                <Textarea placeholder="Enter product description" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="price"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Product Price</FormLabel>
-              <FormControl>
-                <Input
-                  type="number"
-                  placeholder="Enter product price"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="image"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Product Image</FormLabel>
-              <FormControl>
-                <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => field.onChange(e.target.files[0])}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Saving..." : "Save Product"}
-        </Button>
-      </form>
-    </Form>
-  );
+    <div className="mt-10 max-w-lg mx-auto p-4 sm:p-6 md:p-8 shadow-md rounded-md text-primary border border-primary-foreground">
+      <h1 className="text-2xl font-bold text-center text-primary mb-6">
+        Add New Product
+      </h1>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <FormField
+            control={form.control}
+            name="title"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="font-medium">
+                  Product Title
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="Enter product title"
+                    {...field}
+                    className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="description"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="font-medium">
+                  Product Description
+                </FormLabel>
+                <FormControl>
+                  <Textarea
+                    placeholder="Enter product description"
+                    {...field}
+                    className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="price"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="font-medium">
+                  Product Price
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    placeholder="Enter product price"
+                    {...field}
+                    className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="image"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="font-medium">
+                  Product Image
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => field.onChange(e.target.files[0])}
+                    className="text-primary w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full bg-primary hover:bg-blend-darken font-semibold py-2 px-4 rounded-md transition-all duration-200 disabled:opacity-50"
+          >
+            {isSubmitting ? "Saving..." : "Save Product"}
+          </Button>
+        </form>
+      </Form>
+    </div>
+  );  
 };
 
 export default AddProductPage;

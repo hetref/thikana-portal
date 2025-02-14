@@ -1,6 +1,5 @@
 "use client";
-
-import { useState, useEffect, useRef, use } from "react";
+import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -57,25 +56,13 @@ export default function Chatbot() {
   const scrollref = useRef(null);
   const [suggestions, setSuggestions] = useState([]);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      if (window.scrollY > 200) {
-        setShowChatIcon(true);
-      } else {
-        setShowChatIcon(false);
-        setIsChatOpen(false);
-      }
-    };
-
-    handleScroll();
-
-    window.addEventListener("scroll", handleScroll);
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-    };
-  }, []);
   const toggleChat = () => {
     setIsChatOpen(!isChatOpen);
+    if (!isChatOpen && scrollref.current) {
+      scrollref.current.scrollIntoView({ behavior: "smooth" });
+    } else if (isChatOpen && scrollref.current) {
+      scrollref.current.scrollIntoView({ behavior: "smooth" });
+    }
   };
 
   useEffect(() => {
@@ -113,14 +100,7 @@ export default function Chatbot() {
   return (
     <div>
       <AnimatePresence>
-        {/* {showChatIcon && ( */}
-        <motion.div
-          // initial={{ opacity: 0, y: 100 }}
-          // animate={{ opacity: 1, y: 0 }}
-          // exit={{ opacity: 0, y: 100 }}
-          // transition={{ duration: 0.2 }}
-          className="fixed bottom-4 right-4 z-80"
-        >
+        <motion.div className="fixed bottom-4 right-4 z-80">
           <Button
             ref={chatIconRef}
             onClick={toggleChat}
@@ -134,17 +114,10 @@ export default function Chatbot() {
             )}
           </Button>
         </motion.div>
-        {/* )} */}
       </AnimatePresence>
       <AnimatePresence>
         {isChatOpen && (
-          <motion.div
-            // initial={{ opacity: 0, scale: 0.8 }}
-            // animate={{ opacity: 1, scale: 1 }}
-            // exit={{ opacity: 0, scale: 0.8 }}
-            // transition={{ duration: 0.2 }}
-            className="fixed bottom-20 right-4 z-50 w-[95%] md:w-[500px]"
-          >
+          <motion.div className="fixed bottom-20 right-4 z-50 w-[95%] md:w-[500px]">
             <Card className="border-2">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                 <CardTitle className="text-lg font-bold">
