@@ -39,11 +39,13 @@ const FeedPage = () => {
     try {
       setLoading(true);
       setError(null);
+      console.log("Fetching recommendations for user:", currentUserId);
 
       const response = await fetch(
-        `https://thikana-recommendation-model.onrender.com/recommendations/${currentUserId}?limit=10`,
+        `http://localhost:8000/recommendations/${currentUserId}?limit=10`,
         {
           method: "GET",
+          credentials: "include",
           headers: {
             Accept: "application/json",
             "Content-Type": "application/json",
@@ -60,11 +62,9 @@ const FeedPage = () => {
 
       const data = await response.json();
       console.log("Received recommendations:", data);
-
       if (!data.recommendations || !Array.isArray(data.recommendations)) {
         throw new Error("Invalid recommendations format received");
       }
-
       // Fetch like status for each post
       const likedPosts = new Set();
       const likesSnapshot = await getDocs(
@@ -89,35 +89,138 @@ const FeedPage = () => {
           }
 
           const postData = postDoc.data();
-          const postAuthor = await getDoc(doc(db, "users", postData.uid));
-          const postAuthorData = postAuthor.data();
-          console.log("postAuthorData", postAuthorData);
           return {
             ...post,
             postId: post.id,
             likes: postData.likes || 0,
             isLiked: likedPosts.has(post.id),
-            authorName: postAuthorData.name,
-            authorUsername: postAuthorData.username,
-            authorProfileImage: postAuthorData.profilePic,
           };
         })
       );
-
-      // Filter out null posts
       const validPosts = postsWithLikes.filter((post) => post !== null);
 
       console.log("Processed posts:", validPosts);
 
       setPosts((prev) =>
-        pageNum === 1 ? validPosts : [...prev, ...validPosts]
+        pageNum === 1 ? postsWithLikes : [...prev, ...postsWithLikes]
       );
-      setHasMore(validPosts.length === 10);
+      setHasMore(data.recommendations.length === 10);
     } catch (error) {
       console.error("Error fetching recommendations:", error);
-      setError(`Failed to load posts: ${error.message}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const updateRecentInteractions = async (postId, interactionType) => {
+    if (!currentUserId) return;
+
+    try {
+      const userRef = doc(db, "users", currentUserId);
+      const userDoc = await getDoc(userRef);
+
+      if (!userDoc.exists()) {
+        console.error("User document not found");
+        return;
+      }
+
+      const userData = userDoc.data();
+      const arrayName = `last${interactionType}edPosts`;
+      let currentInteractions = userData?.recentInteractions?.[arrayName] || [];
+      currentInteractions = [postId, ...currentInteractions.slice(0, 4)];
+
+      await updateDoc(userRef, {
+        [`recentInteractions.${arrayName}`]: currentInteractions,
+      });
+
+      if (interactionType === "Like") {
+        const postDoc = await getDoc(doc(db, "posts", postId));
+        if (postDoc.exists()) {
+          const businessType = postDoc.data()?.businessType;
+          if (businessType) {
+            console.log("Updating business preferences:", businessType);
+            await updateDoc(userRef, {
+              businessPreferences: arrayUnion(businessType),
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Error updating interactions: ${error}`);
+    }
+  };
+
+  const handlePostView = async (postId) => {
+    if (!currentUserId || !postId) return;
+
+    try {
+      const postRef = doc(db, "posts", postId);
+      await updateDoc(postRef, {
+        "interactions.viewCount": increment(1),
+      });
+      await updateRecentInteractions(postId, "View");
+    } catch (error) {
+      console.error(`Error handling post view: ${error}`);
+    }
+  };
+
+  const handlePostLike = async (post) => {
+    if (!currentUserId || !post?.postId) return;
+
+    try {
+      const likeRef = doc(db, "users", currentUserId, "likes", post.postId);
+      const postRef = doc(db, "posts", post.postId);
+      const userRef = doc(db, "users", currentUserId);
+
+      const postDoc = await getDoc(postRef);
+
+      if (!postDoc.exists()) {
+        console.error("Post not found");
+        return;
+      }
+
+      const postData = postDoc.data();
+      const businessType = postData.businessType;
+
+      if (post.isLiked) {
+        // Unlike the post
+        await deleteDoc(likeRef);
+        await updateDoc(postRef, { likes: increment(-1) });
+      } else {
+        // Like the post
+        await setDoc(likeRef, {
+          timestamp: new Date(),
+          businessType: businessType, // Store business type in like document
+        });
+        await updateDoc(postRef, { likes: increment(1) });
+
+        // Update user's business preferences
+        if (businessType) {
+          await updateDoc(userRef, {
+            businessPreferences: arrayUnion(businessType),
+          });
+        }
+      }
+
+      // Update posts state
+      setPosts((prevPosts) =>
+        prevPosts.map((p) =>
+          p.postId === post.postId
+            ? {
+                ...p,
+                isLiked: !p.isLiked,
+                likes: p.likes + (p.isLiked ? -1 : 1),
+              }
+            : p
+        )
+      );
+
+      // Fetch new recommendations after like/unlike
+      await fetchRecommendations(1);
+
+      await updateRecentInteractions(post.postId, "Like");
+    } catch (error) {
+      console.error("Error handling like:", error);
     }
   };
   useEffect(() => {
@@ -125,17 +228,10 @@ const FeedPage = () => {
       fetchRecommendations(1);
     } else {
       console.log("No user ID available");
-      setLoading(true); //
+      setLoading(false);
+      // setError("Please log in to view posts");
     }
   }, [currentUserId]);
-
-  if (error) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <p className="text-red-500">{error}</p>
-      </div>
-    );
-  }
 
   const loadMore = () => {
     if (!loading && hasMore) {
@@ -173,6 +269,7 @@ const FeedPage = () => {
               <PostCard
                 key={post.postId}
                 post={post}
+                author={post.author || authors[post.uid]}
                 onLike={() => handlePostLike(post)}
                 onView={() => handlePostView(post.postId)}
               />
