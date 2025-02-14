@@ -20,6 +20,7 @@ const BusinessRegistration = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordShow, setPasswordShow] = useState(false);
+  const [businessType, setBusinessType] = useState("");
 
   const router = useRouter();
 
@@ -36,6 +37,7 @@ const BusinessRegistration = () => {
       const uid = userCredential.user.uid;
       const businessData = {
         businessName,
+        business_type: businessType,
         name: firstName + " " + lastName,
         email,
         phone,
@@ -52,6 +54,7 @@ const BusinessRegistration = () => {
       };
       const business = {
         businessName,
+        business_type: businessType,
         adminName: firstName + " " + lastName,
         email,
         phone,
@@ -96,6 +99,17 @@ const BusinessRegistration = () => {
                 required
                 value={businessName}
                 onChange={(e) => setBusinessName(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="businessType">Business Type</Label>
+              <Input
+                id="businessType"
+                type="text"
+                placeholder="Business Type"
+                required
+                value={businessType}
+                onChange={(e) => setBusinessType(e.target.value)}
               />
             </div>
 
