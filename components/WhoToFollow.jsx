@@ -34,7 +34,6 @@ export default function WhoToFollow() {
         `https://thikana-recommendation-model.onrender.com/business-recommendations/${auth.currentUser.uid}?limit=${LIMIT}&offset=${currentOffset}`,
         {
           method: "GET",
-          credentials: "include",
           headers: {
             Accept: "application/json",
             "Content-Type": "application/json",
