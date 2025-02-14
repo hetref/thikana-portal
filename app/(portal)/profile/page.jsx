@@ -5,9 +5,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -19,35 +16,22 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  CalendarIcon,
   EditIcon,
   FileTextIcon,
   HeartIcon,
-  LinkIcon,
   MapPinIcon,
   Loader2Icon,
   Images,
   SquareChartGantt,
   Globe,
-  Contact,
-  Info,
-  MapPin,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import WhoToFollow from "@/components/WhoToFollow";
 import { useGetUserPosts } from "@/hooks/useGetPosts";
 import useGetUser from "@/hooks/useGetUser";
 import { auth, db } from "@/lib/firebase";
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  onSnapshot,
-} from "firebase/firestore";
+import { collection, doc, getDoc, onSnapshot } from "firebase/firestore";
 import ProfilePosts from "@/components/ProfilePosts";
-import ProfileEditModal from "@/components/ProfileEditModal";
-import Chatbot from "@/components/Chatbot";
 import Link from "next/link";
 import ShowProductsTabContent from "@/components/profile/ShowProductsTabContent";
 import Image from "next/image";
@@ -214,18 +198,55 @@ export default function Profile() {
                           src={userData?.coverPic || "/avatar.png"}
                         />
                       </Avatar> */}
-                      <Image
-                        src={userData?.coverPic || "/coverimg.png"}
-                        width={2000}
-                        height={2000}
-                        alt="Cover Image"
-                        className="w-full h-full object-cover"
-                      />
-                      <Avatar className="w-24 h-24 border absolute left-[50%] -translate-x-1/2 -translate-y-1/2">
-                        <AvatarImage
-                          src={userData?.profilePic || "/avatar.png"}
-                        />
-                      </Avatar>
+
+                      <Dialog>
+                        <DialogTrigger>
+                          <Image
+                            src={userData?.coverPic || "/coverimg.png"}
+                            width={2000}
+                            height={2000}
+                            alt="Cover Image"
+                            className="w-full h-full object-cover"
+                          />
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Cover Image</DialogTitle>
+                            <DialogDescription>
+                              <Image
+                                src={userData?.coverPic || "/coverimg.png"}
+                                width={2000}
+                                height={2000}
+                                alt="Cover Image"
+                                className="w-full h-full object-cover"
+                              />
+                            </DialogDescription>
+                          </DialogHeader>
+                        </DialogContent>
+                      </Dialog>
+                      <Dialog>
+                        <DialogTrigger>
+                          <Avatar className="w-24 h-24 border absolute left-[50%] -translate-x-1/2 -translate-y-1/2">
+                            <AvatarImage
+                              src={userData?.profilePic || "/avatar.png"}
+                            />
+                          </Avatar>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Profile Image</DialogTitle>
+                            <DialogDescription>
+                              <Image
+                                src={userData?.profilePic || "/avatar.png"}
+                                width={2000}
+                                height={2000}
+                                alt="Profile Image"
+                                className="w-full h-full object-cover"
+                              />
+                            </DialogDescription>
+                          </DialogHeader>
+                        </DialogContent>
+                      </Dialog>
                     </div>
                     <h1 className="mt-4 text-2xl font-bold">
                       {userData?.businessName || "Business Name"}
