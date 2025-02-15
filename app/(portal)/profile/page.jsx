@@ -39,6 +39,8 @@ import { userEmailStatus } from "@/utils/userStatus";
 import toast from "react-hot-toast";
 import { sendEmailVerification } from "firebase/auth";
 import MoreInformationDialog from "@/components/profile/MoreInformationDialog";
+import FollowingDialog from "@/components/profile/FollowingDialog";
+import FollowerDialog from "@/components/profile/FollowerDialog";
 
 // TODO: Fix the profile page for user view.
 
@@ -259,20 +261,23 @@ export default function Profile() {
                     </p>
                     <div className="w-full mt-6">
                       <div className="flex justify-between mb-4">
-                        <div>
-                          <div className="font-semibold">{followingCount}</div>
-                          <div className="text-sm text-muted-foreground">
-                            Following
-                          </div>
-                        </div>
+                        <FollowingDialog
+                          followingCount={followingCount}
+                          userId={userId}
+                        />
                         <Separator orientation="vertical" />
-                        <div>
+                        <FollowerDialog
+                          followerCount={followersCount}
+                          userId={userId}
+                        />
+                        <Separator orientation="vertical" />
+                        {/* <div>
                           <div className="font-semibold">{followersCount}</div>
                           <div className="text-sm text-muted-foreground">
                             Followers
                           </div>
                         </div>
-                        <Separator orientation="vertical" />
+                        <Separator orientation="vertical" /> */}
                         <div>
                           <div className="font-semibold">{posts.length}</div>
                           <div className="text-sm text-muted-foreground">

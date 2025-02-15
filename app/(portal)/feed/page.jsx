@@ -22,6 +22,7 @@ import Image from "next/image";
 import { userEmailStatus } from "@/utils/userStatus";
 import { sendEmailVerification } from "firebase/auth";
 import { Button } from "@/components/ui/button";
+import toast from "react-hot-toast";
 
 const FeedPage = () => {
   const [posts, setPosts] = useState([]);

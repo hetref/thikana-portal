@@ -14,6 +14,7 @@ import {
   signInWithPopup,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import toast from "react-hot-toast";
 
 export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
@@ -54,14 +55,15 @@ export function LoginForm() {
         const user = userCredential.user;
         // ...
         console.log("User signed in:", user);
+        toast.success("Signed in successfully");
+        router.push("/feed");
       })
       .catch((error) => {
         const errorCode = error.code;
         const errorMessage = error.message;
         console.log(errorCode, errorMessage);
+        toast.error("Error signing in");
       });
-
-    router.push("/");
   };
 
   return (
