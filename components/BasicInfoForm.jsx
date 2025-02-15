@@ -39,6 +39,11 @@ export default function BasicInfoForm() {
   const [isLoading, setIsLoading] = useState(true);
   const [profileImageFile, setProfileImageFile] = useState(null);
   const [coverImageFile, setCoverImageFile] = useState(null);
+  const [uploadingProgress, setUploadingProgress] = useState({
+    profileImg: 0,
+    coverImg: 0,
+  });
+  const [uploadingType, setUploadingType] = useState(null);
   const user = auth.currentUser;
   const form = useForm({
     resolver: zodResolver(basicInfoSchema),
@@ -81,18 +86,21 @@ export default function BasicInfoForm() {
     await setDoc(userRef, userData, { merge: true });
   }
 
-  async function uploadImage(file, onProgress) {
-    const storageRef = ref(storage, `${user.uid}/profilePhoto`);
+  async function uploadImage(file, type) {
+    setUploadingType(type);
+    const storageRef = ref(storage, `${user.uid}/${type}`);
     const uploadTask = uploadBytesResumable(storageRef, file);
+
     return new Promise((resolve, reject) => {
       uploadTask.on(
         "state_changed",
         (snapshot) => {
           const progress =
             (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          if (onProgress) {
-            onProgress(progress);
-          }
+          setUploadingProgress((prev) => ({
+            ...prev,
+            [type]: progress,
+          }));
         },
         (error) => {
           reject(error);
@@ -107,6 +115,8 @@ export default function BasicInfoForm() {
 
   async function onSubmit(data) {
     setIsSubmitting(true);
+    const toastId = toast.loading("Saving changes...");
+
     try {
       if (!user) {
         throw new Error("User not authenticated");
@@ -116,11 +126,15 @@ export default function BasicInfoForm() {
       let coverImageUrl = null;
 
       if (profileImageFile) {
-        profileImageUrl = await uploadImage(profileImageFile);
+        toast.loading("Uploading Profile Image...", { id: toastId });
+        profileImageUrl = await uploadImage(profileImageFile, "profileImg");
       }
       if (coverImageFile) {
-        coverImageUrl = await uploadImage(coverImageFile);
+        toast.loading("Uploading Cover Image...", { id: toastId });
+        coverImageUrl = await uploadImage(coverImageFile, "coverImg");
       }
+
+      toast.loading("Saving Data...", { id: toastId });
 
       const updatedData = {
         ...data,
@@ -128,11 +142,19 @@ export default function BasicInfoForm() {
         ...(coverImageUrl ? { coverPic: coverImageUrl } : {}),
       };
 
+      setUploadingType(null);
+      setUploadingProgress({
+        profileImg: 0,
+        coverImg: 0,
+      });
+
       await updateProfile(updatedData);
-      toast.success("Basic information updated successfully!");
+      toast.success("Details Saved Successfully!", { id: toastId });
     } catch (error) {
       console.error("Error updating basic information:", error);
-      toast.error("Failed to update basic information. Please try again.");
+      toast.error("Failed to update basic information. Please try again.", {
+        id: toastId,
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -156,6 +178,17 @@ export default function BasicInfoForm() {
           onImageChange={setCoverImageFile}
           isCover
         />
+        {uploadingType && (
+          <div>
+            {uploadingType === "profileImg"
+              ? `Profile Image Uploading... ${uploadingProgress.profileImg.toFixed(
+                  0
+                )}%`
+              : `Cover Image Uploading... ${uploadingProgress.coverImg.toFixed(
+                  0
+                )}%`}
+          </div>
+        )}
         <FormField
           control={form.control}
           name="name"
@@ -163,7 +196,11 @@ export default function BasicInfoForm() {
             <FormItem>
               <FormLabel>Name</FormLabel>
               <FormControl>
-                <Input placeholder="John Doe" {...field} />
+                <Input
+                  placeholder="John Doe"
+                  {...field}
+                  disabled={isSubmitting}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -176,7 +213,11 @@ export default function BasicInfoForm() {
             <FormItem>
               <FormLabel>Business Name</FormLabel>
               <FormControl>
-                <Input placeholder="Acme Inc." {...field} />
+                <Input
+                  placeholder="Acme Inc."
+                  {...field}
+                  disabled={isSubmitting}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -189,7 +230,11 @@ export default function BasicInfoForm() {
             <FormItem>
               <FormLabel>Phone</FormLabel>
               <FormControl>
-                <Input placeholder="+1234567890" {...field} />
+                <Input
+                  placeholder="+1234567890"
+                  {...field}
+                  disabled={isSubmitting}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -205,6 +250,7 @@ export default function BasicInfoForm() {
                 <Input
                   placeholder="123 Business St, City, Country"
                   {...field}
+                  disabled={isSubmitting}
                 />
               </FormControl>
               <FormMessage />
@@ -218,7 +264,11 @@ export default function BasicInfoForm() {
             <FormItem>
               <FormLabel>Location</FormLabel>
               <FormControl>
-                <Input placeholder="City, Country" {...field} />
+                <Input
+                  placeholder="City, Country"
+                  {...field}
+                  disabled={isSubmitting}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -234,6 +284,7 @@ export default function BasicInfoForm() {
                 <Textarea
                   placeholder="Tell us about your business..."
                   {...field}
+                  disabled={isSubmitting}
                 />
               </FormControl>
               <FormDescription>Max 500 characters</FormDescription>
@@ -248,7 +299,11 @@ export default function BasicInfoForm() {
             <FormItem>
               <FormLabel>Website</FormLabel>
               <FormControl>
-                <Input placeholder="https://www.example.com" {...field} />
+                <Input
+                  placeholder="https://www.example.com"
+                  {...field}
+                  disabled={isSubmitting}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>

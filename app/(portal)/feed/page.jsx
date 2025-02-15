@@ -19,6 +19,10 @@ import {
 import Chatbot from "@/components/Chatbot";
 import PostCard from "@/components/PostCard";
 import Image from "next/image";
+import { userEmailStatus } from "@/utils/userStatus";
+import { sendEmailVerification } from "firebase/auth";
+import { Button } from "@/components/ui/button";
+import toast from "react-hot-toast";
 
 const FeedPage = () => {
   const [posts, setPosts] = useState([]);
@@ -28,6 +32,26 @@ const FeedPage = () => {
   const [authors, setAuthors] = useState({});
   const [hasMore, setHasMore] = useState(true);
   const currentUserId = auth.currentUser?.uid;
+
+  if (userEmailStatus() === false) {
+    const verifyEmailHandler = async () => {
+      await sendEmailVerification(auth.currentUser)
+        .then(() => {
+          toast.success("Verification email sent!");
+        })
+        .catch((error) => {
+          toast.error("Error sending verification email: " + error.code);
+        });
+    };
+    return (
+      <div className="flex flex-col gap-4 justify-center items-center min-h-[500px]">
+        <p>Please verify your email to continue</p>
+        <Button onClick={verifyEmailHandler} className="bg-emerald-800 mt-1">
+          Verify Email
+        </Button>
+      </div>
+    );
+  }
 
   const fetchRecommendations = async (pageNum) => {
     if (!currentUserId) {

@@ -16,6 +16,8 @@ import {
 import { db, auth } from "@/lib/firebase";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { userEmailStatus } from "@/utils/userStatus";
+import { sendEmailVerification } from "firebase/auth";
 
 export default function WhoToFollow() {
   const [businesses, setBusinesses] = useState([]);
@@ -24,6 +26,26 @@ export default function WhoToFollow() {
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
   const LIMIT = 4;
+
+  // if (userEmailStatus() === false) {
+  //   const verifyEmailHandler = async () => {
+  //     await sendEmailVerification(auth.currentUser)
+  //       .then(() => {
+  //         toast.success("Verification email sent!");
+  //       })
+  //       .catch((error) => {
+  //         toast.error("Error sending verification email: " + error.code);
+  //       });
+  //   };
+  //   return (
+  //     <div className="flex flex-col gap-4 justify-center items-center min-h-[500px]">
+  //       <p>Please verify your email to continue</p>
+  //       <Button onClick={verifyEmailHandler} className="bg-emerald-800 mt-1">
+  //         Verify Email
+  //       </Button>
+  //     </div>
+  //   );
+  // }
 
   const fetchRecommendedBusinesses = async (currentOffset = 0) => {
     if (!auth.currentUser || loading) return;
@@ -166,62 +188,71 @@ export default function WhoToFollow() {
           <hr />
         </CardHeader>
         <CardContent className="grid gap-4">
-          <div className="flex flex-col items-center gap-2">
-            {businesses.map((business) => (
-              <div
-                className="flex items-center justify-between gap-4 border p-3 rounded-md w-full"
-                key={`${business.id}-${offset}`}
-              >
-                <div className="flex flex-col justify-center w-full gap-2">
-                  <div className="flex items-center gap-2">
-                    <Link
-                      href={`/${business.username}?user=${business.id}`}
-                      className="grid gap-0.5 text-sm"
-                    >
-                      <span className="font-medium">{business.name}</span>
-                      <span className="text-muted-foreground">
-                        @{business.username}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {business.business_type}
-                      </span>
-                    </Link>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className={`${
-                      following.has(business.id)
-                        ? "bg-red-500 text-primary-foreground hover:bg-red-400 hover:text-white"
-                        : ""
-                    }`}
-                    onClick={() =>
-                      following.has(business.id)
-                        ? handleUnfollow(business.id)
-                        : handleFollow(business.id)
-                    }
+          {userEmailStatus() === false && (
+            <div className="flex flex-col gap-4 justify-center items-center]">
+              <p>Please verify your email to continue.</p>
+            </div>
+          )}
+          {userEmailStatus() === true && (
+            <>
+              <div className="flex flex-col items-center gap-2">
+                {businesses.map((business) => (
+                  <div
+                    className="flex items-center justify-between gap-4 border p-3 rounded-md w-full"
+                    key={`${business.id}-${offset}`}
                   >
-                    {following.has(business.id) ? "Unfollow" : "Follow"}
-                  </Button>
-                </div>
+                    <div className="flex flex-col justify-center w-full gap-2">
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/${business.username}?user=${business.id}`}
+                          className="grid gap-0.5 text-sm"
+                        >
+                          <span className="font-medium">{business.name}</span>
+                          <span className="text-muted-foreground">
+                            @{business.username}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {business.business_type}
+                          </span>
+                        </Link>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className={`${
+                          following.has(business.id)
+                            ? "bg-red-500 text-primary-foreground hover:bg-red-400 hover:text-white"
+                            : ""
+                        }`}
+                        onClick={() =>
+                          following.has(business.id)
+                            ? handleUnfollow(business.id)
+                            : handleFollow(business.id)
+                        }
+                      >
+                        {following.has(business.id) ? "Unfollow" : "Follow"}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          {hasMore && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleLoadMore}
-              disabled={loading}
-              className="w-full"
-            >
-              {loading ? "Loading..." : "Load More"}
-            </Button>
+              {hasMore && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleLoadMore}
+                  disabled={loading}
+                  className="w-full"
+                >
+                  {loading ? "Loading..." : "Load More"}
+                </Button>
+              )}
+            </>
           )}
           <hr />
         </CardContent>
       </Card>
-      <Map />
+      {/* <Map /> */}
     </div>
   );
 }
