@@ -23,6 +23,7 @@ const ShowProductsTabContent = ({ userId, userData }) => {
         <p>No products found.</p>
       ) : ( */}
       {/* <ProductGrid products={products} userId={userId} userData={userData} /> */}
+
       <ProductGrid userId={userId} userData={userData} />
       {/* )} */}
     </div>

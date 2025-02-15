@@ -14,12 +14,12 @@ import { auth, db } from "@/lib/firebase";
 import Link from "next/link";
 import { Minus } from "lucide-react";
 
-const FollowingDialog = ({ followingCount }) => {
+const FollowingDialog = ({ followingCount, userId }) => {
   const [following, setFollowing] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [open, setOpen] = useState(false);
-  const userId = auth.currentUser?.uid;
+  // const userId = auth.currentUser?.uid;
 
   useEffect(() => {
     const fetchFollowing = async () => {

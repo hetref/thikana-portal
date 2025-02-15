@@ -92,9 +92,7 @@ const InventoryPage = () => {
           id: doc.id,
           ...doc.data(),
         }));
-        setProducts(
-          fetchedProducts.length > 0 ? fetchedProducts : initialProducts
-        );
+        setProducts(fetchedProducts.length > 0 ? fetchedProducts : []);
       },
       (error) => {
         console.error("Error fetching products:", error);
@@ -248,70 +246,77 @@ const InventoryPage = () => {
           </DialogContent>
         </Dialog>
       </div>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Image</TableHead>
-            <TableHead>Name</TableHead>
-            <TableHead>Description</TableHead>
-            <TableHead>Price</TableHead>
-            <TableHead>Quantity</TableHead>
-            <TableHead>Category</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {products.map((product) => (
-            <TableRow key={product.id}>
-              <TableCell>
-                <Image
-                  src={product.imageUrl || "/placeholder.svg"}
-                  alt={product.name}
-                  width={50}
-                  height={50}
-                />
-              </TableCell>
-              <TableCell>{product.name}</TableCell>
-              <TableCell>{product.description}</TableCell>
-              <TableCell>₹{product.price.toFixed(2)}</TableCell>
-              <TableCell>{product.quantity}</TableCell>
-              <TableCell>{product.category}</TableCell>
-              <TableCell>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline">
-                      <EllipsisVertical />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem
-                      onClick={() => {
-                        setCurrentProduct(product);
-                        setIsEditDialogOpen(true);
-                      }}
-                    >
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => {
-                        // setCurrentProduct(product);
-                        // setIsAnalyticsDialogOpen(true);
-                      }}
-                    >
-                      <Link href="/profile/analytics">Analytics</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => handleDeleteProduct(product)}
-                    >
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </TableCell>
+      {products.length === 0 && (
+        <div className="text-center text-muted-foreground">
+          No products found.
+        </div>
+      )}
+      {products.length > 0 && (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Image</TableHead>
+              <TableHead>Name</TableHead>
+              <TableHead>Description</TableHead>
+              <TableHead>Price</TableHead>
+              <TableHead>Quantity</TableHead>
+              <TableHead>Category</TableHead>
+              <TableHead>Actions</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {products.map((product) => (
+              <TableRow key={product.id}>
+                <TableCell>
+                  <Image
+                    src={product.imageUrl || "/placeholder.svg"}
+                    alt={product.name}
+                    width={50}
+                    height={50}
+                  />
+                </TableCell>
+                <TableCell>{product.name}</TableCell>
+                <TableCell>{product.description}</TableCell>
+                <TableCell>₹{product.price.toFixed(2)}</TableCell>
+                <TableCell>{product.quantity}</TableCell>
+                <TableCell>{product.category}</TableCell>
+                <TableCell>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline">
+                        <EllipsisVertical />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setCurrentProduct(product);
+                          setIsEditDialogOpen(true);
+                        }}
+                      >
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          // setCurrentProduct(product);
+                          // setIsAnalyticsDialogOpen(true);
+                        }}
+                      >
+                        <Link href="/profile/analytics">Analytics</Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleDeleteProduct(product)}
+                      >
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
           <DialogHeader>

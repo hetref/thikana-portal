@@ -42,8 +42,6 @@ import MoreInformationDialog from "@/components/profile/MoreInformationDialog";
 import FollowingDialog from "@/components/profile/FollowingDialog";
 import FollowerDialog from "@/components/profile/FollowerDialog";
 
-// TODO: Fix the profile page for user view.
-
 export default function Profile() {
   const router = useRouter();
   const [user, setUser] = useState(null);
@@ -214,7 +212,7 @@ export default function Profile() {
                         <DialogContent>
                           <DialogHeader>
                             <DialogTitle>Cover Image</DialogTitle>
-                            <DialogDescription>
+                            <DialogDescription className="pt-4">
                               <Image
                                 src={userData?.coverPic || "/coverimg.png"}
                                 width={2000}
@@ -237,7 +235,7 @@ export default function Profile() {
                         <DialogContent>
                           <DialogHeader>
                             <DialogTitle>Profile Image</DialogTitle>
-                            <DialogDescription>
+                            <DialogDescription className="pt-4">
                               <Image
                                 src={userData?.profilePic || "/avatar.png"}
                                 width={2000}
@@ -263,12 +261,12 @@ export default function Profile() {
                       <div className="flex justify-between mb-4">
                         <FollowingDialog
                           followingCount={followingCount}
-                          userId={userId}
+                          userId={userId && userId}
                         />
                         <Separator orientation="vertical" />
                         <FollowerDialog
                           followerCount={followersCount}
-                          userId={userId}
+                          userId={userId && userId}
                         />
                         <Separator orientation="vertical" />
                         {/* <div>
@@ -521,6 +519,7 @@ export default function Profile() {
                     </Card>
                   ))}
                 </div> */}
+                  {/* TODO: Add the cart functionality */}
                   {userData && user && (
                     <ShowProductsTabContent
                       userId={userId}

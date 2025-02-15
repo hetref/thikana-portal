@@ -151,12 +151,12 @@ const FollowingDialog = ({ followingCount }) => {
   );
 };
 
-const FollowerDialog = ({ followerCount }) => {
+const FollowerDialog = ({ followerCount, userId }) => {
   const [followers, setFollowers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [open, setOpen] = useState(false);
-  const userId = auth.currentUser?.uid;
+  // const userId = auth.currentUser?.uid;
 
   useEffect(() => {
     const fetchFollowers = async () => {
