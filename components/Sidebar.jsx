@@ -82,6 +82,47 @@ export default function Sidebar() {
       });
   };
 
+  // Format location for display, handling object case
+  const getLocationDisplay = () => {
+    if (!user.location) return "No location";
+
+    // Check if location is an object with latitude and longitude
+    if (
+      typeof user.location === "object" &&
+      user.location.latitude &&
+      user.location.longitude
+    ) {
+      return `${user.location.latitude}, ${user.location.longitude}`;
+    }
+
+    // If it's a string, return as is
+    return user.location;
+  };
+
+  // Get location URL for linking
+  const getLocationUrl = () => {
+    if (!user.location) return null;
+
+    // If location is an object with coordinates
+    if (
+      typeof user.location === "object" &&
+      user.location.latitude &&
+      user.location.longitude
+    ) {
+      return `https://maps.google.com/?q=${user.location.latitude},${user.location.longitude}`;
+    }
+
+    // If location is already a URL
+    if (typeof user.location === "string" && user.location.includes("http")) {
+      return user.location;
+    }
+
+    // Otherwise, assume it's a place name and search for it
+    return `https://maps.google.com/search?q=${encodeURIComponent(
+      user.location
+    )}`;
+  };
+
   if (!user || loading) {
     return (
       <div className="flex items-center justify-center">
@@ -147,25 +188,21 @@ export default function Sidebar() {
               <div className="w-full space-y-2 text-sm">
                 <div className="flex items-center text-muted-foreground">
                   <MapPinIcon className="w-4 h-4 mr-2" />
-                  {/* {user.location || "No location"} */}
-
-                  {user?.location ? (
+                  {getLocationUrl() ? (
                     <a
-                      href={user.location}
+                      href={getLocationUrl()}
                       className="hover:underline"
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      {user.location}
+                      {getLocationDisplay()}
                     </a>
                   ) : (
-                    "No location"
+                    getLocationDisplay()
                   )}
                 </div>
                 <div className="flex items-center text-muted-foreground">
                   <LinkIcon className="w-4 h-4 mr-2 shrink-0" />
-                  {/* {user.website || "No website"} */}
-
                   {user?.website ? (
                     <a
                       href={

@@ -31,8 +31,11 @@ const FeedPage = () => {
   const [page, setPage] = useState(1);
   const [authors, setAuthors] = useState({});
   const [hasMore, setHasMore] = useState(true);
+  const [userLocation, setUserLocation] = useState(null);
+  const [locationPermission, setLocationPermission] = useState(null);
   const currentUserId = auth.currentUser?.uid;
 
+  // Check for email verification
   if (userEmailStatus() === false) {
     const verifyEmailHandler = async () => {
       await sendEmailVerification(auth.currentUser)
@@ -53,6 +56,165 @@ const FeedPage = () => {
     );
   }
 
+  // Request user location if not already available
+  const requestLocationPermission = () => {
+    if (navigator.geolocation) {
+      setLocationPermission("requesting");
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setUserLocation({ latitude, longitude });
+          setLocationPermission("granted");
+
+          // Store user location in Firestore for future use
+          if (currentUserId) {
+            const userRef = doc(db, "users", currentUserId);
+            updateDoc(userRef, {
+              location: { latitude, longitude },
+              locationUpdatedAt: new Date(),
+            }).catch((err) => console.error("Error saving location:", err));
+          }
+        },
+        (error) => {
+          console.error("Error getting location:", error);
+          setLocationPermission("denied");
+          toast.error("Location access denied. Some features may be limited.");
+        }
+      );
+    } else {
+      setLocationPermission("unavailable");
+      toast.error("Geolocation is not supported by your browser.");
+    }
+  };
+
+  // Load saved location from user profile
+  const loadSavedLocation = async () => {
+    if (currentUserId) {
+      try {
+        const userDoc = await getDoc(doc(db, "users", currentUserId));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          if (
+            userData.location &&
+            userData.location.latitude &&
+            userData.location.longitude
+          ) {
+            setUserLocation(userData.location);
+            return true;
+          }
+        }
+        return false;
+      } catch (error) {
+        console.error("Error loading saved location:", error);
+        return false;
+      }
+    }
+    return false;
+  };
+
+  // Fetch combined recommendations (location + preferences)
+  const fetchCombinedRecommendations = async (pageNum) => {
+    if (!currentUserId) {
+      setError("No user ID found. Please log in.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      console.log("Fetching combined recommendations for user:", currentUserId);
+
+      // Use the new feed endpoint that combines location and preference-based recommendations
+      const response = await fetch(
+        `https://thikana-recommendation-model.onrender.com/feed/${currentUserId}?limit=10`,
+        {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `HTTP error! status: ${response.status}, message: ${errorText}`
+        );
+      }
+
+      const data = await response.json();
+      console.log("Received combined recommendations:", data);
+      if (!data.recommendations || !Array.isArray(data.recommendations)) {
+        throw new Error("Invalid recommendations format received");
+      }
+
+      // Fetch like status for each post
+      const likedPosts = new Set();
+      const likesSnapshot = await getDocs(
+        collection(db, "users", currentUserId, "likes")
+      );
+      likesSnapshot.forEach((doc) => likedPosts.add(doc.id));
+
+      // Fetch current likes count for each post
+      const postsWithLikes = await Promise.all(
+        data.recommendations.map(async (post) => {
+          if (!post.id) {
+            console.warn("Post missing ID:", post);
+            return null;
+          }
+
+          const postRef = doc(db, "posts", post.id);
+          const postDoc = await getDoc(postRef);
+
+          if (!postDoc.exists()) {
+            console.warn(`Post ${post.id} not found in Firestore`);
+            return null;
+          }
+
+          const postData = postDoc.data();
+          const postAuthor = await getDoc(doc(db, "users", postData.uid));
+          const postAuthorData = postAuthor.data();
+
+          // Add indicator for location-based recommendations
+          const isLocationBased = post.recommendation_type === "location";
+          const distanceText = post.distance_km
+            ? `${post.distance_km} km away`
+            : null;
+
+          return {
+            ...post,
+            postId: post.id,
+            likes: postData.likes || 0,
+            isLiked: likedPosts.has(post.id),
+            authorName: postAuthorData.name,
+            authorUsername: postAuthorData.username,
+            authorProfileImage: postAuthorData.profilePic,
+            isLocationBased,
+            distanceText,
+          };
+        })
+      );
+      const validPosts = postsWithLikes.filter((post) => post !== null);
+
+      console.log("Processed posts:", validPosts);
+
+      setPosts((prev) =>
+        pageNum === 1 ? validPosts : [...prev, ...validPosts]
+      );
+      setHasMore(data.recommendations.length === 10);
+    } catch (error) {
+      console.error("Error fetching combined recommendations:", error);
+      // Fall back to regular recommendations if combined ones fail
+      fetchRecommendations(pageNum);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Original recommendation function (fallback)
   const fetchRecommendations = async (pageNum) => {
     if (!currentUserId) {
       setError("No user ID found. Please log in.");
@@ -245,30 +407,69 @@ const FeedPage = () => {
         )
       );
 
-      // Fetch new recommendations after like/unlike
-      await fetchRecommendations(1);
+      // Refresh recommendations after like/unlike
+      await fetchCombinedRecommendations(1);
 
       await updateRecentInteractions(post.postId, "Like");
     } catch (error) {
       console.error("Error handling like:", error);
     }
   };
+
   useEffect(() => {
     if (currentUserId) {
-      fetchRecommendations(1);
+      // First try to load saved location
+      loadSavedLocation().then((hasSavedLocation) => {
+        if (!hasSavedLocation && locationPermission === null) {
+          // If no saved location, request it
+          requestLocationPermission();
+        }
+
+        // Fetch recommendations (will use location if available)
+        fetchCombinedRecommendations(1);
+      });
     } else {
       console.log("No user ID available");
       setLoading(false);
-      // setError("Please log in to view posts");
     }
   }, [currentUserId]);
+
+  // Re-fetch when user location changes
+  useEffect(() => {
+    if (userLocation && currentUserId) {
+      console.log("Location updated, refreshing recommendations");
+      fetchCombinedRecommendations(1);
+    }
+  }, [userLocation]);
 
   const loadMore = () => {
     if (!loading && hasMore) {
       const nextPage = page + 1;
       setPage(nextPage);
-      fetchRecommendations(nextPage);
+      fetchCombinedRecommendations(nextPage);
     }
+  };
+
+  // UI for requesting location permission
+  const renderLocationPrompt = () => {
+    if (locationPermission === null || locationPermission === "requesting") {
+      return null; // Already handled or in progress
+    } else if (locationPermission === "denied") {
+      return (
+        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <p className="text-sm text-yellow-800">
+            Enable location access to see posts from nearby businesses.
+          </p>
+          <Button
+            onClick={requestLocationPermission}
+            className="mt-2 bg-yellow-600 hover:bg-yellow-700 text-white text-sm py-1"
+          >
+            Enable Location
+          </Button>
+        </div>
+      );
+    }
+    return null;
   };
 
   if (loading && posts.length === 0) {
@@ -295,12 +496,40 @@ const FeedPage = () => {
             <Sidebar />
           </aside>
           <main className="space-y-6">
+            {renderLocationPrompt()}
+
+            {userLocation && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg flex items-center">
+                <div className="text-blue-500 mr-2">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                    <circle cx="12" cy="10" r="3"></circle>
+                  </svg>
+                </div>
+                <p className="text-sm text-blue-600">
+                  Showing posts from businesses near you
+                </p>
+              </div>
+            )}
+
             {posts.map((post) => (
               <PostCard
                 key={post.postId}
                 post={post}
                 onLike={() => handlePostLike(post)}
                 onView={() => handlePostView(post.postId)}
+                showDistance={post.isLocationBased}
+                distanceText={post.distanceText}
               />
             ))}
             {hasMore && (
