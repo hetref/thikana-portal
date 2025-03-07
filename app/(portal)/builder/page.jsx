@@ -1,76 +1,159 @@
 "use client";
-import React, { useState, useEffect } from "react";
-import { DndProvider } from "react-dnd";
-import { HTML5Backend } from "react-dnd-html5-backend";
-import BuilderCanvas from "@/components/builder/BuilderCanvas";
-import ComponentSidebar from "@/components/builder/ComponentSidebar";
-import PagesList from "@/components/builder/PagesList";
-import { db } from "@/lib/firebase"; // You'll need to set up Firebase configuration
+import React, { useEffect, useRef } from "react";
+import grapesjs from "grapesjs";
+import gjsPresetWebpage from "grapesjs-preset-webpage";
+import { auth, db } from "@/lib/firebase";
 import { doc, setDoc, getDoc } from "firebase/firestore";
+import { useAuth } from "@/context/AuthContext";
+import "grapesjs/dist/css/grapes.min.css";
 
 const Builder = () => {
-  const [pages, setPages] = useState([
-    { id: "home", name: "Home", components: [] },
-  ]);
-  const [currentPage, setCurrentPage] = useState("home");
-  const [businessId, setBusinessId] = useState(null); // You'll need to get this from your auth or route
+  const editorRef = useRef(null);
+  //   const { user } = useAuth();
 
-  const saveSite = async () => {
-    try {
-      await setDoc(doc(db, "websites", businessId), {
-        pages: pages,
-        lastUpdated: new Date().toISOString(),
+  useEffect(() => {
+    if (!editorRef.current) {
+      const editor = grapesjs.init({
+        container: "#gjs",
+        height: "100vh",
+        width: "auto",
+        storageManager: false,
+        plugins: [gjsPresetWebpage],
+        pluginsOpts: {
+          gjsPresetWebpage: {},
+        },
+        deviceManager: {
+          devices: [
+            {
+              name: "Desktop",
+              width: "",
+            },
+            {
+              name: "Mobile",
+              width: "320px",
+              widthMedia: "480px",
+            },
+          ],
+        },
+        panels: {
+          defaults: [
+            {
+              id: "basic-actions",
+              el: ".panel__basic-actions",
+              buttons: [
+                {
+                  id: "save-db",
+                  className: "btn-save-db",
+                  label: "Save",
+                  command: "save-db",
+                  attributes: { title: "Save to Database" },
+                },
+              ],
+            },
+          ],
+        },
       });
-    } catch (error) {
-      console.error("Error saving site:", error);
+
+      // Add save command
+      editor.Commands.add("save-db", {
+        run: async (editor) => {
+          try {
+            if (!auth?.currentUser?.uid) {
+              alert("Please login to save your website");
+              return;
+            }
+
+            const html = editor.getHtml();
+            const css = editor.getCss();
+            const components = editor.getComponents();
+            const styles = editor.getStyle();
+
+            // Save to Firestore
+            const websiteRef = doc(db, "websites", auth?.currentUser?.uid);
+            await setDoc(
+              websiteRef,
+              {
+                html,
+                css,
+                components: JSON.stringify(components),
+                styles: JSON.stringify(styles),
+                lastUpdated: new Date().toISOString(),
+              },
+              { merge: true }
+            );
+
+            // Show success message
+            editor.Modal.open({
+              title: "Success",
+              content: "Website saved successfully!",
+              attributes: { class: "success-modal" },
+            });
+          } catch (error) {
+            console.error("Error saving website:", error);
+            // Show error message
+            editor.Modal.open({
+              title: "Error",
+              content: "Failed to save website. Please try again.",
+              attributes: { class: "error-modal" },
+            });
+          }
+        },
+      });
+
+      // Add custom styles for the save button
+      editor.Panels.addButton("options", {
+        id: "save-db",
+        className: "fa fa-floppy-o",
+        command: "save-db",
+        attributes: {
+          title: "Save to Database",
+          style: `
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+          `,
+        },
+      });
+
+      editorRef.current = editor;
     }
-  };
+
+    // Load existing website data if available
+    const loadExistingWebsite = async () => {
+      if (auth?.currentUser?.uid) {
+        try {
+          const websiteRef = doc(db, "websites", auth?.currentUser?.uid);
+          const websiteDoc = await getDoc(websiteRef);
+
+          if (websiteDoc.exists()) {
+            const data = websiteDoc.data();
+            editorRef.current.setComponents(JSON.parse(data.components));
+            editorRef.current.setStyle(JSON.parse(data.styles));
+          }
+        } catch (error) {
+          console.error("Error loading website:", error);
+        }
+      }
+    };
+
+    loadExistingWebsite();
+
+    return () => {
+      if (editorRef.current) {
+        editorRef.current.destroy();
+        editorRef.current = null;
+      }
+    };
+  }, [auth?.currentUser?.uid]);
 
   return (
-    <DndProvider backend={HTML5Backend}>
-      <div className="flex h-screen">
-        {/* Pages Sidebar */}
-        <div className="w-64 border-r p-4">
-          <PagesList
-            pages={pages}
-            currentPage={currentPage}
-            onPageChange={setCurrentPage}
-            onAddPage={(newPage) => setPages([...pages, newPage])}
-          />
-        </div>
-
-        {/* Components Sidebar */}
-        <div className="w-64 border-r p-4">
-          <ComponentSidebar />
-        </div>
-
-        {/* Main Canvas */}
-        <div className="flex-1">
-          <BuilderCanvas
-            components={
-              pages.find((p) => p.id === currentPage)?.components || []
-            }
-            onUpdate={(newComponents) => {
-              setPages(
-                pages.map((page) =>
-                  page.id === currentPage
-                    ? { ...page, components: newComponents }
-                    : page
-                )
-              );
-            }}
-          />
-        </div>
-
-        {/* Save Button */}
-        <button
-          onClick={saveSite}
-          className="fixed bottom-4 right-4 bg-blue-500 text-white px-4 py-2 rounded"
-        >
-          Save Site
-        </button>
-      </div>
-    </DndProvider>
+    <div>
+      <div id="gjs"></div>
+    </div>
   );
 };
 

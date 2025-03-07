@@ -257,6 +257,7 @@ export default function Profile() {
                     <p className="mt-2 text-sm">
                       {userData?.bio || "Amazing Bio..."}
                     </p>
+                    <Link href="/builder">Edit Website</Link>
                     <div className="w-full mt-6">
                       <div className="flex justify-between mb-4">
                         <FollowingDialog
