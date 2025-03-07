@@ -2,7 +2,6 @@
 import React, { useEffect, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import WhoToFollow from "@/components/WhoToFollow";
-// import PostCard from "@/components/PostCard";
 import { auth, db } from "@/lib/firebase";
 import {
   collection,
@@ -13,31 +12,122 @@ import {
   getDoc,
   updateDoc,
   arrayUnion,
-  arrayRemove,
+  deleteDoc,
   increment,
+  setDoc,
 } from "firebase/firestore";
 import Chatbot from "@/components/Chatbot";
 import PostCard from "@/components/PostCard";
-
-// In your FeedPage component, add this function:
-
-// Replace your existing useEffect with:
+import Image from "next/image";
+import { userEmailStatus } from "@/utils/userStatus";
+import { sendEmailVerification } from "firebase/auth";
+import { Button } from "@/components/ui/button";
+import toast from "react-hot-toast";
 
 const FeedPage = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
-  const [author, setAuthor] = useState(null);
-  const currentUserId = auth.currentUser?.uid;
+  const [authors, setAuthors] = useState({});
   const [hasMore, setHasMore] = useState(true);
-  // Function to update user's recent interactions
-  const fetchRecommendations = async (pageNum) => {
-    if (!currentUserId) return;
+  const [userLocation, setUserLocation] = useState(null);
+  const [locationPermission, setLocationPermission] = useState(null);
+  const currentUserId = auth.currentUser?.uid;
+
+  // Check for email verification
+  if (userEmailStatus() === false) {
+    const verifyEmailHandler = async () => {
+      await sendEmailVerification(auth.currentUser)
+        .then(() => {
+          toast.success("Verification email sent!");
+        })
+        .catch((error) => {
+          toast.error("Error sending verification email: " + error.code);
+        });
+    };
+    return (
+      <div className="flex flex-col gap-4 justify-center items-center min-h-[500px]">
+        <p>Please verify your email to continue</p>
+        <Button onClick={verifyEmailHandler} className="bg-emerald-800 mt-1">
+          Verify Email
+        </Button>
+      </div>
+    );
+  }
+
+  // Request user location if not already available
+  const requestLocationPermission = () => {
+    if (navigator.geolocation) {
+      setLocationPermission("requesting");
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setUserLocation({ latitude, longitude });
+          setLocationPermission("granted");
+
+          // Store user location in Firestore for future use
+          if (currentUserId) {
+            const userRef = doc(db, "users", currentUserId);
+            updateDoc(userRef, {
+              location: { latitude, longitude },
+              locationUpdatedAt: new Date(),
+            }).catch((err) => console.error("Error saving location:", err));
+          }
+        },
+        (error) => {
+          console.error("Error getting location:", error);
+          setLocationPermission("denied");
+          toast.error("Location access denied. Some features may be limited.");
+        }
+      );
+    } else {
+      setLocationPermission("unavailable");
+      toast.error("Geolocation is not supported by your browser.");
+    }
+  };
+
+  // Load saved location from user profile
+  const loadSavedLocation = async () => {
+    if (currentUserId) {
+      try {
+        const userDoc = await getDoc(doc(db, "users", currentUserId));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          if (
+            userData.location &&
+            userData.location.latitude &&
+            userData.location.longitude
+          ) {
+            setUserLocation(userData.location);
+            return true;
+          }
+        }
+        return false;
+      } catch (error) {
+        console.error("Error loading saved location:", error);
+        return false;
+      }
+    }
+    return false;
+  };
+
+  // Fetch combined recommendations (location + preferences)
+  const fetchCombinedRecommendations = async (pageNum) => {
+    if (!currentUserId) {
+      setError("No user ID found. Please log in.");
+      setLoading(false);
+      return;
+    }
 
     try {
       setLoading(true);
+      setError(null);
+      console.log("Fetching combined recommendations for user:", currentUserId);
+
+      // Use the new feed endpoint that combines location and preference-based recommendations
       const response = await fetch(
-        `http://localhost:8000/recommendations/${currentUserId}?page=${pageNum}&limit=10`,
+        `https://thikana-recommendation-model.onrender.com/feed/${currentUserId}?limit=10`,
         {
           method: "GET",
           credentials: "include",
@@ -49,36 +139,164 @@ const FeedPage = () => {
       );
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(
+          `HTTP error! status: ${response.status}, message: ${errorText}`
+        );
       }
 
       const data = await response.json();
+      console.log("Received combined recommendations:", data);
+      if (!data.recommendations || !Array.isArray(data.recommendations)) {
+        throw new Error("Invalid recommendations format received");
+      }
 
-      // Transform recommendations into the format expected by your PostCard component
-      const recommendedPosts = await Promise.all(
+      // Fetch like status for each post
+      const likedPosts = new Set();
+      const likesSnapshot = await getDocs(
+        collection(db, "users", currentUserId, "likes")
+      );
+      likesSnapshot.forEach((doc) => likedPosts.add(doc.id));
+
+      // Fetch current likes count for each post
+      const postsWithLikes = await Promise.all(
         data.recommendations.map(async (post) => {
-          // Fetch author details
-          const authorRef = doc(db, "users", post.uid);
-          const authorDoc = await getDoc(authorRef);
-          const authorData = authorDoc.data();
+          if (!post.id) {
+            console.warn("Post missing ID:", post);
+            return null;
+          }
 
-          // Check if post is liked
-          const likeDocRef = doc(db, "users", currentUserId, "likes", post.id);
-          const likeDoc = await getDoc(likeDocRef);
+          const postRef = doc(db, "posts", post.id);
+          const postDoc = await getDoc(postRef);
+
+          if (!postDoc.exists()) {
+            console.warn(`Post ${post.id} not found in Firestore`);
+            return null;
+          }
+
+          const postData = postDoc.data();
+          const postAuthor = await getDoc(doc(db, "users", postData.uid));
+          const postAuthorData = postAuthor.data();
+
+          // Add indicator for location-based recommendations
+          const isLocationBased = post.recommendation_type === "location";
+          const distanceText = post.distance_km
+            ? `${post.distance_km} km away`
+            : null;
 
           return {
-            postId: post.id,
             ...post,
-            author: authorData,
-            isLiked: likeDoc.exists(),
+            postId: post.id,
+            likes: postData.likes || 0,
+            isLiked: likedPosts.has(post.id),
+            authorName: postAuthorData.name,
+            authorUsername: postAuthorData.username,
+            authorProfileImage: postAuthorData.profilePic,
+            isLocationBased,
+            distanceText,
           };
         })
       );
+      const validPosts = postsWithLikes.filter((post) => post !== null);
+
+      console.log("Processed posts:", validPosts);
 
       setPosts((prev) =>
-        pageNum === 1 ? recommendedPosts : [...prev, ...recommendedPosts]
+        pageNum === 1 ? validPosts : [...prev, ...validPosts]
       );
-      setHasMore(data.hasMore);
+      setHasMore(data.recommendations.length === 10);
+    } catch (error) {
+      console.error("Error fetching combined recommendations:", error);
+      // Fall back to regular recommendations if combined ones fail
+      fetchRecommendations(pageNum);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Original recommendation function (fallback)
+  const fetchRecommendations = async (pageNum) => {
+    if (!currentUserId) {
+      setError("No user ID found. Please log in.");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      console.log("Fetching recommendations for user:", currentUserId);
+
+      const response = await fetch(
+        `https://thikana-recommendation-model.onrender.com/recommendations/${currentUserId}?limit=10`,
+        {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `HTTP error! status: ${response.status}, message: ${errorText}`
+        );
+      }
+
+      const data = await response.json();
+      console.log("Received recommendations:", data);
+      if (!data.recommendations || !Array.isArray(data.recommendations)) {
+        throw new Error("Invalid recommendations format received");
+      }
+      // Fetch like status for each post
+      const likedPosts = new Set();
+      const likesSnapshot = await getDocs(
+        collection(db, "users", currentUserId, "likes")
+      );
+      likesSnapshot.forEach((doc) => likedPosts.add(doc.id));
+
+      // Fetch current likes count for each post
+      const postsWithLikes = await Promise.all(
+        data.recommendations.map(async (post) => {
+          if (!post.id) {
+            console.warn("Post missing ID:", post);
+            return null;
+          }
+
+          const postRef = doc(db, "posts", post.id);
+          const postDoc = await getDoc(postRef);
+
+          if (!postDoc.exists()) {
+            console.warn(`Post ${post.id} not found in Firestore`);
+            return null;
+          }
+
+          const postData = postDoc.data();
+          const postAuthor = await getDoc(doc(db, "users", postData.uid));
+          const postAuthorData = postAuthor.data();
+          console.log("postAuthorData", postAuthorData);
+          return {
+            ...post,
+            postId: post.id,
+            likes: postData.likes || 0,
+            isLiked: likedPosts.has(post.id),
+            authorName: postAuthorData.name,
+            authorUsername: postAuthorData.username,
+            authorProfileImage: postAuthorData.profilePic,
+          };
+        })
+      );
+      const validPosts = postsWithLikes.filter((post) => post !== null);
+
+      console.log("Processed posts:", validPosts);
+
+      setPosts((prev) =>
+        pageNum === 1 ? postsWithLikes : [...prev, ...postsWithLikes]
+      );
+      setHasMore(data.recommendations.length === 10);
     } catch (error) {
       console.error("Error fetching recommendations:", error);
     } finally {
@@ -86,147 +304,188 @@ const FeedPage = () => {
     }
   };
 
-  useEffect(() => {
-    if (currentUserId) {
-      fetchRecommendations(1);
-    }
-  }, [currentUserId]);
-
   const updateRecentInteractions = async (postId, interactionType) => {
     if (!currentUserId) return;
 
-    const userRef = doc(db, "users", currentUserId);
-    const userDoc = await getDoc(userRef);
-    const userData = userDoc.data();
+    try {
+      const userRef = doc(db, "users", currentUserId);
+      const userDoc = await getDoc(userRef);
 
-    // Get current interactions array
-    const arrayName = `last${interactionType}edPosts`;
-    let currentInteractions = userData?.recentInteractions?.[arrayName] || [];
-
-    // Add new interaction and keep only last 5
-    currentInteractions = [postId, ...currentInteractions.slice(0, 4)];
-
-    // Update the user document
-    await updateDoc(userRef, {
-      [`recentInteractions.${arrayName}`]: currentInteractions,
-    });
-
-    // If it's a like interaction, update business preferences
-    if (interactionType === "Like") {
-      const postDoc = await getDoc(doc(db, "posts", postId));
-      const businessType = postDoc.data()?.businessType;
-      if (businessType) {
-        await updateDoc(userRef, {
-          businessPreferences: arrayUnion(businessType),
-        });
+      if (!userDoc.exists()) {
+        console.error("User document not found");
+        return;
       }
+
+      const userData = userDoc.data();
+      const arrayName = `last${interactionType}edPosts`;
+      let currentInteractions = userData?.recentInteractions?.[arrayName] || [];
+      currentInteractions = [postId, ...currentInteractions.slice(0, 4)];
+
+      await updateDoc(userRef, {
+        [`recentInteractions.${arrayName}`]: currentInteractions,
+      });
+
+      if (interactionType === "Like") {
+        const postDoc = await getDoc(doc(db, "posts", postId));
+        if (postDoc.exists()) {
+          const businessType = postDoc.data()?.businessType;
+          if (businessType) {
+            console.log("Updating business preferences:", businessType);
+            await updateDoc(userRef, {
+              businessPreferences: arrayUnion(businessType),
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Error updating interactions: ${error}`);
     }
   };
 
-  // Function to handle post view
   const handlePostView = async (postId) => {
-    if (!currentUserId) return;
+    if (!currentUserId || !postId) return;
 
-    // Update post view count
-    const postRef = doc(db, "posts", postId);
-    await updateDoc(postRef, {
-      "interactions.viewCount": increment(1),
-    });
+    try {
+      const postRef = doc(db, "posts", postId);
+      await updateDoc(postRef, {
+        "interactions.viewCount": increment(1),
+      });
+      await updateRecentInteractions(postId, "View");
+    } catch (error) {
+      console.error(`Error handling post view: ${error}`);
+    }
+  };
 
-    // Update user's recent views
-    await updateRecentInteractions(postId, "View");
+  const handlePostLike = async (post) => {
+    if (!currentUserId || !post?.postId) return;
+
+    try {
+      const likeRef = doc(db, "users", currentUserId, "likes", post.postId);
+      const postRef = doc(db, "posts", post.postId);
+      const userRef = doc(db, "users", currentUserId);
+
+      const postDoc = await getDoc(postRef);
+
+      if (!postDoc.exists()) {
+        console.error("Post not found");
+        return;
+      }
+
+      const postData = postDoc.data();
+      const businessType = postData.businessType;
+
+      if (post.isLiked) {
+        // Unlike the post
+        await deleteDoc(likeRef);
+        await updateDoc(postRef, { likes: increment(-1) });
+      } else {
+        // Like the post
+        await setDoc(likeRef, {
+          timestamp: new Date(),
+          businessType: businessType, // Store business type in like document
+        });
+        await updateDoc(postRef, { likes: increment(1) });
+
+        // Update user's business preferences
+        if (businessType) {
+          await updateDoc(userRef, {
+            businessPreferences: arrayUnion(businessType),
+          });
+        }
+      }
+
+      // Update posts state
+      setPosts((prevPosts) =>
+        prevPosts.map((p) =>
+          p.postId === post.postId
+            ? {
+                ...p,
+                isLiked: !p.isLiked,
+                likes: p.likes + (p.isLiked ? -1 : 1),
+              }
+            : p
+        )
+      );
+
+      // Refresh recommendations after like/unlike
+      await fetchCombinedRecommendations(1);
+
+      await updateRecentInteractions(post.postId, "Like");
+    } catch (error) {
+      console.error("Error handling like:", error);
+    }
   };
 
   useEffect(() => {
-    const fetchPosts = async () => {
-      setLoading(true);
-      try {
-        // Fetch posts from Firestore
-        const postsRef = collection(db, "posts");
-        const postsQuery = query(postsRef, where("uid", "!=", currentUserId));
-        const querySnapshot = await getDocs(postsQuery);
-
-        const postsData = await Promise.all(
-          querySnapshot.docs.map(async (docu) => {
-            const postData = docu.data();
-            const postId = docu.id;
-
-            // Fetch author details
-            const authorRef = doc(db, "users", postData.uid);
-            const authorDoc = await getDoc(authorRef);
-            const authorData = authorDoc.data();
-
-            // Check if post is liked
-            const likeDocRef = doc(db, "users", currentUserId, "likes", postId);
-            const likeDoc = await getDoc(likeDocRef);
-
-            // Track view for each post
-            await handlePostView(postId);
-
-            // Return formatted post data
-            return {
-              postId,
-              ...postData,
-              author: authorData,
-              isLiked: likeDoc.exists(),
-            };
-          })
-        );
-
-        // Update state with fetched posts
-        setPosts((prev) => (page === 1 ? postsData : [...prev, ...postsData]));
-      } catch (error) {
-        console.error("Error fetching posts:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     if (currentUserId) {
-      fetchPosts();
-    }
-  }, [currentUserId, page]);
+      // First try to load saved location
+      loadSavedLocation().then((hasSavedLocation) => {
+        if (!hasSavedLocation && locationPermission === null) {
+          // If no saved location, request it
+          requestLocationPermission();
+        }
 
-  const handlePostLike = async (post) => {
-    if (!currentUserId) return;
-
-    const likeRef = doc(db, "users", currentUserId, "likes", post.postId);
-    const postRef = doc(db, "posts", post.postId);
-
-    if (post.isLiked) {
-      // Unlike
-      await updateDoc(postRef, { likes: increment(-1) });
-      await updateDoc(doc(db, "users", currentUserId), {
-        [`recentInteractions.lastLikedPosts`]: arrayRemove(post.postId),
+        // Fetch recommendations (will use location if available)
+        fetchCombinedRecommendations(1);
       });
     } else {
-      // Like
-      await updateDoc(postRef, { likes: increment(1) });
-      await updateRecentInteractions(post.postId, "Like");
+      console.log("No user ID available");
+      setLoading(false);
     }
+  }, [currentUserId]);
 
-    // Update posts state
-    setPosts((prevPosts) =>
-      prevPosts.map((p) =>
-        p.postId === post.postId ? { ...p, isLiked: !p.isLiked } : p
-      )
-    );
-  };
+  // Re-fetch when user location changes
+  useEffect(() => {
+    if (userLocation && currentUserId) {
+      console.log("Location updated, refreshing recommendations");
+      fetchCombinedRecommendations(1);
+    }
+  }, [userLocation]);
 
   const loadMore = () => {
     if (!loading && hasMore) {
       const nextPage = page + 1;
       setPage(nextPage);
-      fetchRecommendations(nextPage);
+      fetchCombinedRecommendations(nextPage);
     }
   };
 
+  // UI for requesting location permission
+  const renderLocationPrompt = () => {
+    if (locationPermission === null || locationPermission === "requesting") {
+      return null; // Already handled or in progress
+    } else if (locationPermission === "denied") {
+      return (
+        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <p className="text-sm text-yellow-800">
+            Enable location access to see posts from nearby businesses.
+          </p>
+          <Button
+            onClick={requestLocationPermission}
+            className="mt-2 bg-yellow-600 hover:bg-yellow-700 text-white text-sm py-1"
+          >
+            Enable Location
+          </Button>
+        </div>
+      );
+    }
+    return null;
+  };
+
   if (loading && posts.length === 0) {
-    return <p>Loading posts...</p>;
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <p>Loading posts...</p>
+      </div>
+    );
   }
 
-  if (posts.length === 0) {
-    return <p>No posts found.</p>;
+  if (!loading && posts.length === 0) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <p>No posts found.</p>
+      </div>
+    );
   }
 
   return (
@@ -237,13 +496,40 @@ const FeedPage = () => {
             <Sidebar />
           </aside>
           <main className="space-y-6">
+            {renderLocationPrompt()}
+
+            {userLocation && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg flex items-center">
+                <div className="text-blue-500 mr-2">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                    <circle cx="12" cy="10" r="3"></circle>
+                  </svg>
+                </div>
+                <p className="text-sm text-blue-600">
+                  Showing posts from businesses near you
+                </p>
+              </div>
+            )}
+
             {posts.map((post) => (
               <PostCard
                 key={post.postId}
                 post={post}
-                author={post.author}
                 onLike={() => handlePostLike(post)}
                 onView={() => handlePostView(post.postId)}
+                showDistance={post.isLocationBased}
+                distanceText={post.distanceText}
               />
             ))}
             {hasMore && (

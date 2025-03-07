@@ -11,7 +11,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { collection, onSnapshot } from "firebase/firestore";
 import { sendEmailVerification } from "firebase/auth";
-// import toast from "react-hot-toast";
+import { useIsBusinessUser } from "@/lib/business-user"; // Import the custom hook
+import toast from "react-hot-toast";
+import { userEmailStatus } from "@/utils/userStatus";
 
 function DefaultSidebar() {
   return (
@@ -47,10 +49,10 @@ export default function Sidebar() {
   const user = useGetUser(userId);
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
+  const { isBusinessUser, loading } = useIsBusinessUser(userId); // Use the custom hook
 
   useEffect(() => {
     if (!userId) return;
-
     const followersRef = collection(db, "users", userId, "followers");
     const followingRef = collection(db, "users", userId, "following");
 
@@ -80,7 +82,48 @@ export default function Sidebar() {
       });
   };
 
-  if (!user) {
+  // Format location for display, handling object case
+  const getLocationDisplay = () => {
+    if (!user.location) return "No location";
+
+    // Check if location is an object with latitude and longitude
+    if (
+      typeof user.location === "object" &&
+      user.location.latitude &&
+      user.location.longitude
+    ) {
+      return `${user.location.latitude}, ${user.location.longitude}`;
+    }
+
+    // If it's a string, return as is
+    return user.location;
+  };
+
+  // Get location URL for linking
+  const getLocationUrl = () => {
+    if (!user.location) return null;
+
+    // If location is an object with coordinates
+    if (
+      typeof user.location === "object" &&
+      user.location.latitude &&
+      user.location.longitude
+    ) {
+      return `https://maps.google.com/?q=${user.location.latitude},${user.location.longitude}`;
+    }
+
+    // If location is already a URL
+    if (typeof user.location === "string" && user.location.includes("http")) {
+      return user.location;
+    }
+
+    // Otherwise, assume it's a place name and search for it
+    return `https://maps.google.com/search?q=${encodeURIComponent(
+      user.location
+    )}`;
+  };
+
+  if (!user || loading) {
     return (
       <div className="flex items-center justify-center">
         <h2>Loading ...</h2>
@@ -90,7 +133,7 @@ export default function Sidebar() {
   }
 
   return (
-    <div className="sticky top-20">
+    <div className="sticky top-20 mt-[15px]">
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col items-center text-center">
@@ -111,14 +154,17 @@ export default function Sidebar() {
                 </p>
               </div>
             </Link>
-            {!auth?.currentUser.emailVerified && (
+            {userEmailStatus() === false && (
               <>
-                <p className="mt-3 text-sm text-muted-foreground">
+                <div className="mt-3 text-sm text-muted-foreground">
                   <p>Email not verified</p>
-                  <Button onClick={verifyEmailHandler} variant="ghost">
+                  <Button
+                    onClick={verifyEmailHandler}
+                    className="bg-emerald-800 mt-1"
+                  >
                     Verify Email
                   </Button>
-                </p>
+                </div>
               </>
             )}
             <div className="w-full">
@@ -129,33 +175,63 @@ export default function Sidebar() {
                   <p className="text-xs text-muted-foreground">Following</p>
                 </div>
                 <Separator orientation="vertical" />
-                <div>
-                  <p className="font-medium">{followersCount || "0"}</p>
-                  <p className="text-xs text-muted-foreground">Followers</p>
-                </div>
+                {isBusinessUser && (
+                  <div>
+                    <p className="font-medium">{followersCount || "0"}</p>
+                    <p className="text-xs text-muted-foreground">Followers</p>
+                  </div>
+                )}
               </div>
               <Separator className="my-4" />
             </div>
-            <div className="w-full space-y-2 text-sm">
-              <div className="flex items-center text-muted-foreground">
-                <MapPinIcon className="w-4 h-4 mr-2" />
-                {user.location || "No location"}
+            {isBusinessUser && (
+              <div className="w-full space-y-2 text-sm">
+                <div className="flex items-center text-muted-foreground">
+                  <MapPinIcon className="w-4 h-4 mr-2" />
+                  {getLocationUrl() ? (
+                    <a
+                      href={getLocationUrl()}
+                      className="hover:underline"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {getLocationDisplay()}
+                    </a>
+                  ) : (
+                    getLocationDisplay()
+                  )}
+                </div>
+                <div className="flex items-center text-muted-foreground">
+                  <LinkIcon className="w-4 h-4 mr-2 shrink-0" />
+                  {user?.website ? (
+                    <a
+                      href={
+                        user.website.startsWith("http")
+                          ? user.website
+                          : `https://${user.website}`
+                      }
+                      className="hover:underline"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {user.website}
+                    </a>
+                  ) : (
+                    "No website"
+                  )}
+                </div>
+                <Link
+                  href="/pricing"
+                  className="flex items-center text-muted-foreground font-semibold w-fit"
+                >
+                  <TicketCheck className="w-4 h-4 mr-2 shrink-0" />
+                  {(user.plan &&
+                    user.subscriptionStatus === "active" &&
+                    user.plan.charAt(0).toUpperCase() + user.plan.slice(1)) ||
+                    "Free"}
+                </Link>
               </div>
-              <div className="flex items-center text-muted-foreground">
-                <LinkIcon className="w-4 h-4 mr-2 shrink-0" />
-                {user.website || "No website"}
-              </div>
-              <Link
-                href="/pricing"
-                className="flex items-center text-muted-foreground font-semibold"
-              >
-                <TicketCheck className="w-4 h-4 mr-2 shrink-0" />
-                {(user.plan &&
-                  user.subscriptionStatus === "active" &&
-                  user.plan.charAt(0).toUpperCase() + user.plan.slice(1)) ||
-                  "Free"}
-              </Link>
-            </div>
+            )}
           </div>
         </CardContent>
       </Card>
