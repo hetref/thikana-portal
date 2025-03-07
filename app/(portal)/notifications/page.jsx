@@ -1,8 +1,6 @@
 import NotificationsSkeleton from "@/components/NotificationsSkeleton"
 import Sidebar from "@/components/Sidebar"
 import WhoToFollow from "@/components/WhoToFollow"
-import { Suspense } from 'react'
-import NotificationsList from '@/components/NotificationsList'
 
 export default function NotificationsPage() {
   return (
@@ -13,9 +11,7 @@ export default function NotificationsPage() {
             <Sidebar />
           </aside>
           <main>
-            <Suspense fallback={<NotificationsSkeleton />}>
-              <NotificationsList />
-            </Suspense>
+            <NotificationsSkeleton />
           </main>
           <aside className="hidden lg:block">
             <div className="sticky top-20">
