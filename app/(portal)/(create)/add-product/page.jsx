@@ -83,7 +83,7 @@ const AddProductPage = () => {
   };
 
   return (
-    <div className="mt-10 max-w-lg mx-auto p-4 sm:p-6 md:p-8 shadow-md rounded-md text-primary border border-primary-foreground">
+    <div className="mt-20 max-w-lg mx-auto p-4 sm:p-6 md:p-8 shadow-md rounded-md text-primary border border-primary-foreground">
       <h1 className="text-2xl font-bold text-center text-primary mb-6">
         Add New Product
       </h1>
