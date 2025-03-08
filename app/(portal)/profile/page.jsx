@@ -184,7 +184,7 @@ export default function Profile() {
   };
 
   return (
-    <div className="flex items-center justify-center w-full">
+    <div className="flex items-center justify-center w-full mt-16">
       <div className="max-w-7xl w-full flex justify-center gap-6">
         <main className="mx-auto w-full md:w-4/6 px-2 mt-[15px]">
           <div className="grid grid-cols-1 gap-6">
@@ -449,6 +449,13 @@ export default function Profile() {
                 </TabsContent>
                 <TabsContent value="likes" className="p-6">
                   <div className="space-y-4">
+                    {likedPosts.length === 0 && (
+                      <div className="text-center">
+                        <p className="text-muted-foreground">
+                          No liked posts yet
+                        </p>
+                      </div>
+                    )}
                     {likedPosts.map((post, index) => (
                       <Card key={index} className="p-4">
                         <ProfilePosts post={post} userData={userData} />

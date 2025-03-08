@@ -7,7 +7,7 @@ function NotificationsSkeleton() {
   const skeletonItems = Array.from({ length: 5 }, (_, i) => i);
 
   return (
-    <div className="space-y-4 w-full">
+    <div className="space-y-4 w-full mt-12">
       <Card>
         <CardHeader className="border-b">
           <div className="flex items-center justify-between">
