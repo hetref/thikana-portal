@@ -213,7 +213,7 @@ const FeedPage = () => {
       const cacheBuster = Math.floor(Date.now() / (15 * 60 * 1000)); // Changes every 15 min
 
       const response = await fetch(
-        ` http://127.0.0.1:8000/feed/${currentUserId}?limit=10&_t=${cacheBuster}`,
+        ` https://thikana-recommendation-model.onrender.com/feed/${currentUserId}?limit=10&_t=${cacheBuster}`,
         {
           method: "GET",
           credentials: "include",
