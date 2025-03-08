@@ -1,106 +1,118 @@
-import React, { useState, useEffect } from "react";
-import { Card, CardContent, CardFooter, CardHeader } from "./ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import React, { useState, useEffect, useRef } from "react";
+import { Card, CardContent } from "./ui/card";
+import { Avatar, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
-import { Bookmark, Heart, MessageCircle, MoreHorizontal } from "lucide-react";
-import Image from "next/image";
+import { Heart, MessageCircle, MapPin } from "lucide-react";
 
-function PostCard({ post, onLike, onView }) {
-  const [hasLiked, setHasLiked] = useState(post?.isLiked || false);
-  const [likeCount, setLikeCount] = useState(post?.likes || 0);
+function PostCard({ post, onLike, onView, showDistance, distanceText }) {
+  // Track if we're currently processing a like operation
+  const [isLikeProcessing, setIsLikeProcessing] = useState(false);
 
+  // Ref to track the actual liked state from props
+  const isLikedRef = useRef(post?.isLiked);
+  const likesCountRef = useRef(post?.likes);
+
+  // Update the ref when props change
   useEffect(() => {
-    setHasLiked(post?.isLiked || false);
-    setLikeCount(post?.likes || 0);
+    isLikedRef.current = post?.isLiked;
+    likesCountRef.current = post?.likes;
   }, [post?.isLiked, post?.likes]);
 
   const handleLike = async (e) => {
     e.stopPropagation();
+    e.preventDefault();
+
+    // If we're already processing a like operation, don't start another one
+    if (isLikeProcessing) {
+      return;
+    }
+
     try {
-      const newLikedState = !hasLiked;
-      setHasLiked(newLikedState);
-      setLikeCount((prev) => prev + (newLikedState ? 1 : -1));
+      setIsLikeProcessing(true);
+
+      // Call the parent's onLike function
       await onLike();
+
+      // Processing is complete
+      setIsLikeProcessing(false);
     } catch (error) {
-      setHasLiked((prev) => !prev);
-      setLikeCount((prev) => prev + (hasLiked ? 1 : -1));
       console.error("Error handling like:", error);
+      setIsLikeProcessing(false);
     }
   };
 
   return (
-    <Card className="max-w-md mx-auto" onClick={onView}>
-      <CardHeader className="flex flex-row items-center space-x-4 p-4">
-        <Avatar>
-          <AvatarImage
-            src={post?.authorProfileImage || "/default-avatar.png"}
-            alt={post?.authorName || "User"}
-          />
-          <AvatarFallback>{(post?.authorName || "U").charAt(0)}</AvatarFallback>
-        </Avatar>
-        <div className="flex-1 space-y-1">
-          <p className="text-sm font-medium leading-none">
-            {post?.authorName || "Anonymous"}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            @{post?.authorUsername || "user"}
-          </p>
+    <Card
+      className="cursor-pointer hover:shadow-md transition-shadow"
+      onClick={onView}
+    >
+      <CardContent className="pt-6">
+        {/* Post Header */}
+        <div className="flex justify-between items-start mb-4">
+          <div className="flex gap-3">
+            <Avatar className="h-10 w-10">
+              <AvatarImage
+                src={post?.authorProfileImage || "/default-avatar.png"}
+                alt={post?.authorName || "User"}
+              />
+            </Avatar>
+            <div>
+              <p className="font-semibold">{post?.authorName || "Anonymous"}</p>
+              <p className="text-sm text-muted-foreground">
+                @{post?.authorUsername || "user"}
+              </p>
+            </div>
+          </div>
+
+          {showDistance && distanceText && (
+            <div className="flex items-center text-sm text-blue-600">
+              <MapPin className="h-4 w-4 mr-1" />
+              <span>{distanceText}</span>
+            </div>
+          )}
         </div>
-        <Button variant="ghost" size="icon">
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
-      </CardHeader>
-      <CardContent className="p-0">
-        <div className="relative aspect-[4/5] w-full">
-          <Image
-            src={post?.mediaUrl || "/default-post.png"}
-            alt={post?.caption || "Post image"}
-            fill
-            className="object-cover"
-            priority={true}
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-          />
+
+        {/* Post Content */}
+        <div className="space-y-4">
+          <p>{post?.caption || post?.content || post?.description}</p>
+
+          {/* Image */}
+          {post?.mediaUrl && (
+            <div className="relative rounded-lg overflow-hidden bg-muted">
+              <div className="relative aspect-[16/9]">
+                <img
+                  src={post?.mediaUrl}
+                  alt="Post content"
+                  className="object-cover w-full h-full"
+                />
+              </div>
+            </div>
+          )}
         </div>
-      </CardContent>
-      <CardFooter className="flex flex-col space-y-2 p-4">
-        <div className="flex items-center justify-between w-full">
-          <div className="flex space-x-4">
+
+        {/* Post Actions */}
+        <div className="flex items-center justify-between mt-4">
+          <div className="flex gap-4">
             <Button
               variant="ghost"
-              size="icon"
+              size="sm"
+              className={`flex gap-2 ${post?.isLiked ? "text-red-500" : ""}`}
               onClick={handleLike}
-              className="flex items-center gap-2"
+              disabled={isLikeProcessing}
             >
               <Heart
-                className={`h-5 w-5 transition-colors ${
-                  hasLiked ? "fill-red-500 stroke-red-500" : ""
-                }`}
+                className={`h-5 w-5 ${post?.isLiked ? "fill-current" : ""}`}
               />
-              <span>{likeCount}</span>
+              <span>{post?.likes || 0}</span>
             </Button>
-            <Button variant="ghost" size="icon">
+
+            <Button variant="ghost" size="sm" className="flex gap-2">
               <MessageCircle className="h-5 w-5" />
+              <span>{post?.comments?.length || 0}</span>
             </Button>
           </div>
-          <Button variant="ghost" size="icon">
-            <Bookmark className="h-5 w-5" />
-          </Button>
         </div>
-        <div className="text-sm">
-          <span className="font-medium">{post?.authorName || "Anonymous"}</span>{" "}
-          {post?.caption}
-        </div>
-        {post?.comments > 0 && (
-          <Button variant="link" className="p-0 h-auto text-muted-foreground">
-            View all {post.comments} comments
-          </Button>
-        )}
-        {post?.businessType && (
-          <Button variant="link" className="p-0 h-auto text-muted-foreground">
-            {post.businessType}
-          </Button>
-        )}
-      </CardFooter>
+      </CardContent>
     </Card>
   );
 }

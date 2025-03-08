@@ -449,6 +449,13 @@ export default function Profile() {
                 </TabsContent>
                 <TabsContent value="likes" className="p-6">
                   <div className="space-y-4">
+                    {likedPosts.length === 0 && (
+                      <div className="text-center">
+                        <p className="text-muted-foreground">
+                          No liked posts yet
+                        </p>
+                      </div>
+                    )}
                     {likedPosts.map((post, index) => (
                       <Card key={index} className="p-4">
                         <ProfilePosts post={post} userData={userData} />

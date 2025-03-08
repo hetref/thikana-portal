@@ -23,6 +23,8 @@ import { userEmailStatus } from "@/utils/userStatus";
 import { sendEmailVerification } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import toast from "react-hot-toast";
+import Loader from "@/components/Loader";
+import PostCardSkeleton from "@/components/PostCardSkeleton";
 
 const FeedPage = () => {
   const [posts, setPosts] = useState([]);
@@ -111,7 +113,89 @@ const FeedPage = () => {
     }
     return false;
   };
+  const shouldUpdateLocation = (oldLocation, newLocation) => {
+    // If no previous location, definitely update
+    if (!oldLocation) return true;
 
+    // Calculate distance between old and new locations (using Haversine formula)
+    const calculateDistance = (lat1, lon1, lat2, lon2) => {
+      const R = 6371; // Earth's radius in km
+      const dLat = ((lat2 - lat1) * Math.PI) / 180;
+      const dLon = ((lon2 - lon1) * Math.PI) / 180;
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos((lat1 * Math.PI) / 180) *
+          Math.cos((lat2 * Math.PI) / 180) *
+          Math.sin(dLon / 2) *
+          Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    };
+
+    const distance = calculateDistance(
+      oldLocation.latitude,
+      oldLocation.longitude,
+      newLocation.latitude,
+      newLocation.longitude
+    );
+
+    // Only update if moved more than 1km
+    return distance > 1;
+  };
+
+  // Modify the location handling in useEffect
+  useEffect(() => {
+    if (currentUserId) {
+      // First try to load saved location
+      loadSavedLocation().then((hasSavedLocation) => {
+        if (!hasSavedLocation && locationPermission === null) {
+          // If no saved location, request it
+          requestLocationPermission();
+        } else if (hasSavedLocation) {
+          // If we have a saved location, periodically check for updates in background
+          const watchId = navigator.geolocation.watchPosition(
+            (position) => {
+              const newLocation = {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+              };
+
+              // Check if location changed significantly
+              if (shouldUpdateLocation(userLocation, newLocation)) {
+                setUserLocation(newLocation);
+
+                // Store updated location in Firestore
+                if (currentUserId) {
+                  const userRef = doc(db, "users", currentUserId);
+                  updateDoc(userRef, {
+                    location: newLocation,
+                    locationUpdatedAt: new Date(),
+                  }).catch((err) =>
+                    console.error("Error saving location:", err)
+                  );
+                }
+              }
+            },
+            (error) => console.error("Error watching position:", error),
+            {
+              enableHighAccuracy: true,
+              maximumAge: 10 * 60 * 1000, // 10 minutes
+              timeout: 10000, // 10 seconds
+            }
+          );
+
+          // Clean up watch when component unmounts
+          return () => navigator.geolocation.clearWatch(watchId);
+        }
+
+        // Fetch recommendations (will use location if available)
+        fetchCombinedRecommendations(1);
+      });
+    } else {
+      console.log("No user ID available");
+      setLoading(false);
+    }
+  }, [currentUserId]);
   // Fetch combined recommendations (location + preferences)
   const fetchCombinedRecommendations = async (pageNum) => {
     if (!currentUserId) {
@@ -121,13 +205,15 @@ const FeedPage = () => {
     }
 
     try {
-      setLoading(true);
+      setLoading(pageNum === 1); // Only show loading for first page
       setError(null);
-      console.log("Fetching combined recommendations for user:", currentUserId);
 
-      // Use the new feed endpoint that combines location and preference-based recommendations
+      // Add cache-busting parameter to avoid browser caching
+      // Use timestamp to ensure fresh data but still allow browser to cache between sessions
+      const cacheBuster = Math.floor(Date.now() / (15 * 60 * 1000)); // Changes every 15 min
+
       const response = await fetch(
-        `https://thikana-recommendation-model.onrender.com/feed/${currentUserId}?limit=10`,
+        ` https://thikana-recommendation-model.onrender.com/feed/${currentUserId}?limit=10&_t=${cacheBuster}`,
         {
           method: "GET",
           credentials: "include",
@@ -356,25 +442,111 @@ const FeedPage = () => {
     }
   };
 
+  // const handlePostLike = async (post) => {
+  //   if (!currentUserId || !post?.postId) return;
+
+  //   try {
+  //     const likeRef = doc(db, "users", currentUserId, "likes", post.postId);
+  //     const postRef = doc(db, "posts", post.postId);
+  //     const userRef = doc(db, "users", currentUserId);
+
+  //     const postDoc = await getDoc(postRef);
+
+  //     if (!postDoc.exists()) {
+  //       console.error("Post not found");
+  //       return;
+  //     }
+
+  //     const postData = postDoc.data();
+  //     const businessType = postData.businessType;
+
+  //     if (post.isLiked) {
+  //       // Unlike the post
+  //       await deleteDoc(likeRef);
+  //       await updateDoc(postRef, { likes: increment(-1) });
+  //     } else {
+  //       // Like the post
+  //       await setDoc(likeRef, {
+  //         timestamp: new Date(),
+  //         businessType: businessType, // Store business type in like document
+  //       });
+  //       await updateDoc(postRef, { likes: increment(1) });
+
+  //       // Update user's business preferences
+  //       if (businessType) {
+  //         await updateDoc(userRef, {
+  //           businessPreferences: arrayUnion(businessType),
+  //         });
+  //       }
+  //     }
+
+  //     // Update posts state
+  //     setPosts((prevPosts) =>
+  //       prevPosts.map((p) =>
+  //         p.postId === post.postId
+  //           ? {
+  //               ...p,
+  //               isLiked: !p.isLiked,
+  //               likes: p.likes + (p.isLiked ? -1 : 1),
+  //             }
+  //           : p
+  //       )
+  //     );
+
+  //     // Refresh recommendations after like/unlike
+  //     await fetchCombinedRecommendations(1);
+
+  //     await updateRecentInteractions(post.postId, "Like");
+  //   } catch (error) {
+  //     console.error("Error handling like:", error);
+  //   }
+  // };
+
   const handlePostLike = async (post) => {
     if (!currentUserId || !post?.postId) return;
 
     try {
+      // Find the current post in state to get its accurate isLiked status
+      const currentPosts = [...posts];
+      const postIndex = currentPosts.findIndex((p) => p.postId === post.postId);
+
+      if (postIndex === -1) {
+        console.error("Post not found in current state");
+        return;
+      }
+
+      const currentPost = currentPosts[postIndex];
+      const currentlyLiked = currentPost.isLiked;
+
+      // Optimistic UI update
+      currentPosts[postIndex] = {
+        ...currentPost,
+        isLiked: !currentlyLiked,
+        likes: currentPost.likes + (currentlyLiked ? -1 : 1),
+      };
+
+      // Update state immediately for responsive UI
+      setPosts(currentPosts);
+
+      // References for Firebase operations
       const likeRef = doc(db, "users", currentUserId, "likes", post.postId);
       const postRef = doc(db, "posts", post.postId);
       const userRef = doc(db, "users", currentUserId);
 
+      // Get post data for business type
       const postDoc = await getDoc(postRef);
-
       if (!postDoc.exists()) {
-        console.error("Post not found");
+        console.error("Post not found in Firestore");
+        // Revert optimistic update if post doesn't exist
+        setPosts(posts);
         return;
       }
 
       const postData = postDoc.data();
       const businessType = postData.businessType;
 
-      if (post.isLiked) {
+      // Perform the actual database operations
+      if (currentlyLiked) {
         // Unlike the post
         await deleteDoc(likeRef);
         await updateDoc(postRef, { likes: increment(-1) });
@@ -382,7 +554,7 @@ const FeedPage = () => {
         // Like the post
         await setDoc(likeRef, {
           timestamp: new Date(),
-          businessType: businessType, // Store business type in like document
+          businessType: businessType,
         });
         await updateDoc(postRef, { likes: increment(1) });
 
@@ -393,29 +565,22 @@ const FeedPage = () => {
           });
         }
       }
-
-      // Update posts state
-      setPosts((prevPosts) =>
-        prevPosts.map((p) =>
-          p.postId === post.postId
-            ? {
-                ...p,
-                isLiked: !p.isLiked,
-                likes: p.likes + (p.isLiked ? -1 : 1),
-              }
-            : p
-        )
-      );
-
-      // Refresh recommendations after like/unlike
       await fetchCombinedRecommendations(1);
 
+      // Update recent interactions
       await updateRecentInteractions(post.postId, "Like");
+
+      // No need to refresh recommendations after every like/unlike
+      // This may be causing part of the lagginess
+      // Consider commenting this out or implementing a debounced refresh
+      // await fetchCombinedRecommendations(1);
     } catch (error) {
       console.error("Error handling like:", error);
+      // If an error occurs, revert to the original state
+      const originalPosts = [...posts];
+      setPosts(originalPosts);
     }
   };
-
   useEffect(() => {
     if (currentUserId) {
       // First try to load saved location
@@ -474,16 +639,55 @@ const FeedPage = () => {
 
   if (loading && posts.length === 0) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <p>Loading posts...</p>
+      <div className="flex items-center justify-center w-full">
+        <div className="max-w-7xl w-full">
+          <div className="container grid grid-cols-1 lg:grid-cols-[300px_1fr_300px] gap-6 py-8">
+            <aside className="hidden md:block">
+              <Sidebar />
+            </aside>
+            <main className="space-y-6">
+              {/* Render multiple skeleton cards */}
+              {Array(5)
+                .fill(0)
+                .map((_, index) => (
+                  <PostCardSkeleton key={index} />
+                ))}
+            </main>
+            <aside className="hidden lg:block">
+              <WhoToFollow />
+            </aside>
+          </div>
+        </div>
+        <aside>
+          <div className="fixed bottom-4 right-4">
+            <Chatbot />
+          </div>
+        </aside>
       </div>
     );
   }
 
   if (!loading && posts.length === 0) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <p>No posts found.</p>
+      <div className="flex items-center justify-center w-full">
+        <div className="max-w-7xl w-full">
+          <div className="container grid grid-cols-1 lg:grid-cols-[300px_1fr_300px] gap-6 py-8">
+            <aside className="hidden md:block">
+              <Sidebar />
+            </aside>
+            <main className="flex justify-center items-center min-h-[50vh]">
+              <p className="text-gray-500">No posts found.</p>
+            </main>
+            <aside className="hidden lg:block">
+              <WhoToFollow />
+            </aside>
+          </div>
+        </div>
+        <aside>
+          <div className="fixed bottom-4 right-4">
+            <Chatbot />
+          </div>
+        </aside>
       </div>
     );
   }

@@ -20,18 +20,21 @@ import {
 import AddPhotoModal from "./AddPhotoModal";
 
 const TopNavbar = ({ type = "unauthenticated" }) => {
-  const [user, setUser] = useState(null);
+  const [authUser, setAuthUser] = useState(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAddPhotoModalOpen, setIsAddPhotoModalOpen] = useState(false);
+
+  // Get the complete user data from Firestore
+  const userData = useGetUser(authUser?.uid);
 
   const router = useRouter();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        setUser(user);
+        setAuthUser(user);
       } else {
-        setUser(false);
+        setAuthUser(false);
       }
     });
 
@@ -80,7 +83,7 @@ const TopNavbar = ({ type = "unauthenticated" }) => {
         >
           <ThemeToggle />
 
-          {user &&
+          {authUser &&
             type === "authenticated" &&
             authenticatedItems.map((item) => (
               <Link
@@ -93,52 +96,47 @@ const TopNavbar = ({ type = "unauthenticated" }) => {
               </Link>
             ))}
 
-          {user && type === "authenticated" && (
+          {authUser && userData && type === "authenticated" && (
             <>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary">
-                    <Plus className="h-5 w-5" />
-                    <span className="block">Create</span>
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem asChild>
-                    <Link
-                      href="/create-post"
-                      className="flex items-center gap-2"
+              {/* Only show Create dropdown if user role is not "user" */}
+              {userData.role !== "user" && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary">
+                      <Plus className="h-5 w-5" />
+                      <span className="block">Create</span>
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem asChild>
+                      <Link
+                        href="/create-post"
+                        className="flex items-center gap-2"
+                      >
+                        <span>Create Post</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={() => setIsAddPhotoModalOpen(true)}
                     >
-                      <span>Create Post</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={() => setIsAddPhotoModalOpen(true)}
-                  >
-                    <span>Add Photos</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link
-                      href="/add-product"
-                      className="flex items-center gap-2"
-                    >
-                      <span>Add Product</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link
-                      href="/add-bulk-products"
-                      className="flex items-center gap-2"
-                    >
-                      <span>Add Products in bulk</span>
-                    </Link>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              {user && (
+                      <span>Add Photos</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link
+                        href="/add-product"
+                        className="flex items-center gap-2"
+                      >
+                        <span>Add Product</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              {authUser && (
                 <AddPhotoModal
                   isOpen={isAddPhotoModalOpen}
                   onClose={() => setIsAddPhotoModalOpen(false)}
-                  userId={user.uid}
+                  userId={authUser.uid}
                 />
               )}
             </>
@@ -158,7 +156,7 @@ const TopNavbar = ({ type = "unauthenticated" }) => {
 
           {/* Auth Buttons */}
           <div className="flex items-center gap-2">
-            {user && type === "authenticated" ? (
+            {authUser && type === "authenticated" ? (
               <Button
                 size="sm"
                 onClick={logoutHandler}
@@ -172,7 +170,7 @@ const TopNavbar = ({ type = "unauthenticated" }) => {
                 asChild
                 className="bg-primary hover:bg-primary-dark"
               >
-                <Link href={user ? "/feed" : "/login"}>Get Started</Link>
+                <Link href={authUser ? "/feed" : "/login"}>Get Started</Link>
               </Button>
             )}
           </div>

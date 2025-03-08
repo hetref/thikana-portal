@@ -1,5 +1,6 @@
 "use client";
 
+import Loader from "@/components/Loader";
 import TopNavbar from "@/components/TopNavbar";
 // import TopNavbar from "@/components/TopNavbar";
 import { auth, db } from "@/lib/firebase";
@@ -26,8 +27,9 @@ const layout = ({ children }) => {
   }, []);
   if (userData === null) {
     return (
-      <div className="w-full h-full flex items-center justify-center">
-        <h2 className="font-semibold text-xl">Loading</h2>
+      <div className="flex justify-center items-center h-screen">
+        {/* <h2 className="font-semibold text-xl"></h2> */}
+        <Loader />
       </div>
     );
   }
