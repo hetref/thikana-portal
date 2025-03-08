@@ -4,12 +4,18 @@ import React, { useState } from "react";
 import * as Papa from "papaparse";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import Table from "@/components/ui/table";
+import { TableDa } from "@/components/ui/table";
 import { auth, db } from "@/lib/firebase"; // Ensure Firebase is set up correctly
 import { collection, addDoc } from "firebase/firestore";
 import toast from "react-hot-toast";
 
-const REQUIRED_COLUMNS = ["Title", "Description", "Price", "Category", "Quantity"];
+const REQUIRED_COLUMNS = [
+  "Title",
+  "Description",
+  "Price",
+  "Category",
+  "Quantity",
+];
 
 const AddProductsBulkPage = () => {
   const [file, setFile] = useState(null);
@@ -49,7 +55,9 @@ const AddProductsBulkPage = () => {
 
         if (missingColumns.length > 0) {
           toast.error(
-            `The following columns are missing: ${missingColumns.join(", ")}. Please refer to the template.`
+            `The following columns are missing: ${missingColumns.join(
+              ", "
+            )}. Please refer to the template.`
           );
           setTableData(null);
           return;
@@ -119,7 +127,10 @@ const AddProductsBulkPage = () => {
 
       <div className="flex items-center justify-between mb-4">
         <p className="text-lg font-medium">View Template</p>
-        <Button onClick={downloadTemplate} className="bg-primary hover:bg-primary-dark">
+        <Button
+          onClick={downloadTemplate}
+          className="bg-primary hover:bg-primary-dark"
+        >
           Download
         </Button>
       </div>
@@ -136,7 +147,7 @@ const AddProductsBulkPage = () => {
 
       {tableData && (
         <div className="overflow-x-auto mb-6">
-            <Table columns={REQUIRED_COLUMNS} data={tableData} />
+          <TableDa columns={REQUIRED_COLUMNS} data={tableData} />
         </div>
       )}
 

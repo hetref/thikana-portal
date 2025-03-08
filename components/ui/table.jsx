@@ -83,8 +83,9 @@ export {
   TableRow,
   TableCell,
   TableCaption,
-}
-const Table = ({ columns, data }) => {
+  TableDa,
+};
+const TableDa = ({ columns, data }) => {
     return (
       <div className="overflow-x-auto">
         <table className="min-w-full border-collapse border border-gray-300">
