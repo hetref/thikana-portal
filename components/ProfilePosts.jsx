@@ -101,9 +101,7 @@ const ProfilePosts = ({ post: initialPost, userData, onPostDelete }) => {
         <div className="flex-1">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="font-semibold">
-                {userData?.fullname || "User"}
-              </span>
+              <span className="font-semibold">{userData?.name || "User"}</span>
               <span className="text-sm text-muted-foreground">
                 {new Date(post.createdAt?.toDate()).toLocaleDateString()}
               </span>
@@ -160,11 +158,11 @@ const ProfilePosts = ({ post: initialPost, userData, onPostDelete }) => {
               </button>
             </div>
           </div>
-          <p className="mt-2">{post.description || "No description"}</p>
+          <p className="mt-2">{post.content || "No description"}</p>
           <div onDoubleClick={handleLikePost} className="cursor-pointer">
-            {post.image && (
+            {post.mediaUrl && (
               <img
-                src={post.image}
+                src={post.mediaUrl}
                 alt="Post image"
                 className="mt-2 rounded-lg max-h-96 object-cover"
               />
