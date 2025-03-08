@@ -8,6 +8,9 @@ import { get, ref } from "firebase/database";
 import { doc, getDoc } from "firebase/firestore";
 import { redirect, useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
+import { ToastProvider } from "@/components/ui/use-toast";
+import { Toaster } from "@/components/ui/toaster";
+import { AuthProvider } from "@/context/AuthContext";
 
 const layout = ({ children }) => {
   const [userData, setUserData] = useState(null);
@@ -33,10 +36,15 @@ const layout = ({ children }) => {
   }
 
   return (
-    <div>
-      <TopNavbar type="authenticated" />
-      <div className="mt-[80px]">{children}</div>
-    </div>
+    <AuthProvider>
+      <ToastProvider>
+        <div>
+          <TopNavbar type="authenticated" />
+          <div className="mt-[80px]">{children}</div>
+          <Toaster />
+        </div>
+      </ToastProvider>
+    </AuthProvider>
   );
 };
 
