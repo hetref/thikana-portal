@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Sidebar from "@/components/Sidebar";
 import WhoToFollow from "@/components/WhoToFollow";
 import { auth, db } from "@/lib/firebase";
@@ -15,10 +15,10 @@ import {
   deleteDoc,
   increment,
   setDoc,
+  writeBatch,
 } from "firebase/firestore";
 import Chatbot from "@/components/Chatbot";
 import PostCard from "@/components/PostCard";
-import Image from "next/image";
 import { userEmailStatus } from "@/utils/userStatus";
 import { sendEmailVerification } from "firebase/auth";
 import { Button } from "@/components/ui/button";
@@ -31,10 +31,10 @@ const FeedPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
-  const [authors, setAuthors] = useState({});
   const [hasMore, setHasMore] = useState(true);
   const [userLocation, setUserLocation] = useState(null);
   const [locationPermission, setLocationPermission] = useState(null);
+  const refreshTimeout = useRef(null);
   const currentUserId = auth.currentUser?.uid;
 
   // Check for email verification
@@ -58,35 +58,31 @@ const FeedPage = () => {
     );
   }
 
-  // Request user location if not already available
-  const requestLocationPermission = () => {
-    if (navigator.geolocation) {
-      setLocationPermission("requesting");
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          setUserLocation({ latitude, longitude });
-          setLocationPermission("granted");
+  // Calculate distance between two points
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371; // Earth's radius in km
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
 
-          // Store user location in Firestore for future use
-          if (currentUserId) {
-            const userRef = doc(db, "users", currentUserId);
-            updateDoc(userRef, {
-              location: { latitude, longitude },
-              locationUpdatedAt: new Date(),
-            }).catch((err) => console.error("Error saving location:", err));
-          }
-        },
-        (error) => {
-          console.error("Error getting location:", error);
-          setLocationPermission("denied");
-          toast.error("Location access denied. Some features may be limited.");
-        }
-      );
-    } else {
-      setLocationPermission("unavailable");
-      toast.error("Geolocation is not supported by your browser.");
-    }
+  // Check if location needs updating
+  const shouldUpdateLocation = (oldLocation, newLocation) => {
+    if (!oldLocation) return true;
+    const distance = calculateDistance(
+      oldLocation.latitude,
+      oldLocation.longitude,
+      newLocation.latitude,
+      newLocation.longitude
+    );
+    return distance > 1; // Update if moved more than 1km
   };
 
   // Load saved location from user profile
@@ -101,7 +97,10 @@ const FeedPage = () => {
             userData.location.latitude &&
             userData.location.longitude
           ) {
-            setUserLocation(userData.location);
+            setUserLocation({
+              ...userData.location,
+              lastUpdated: userData.locationUpdatedAt?.toMillis() || 0,
+            });
             return true;
           }
         }
@@ -113,194 +112,51 @@ const FeedPage = () => {
     }
     return false;
   };
-  const shouldUpdateLocation = (oldLocation, newLocation) => {
-    // If no previous location, definitely update
-    if (!oldLocation) return true;
 
-    // Calculate distance between old and new locations (using Haversine formula)
-    const calculateDistance = (lat1, lon1, lat2, lon2) => {
-      const R = 6371; // Earth's radius in km
-      const dLat = ((lat2 - lat1) * Math.PI) / 180;
-      const dLon = ((lon2 - lon1) * Math.PI) / 180;
-      const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos((lat1 * Math.PI) / 180) *
-          Math.cos((lat2 * Math.PI) / 180) *
-          Math.sin(dLon / 2) *
-          Math.sin(dLon / 2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      return R * c;
-    };
-
-    const distance = calculateDistance(
-      oldLocation.latitude,
-      oldLocation.longitude,
-      newLocation.latitude,
-      newLocation.longitude
-    );
-
-    // Only update if moved more than 1km
-    return distance > 1;
-  };
-
-  // Modify the location handling in useEffect
-  useEffect(() => {
-    if (currentUserId) {
-      // First try to load saved location
-      loadSavedLocation().then((hasSavedLocation) => {
-        if (!hasSavedLocation && locationPermission === null) {
-          // If no saved location, request it
-          requestLocationPermission();
-        } else if (hasSavedLocation) {
-          // If we have a saved location, periodically check for updates in background
-          const watchId = navigator.geolocation.watchPosition(
-            (position) => {
-              const newLocation = {
-                latitude: position.coords.latitude,
-                longitude: position.coords.longitude,
-              };
-
-              // Check if location changed significantly
-              if (shouldUpdateLocation(userLocation, newLocation)) {
-                setUserLocation(newLocation);
-
-                // Store updated location in Firestore
-                if (currentUserId) {
-                  const userRef = doc(db, "users", currentUserId);
-                  updateDoc(userRef, {
-                    location: newLocation,
-                    locationUpdatedAt: new Date(),
-                  }).catch((err) =>
-                    console.error("Error saving location:", err)
-                  );
-                }
-              }
-            },
-            (error) => console.error("Error watching position:", error),
-            {
-              enableHighAccuracy: true,
-              maximumAge: 10 * 60 * 1000, // 10 minutes
-              timeout: 10000, // 10 seconds
-            }
-          );
-
-          // Clean up watch when component unmounts
-          return () => navigator.geolocation.clearWatch(watchId);
-        }
-
-        // Fetch recommendations (will use location if available)
-        fetchCombinedRecommendations(1);
-      });
-    } else {
-      console.log("No user ID available");
-      setLoading(false);
-    }
-  }, [currentUserId]);
-  // Fetch combined recommendations (location + preferences)
-  const fetchCombinedRecommendations = async (pageNum) => {
-    if (!currentUserId) {
-      setError("No user ID found. Please log in.");
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(pageNum === 1); // Only show loading for first page
-      setError(null);
-
-      // Add cache-busting parameter to avoid browser caching
-      // Use timestamp to ensure fresh data but still allow browser to cache between sessions
-      const cacheBuster = Math.floor(Date.now() / (15 * 60 * 1000)); // Changes every 15 min
-
-      const response = await fetch(
-        ` https://thikana-recommendation-model.onrender.com/feed/${currentUserId}?limit=10&_t=${cacheBuster}`,
-        {
-          method: "GET",
-          credentials: "include",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `HTTP error! status: ${response.status}, message: ${errorText}`
-        );
-      }
-
-      const data = await response.json();
-      console.log("Received combined recommendations:", data);
-      if (!data.recommendations || !Array.isArray(data.recommendations)) {
-        throw new Error("Invalid recommendations format received");
-      }
-
-      // Fetch like status for each post
-      const likedPosts = new Set();
-      const likesSnapshot = await getDocs(
-        collection(db, "users", currentUserId, "likes")
-      );
-      likesSnapshot.forEach((doc) => likedPosts.add(doc.id));
-
-      // Fetch current likes count for each post
-      const postsWithLikes = await Promise.all(
-        data.recommendations.map(async (post) => {
-          if (!post.id) {
-            console.warn("Post missing ID:", post);
-            return null;
-          }
-
-          const postRef = doc(db, "posts", post.id);
-          const postDoc = await getDoc(postRef);
-
-          if (!postDoc.exists()) {
-            console.warn(`Post ${post.id} not found in Firestore`);
-            return null;
-          }
-
-          const postData = postDoc.data();
-          const postAuthor = await getDoc(doc(db, "users", postData.uid));
-          const postAuthorData = postAuthor.data();
-
-          // Add indicator for location-based recommendations
-          const isLocationBased = post.recommendation_type === "location";
-          const distanceText = post.distance_km
-            ? `${post.distance_km} km away`
-            : null;
-
-          return {
-            ...post,
-            postId: post.id,
-            likes: postData.likes || 0,
-            isLiked: likedPosts.has(post.id),
-            authorName: postAuthorData.name,
-            authorUsername: postAuthorData.username,
-            authorProfileImage: postAuthorData.profilePic,
-            isLocationBased,
-            distanceText,
+  // Request user location
+  const requestLocationPermission = () => {
+    if (navigator.geolocation) {
+      setLocationPermission("requesting");
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          const newLocation = {
+            latitude,
+            longitude,
+            lastUpdated: Date.now(),
           };
-        })
-      );
-      const validPosts = postsWithLikes.filter((post) => post !== null);
 
-      console.log("Processed posts:", validPosts);
+          if (shouldUpdateLocation(userLocation, newLocation)) {
+            setUserLocation(newLocation);
 
-      setPosts((prev) =>
-        pageNum === 1 ? validPosts : [...prev, ...validPosts]
+            if (currentUserId) {
+              const userRef = doc(db, "users", currentUserId);
+              updateDoc(userRef, {
+                location: { latitude, longitude },
+                locationUpdatedAt: new Date(),
+              }).catch((err) => console.error("Error saving location:", err));
+            }
+          }
+          setLocationPermission("granted");
+        },
+        (error) => {
+          console.error("Error getting location:", error);
+          setLocationPermission("denied");
+          toast.error("Location access denied. Some features may be limited.");
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 5 * 60 * 1000, // 5 minutes
+        }
       );
-      setHasMore(data.recommendations.length === 10);
-    } catch (error) {
-      console.error("Error fetching combined recommendations:", error);
-      // Fall back to regular recommendations if combined ones fail
-      fetchRecommendations(pageNum);
-    } finally {
-      setLoading(false);
+    } else {
+      setLocationPermission("unavailable");
+      toast.error("Geolocation is not supported by your browser.");
     }
   };
 
-  // Original recommendation function (fallback)
+  // Fetch recommendations from API
   const fetchRecommendations = async (pageNum) => {
     if (!currentUserId) {
       setError("No user ID found. Please log in.");
@@ -309,12 +165,12 @@ const FeedPage = () => {
     }
 
     try {
-      setLoading(true);
+      setLoading(pageNum === 1);
       setError(null);
-      console.log("Fetching recommendations for user:", currentUserId);
 
+      const cacheBuster = Math.floor(Date.now() / (15 * 60 * 1000));
       const response = await fetch(
-        `https://thikana-recommendation-model.onrender.com/recommendations/${currentUserId}?limit=10`,
+        `${process.env.NEXT_PUBLIC_API_URL}/feed/${currentUserId}?limit=10&_t=${cacheBuster}`,
         {
           method: "GET",
           credentials: "include",
@@ -326,70 +182,144 @@ const FeedPage = () => {
       );
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `HTTP error! status: ${response.status}, message: ${errorText}`
-        );
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log("Received recommendations:", data);
       if (!data.recommendations || !Array.isArray(data.recommendations)) {
         throw new Error("Invalid recommendations format received");
       }
-      // Fetch like status for each post
-      const likedPosts = new Set();
-      const likesSnapshot = await getDocs(
-        collection(db, "users", currentUserId, "likes")
+
+      // Batch fetch likes and post data
+      const postIds = data.recommendations.map((post) => post.id);
+      const [likesSnapshot, postsSnapshot] = await Promise.all([
+        getDocs(collection(db, "users", currentUserId, "likes")),
+        getDocs(
+          query(collection(db, "posts"), where("__name__", "in", postIds))
+        ),
+      ]);
+
+      const likedPosts = new Set(likesSnapshot.docs.map((doc) => doc.id));
+      const postsMap = new Map(
+        postsSnapshot.docs.map((doc) => [doc.id, doc.data()])
       );
-      likesSnapshot.forEach((doc) => likedPosts.add(doc.id));
+      const authorsMap = new Map();
 
-      // Fetch current likes count for each post
-      const postsWithLikes = await Promise.all(
+      const processedPosts = await Promise.all(
         data.recommendations.map(async (post) => {
-          if (!post.id) {
-            console.warn("Post missing ID:", post);
-            return null;
+          if (!post.id) return null;
+
+          const postData = postsMap.get(post.id);
+          if (!postData) return null;
+
+          let authorData = authorsMap.get(postData.uid);
+          if (!authorData) {
+            const authorDoc = await getDoc(doc(db, "users", postData.uid));
+            authorData = authorDoc.data();
+            authorsMap.set(postData.uid, authorData);
           }
 
-          const postRef = doc(db, "posts", post.id);
-          const postDoc = await getDoc(postRef);
+          const isLocationBased = post.recommendation_type === "location";
+          const distanceText = post.distance_km
+            ? `${post.distance_km} km away${
+                post.business_plan
+                  ? ` (${
+                      post.business_plan.charAt(0).toUpperCase() +
+                      post.business_plan.slice(1)
+                    } Plan)`
+                  : ""
+              }`
+            : null;
 
-          if (!postDoc.exists()) {
-            console.warn(`Post ${post.id} not found in Firestore`);
-            return null;
-          }
-
-          const postData = postDoc.data();
-          const postAuthor = await getDoc(doc(db, "users", postData.uid));
-          const postAuthorData = postAuthor.data();
-          console.log("postAuthorData", postAuthorData);
           return {
             ...post,
             postId: post.id,
             likes: postData.likes || 0,
             isLiked: likedPosts.has(post.id),
-            authorName: postAuthorData.name,
-            authorUsername: postAuthorData.username,
-            authorProfileImage: postAuthorData.profilePic,
+            authorName: authorData.name,
+            authorUsername: authorData.username,
+            authorProfileImage: authorData.profilePic,
+            isLocationBased,
+            distanceText,
           };
         })
       );
-      const validPosts = postsWithLikes.filter((post) => post !== null);
 
-      console.log("Processed posts:", validPosts);
-
+      const validPosts = processedPosts.filter((post) => post !== null);
       setPosts((prev) =>
-        pageNum === 1 ? postsWithLikes : [...prev, ...postsWithLikes]
+        pageNum === 1 ? validPosts : [...prev, ...validPosts]
       );
       setHasMore(data.recommendations.length === 10);
     } catch (error) {
       console.error("Error fetching recommendations:", error);
+      toast.error("Failed to load recommendations");
     } finally {
       setLoading(false);
     }
   };
 
+  // Handle post likes
+  const handlePostLike = async (post) => {
+    if (!currentUserId || !post?.postId) return;
+
+    try {
+      setPosts((prevPosts) =>
+        prevPosts.map((p) =>
+          p.postId === post.postId
+            ? {
+                ...p,
+                isLiked: !p.isLiked,
+                likes: p.likes + (p.isLiked ? -1 : 1),
+              }
+            : p
+        )
+      );
+
+      const batch = writeBatch(db);
+      const likeRef = doc(db, "users", currentUserId, "likes", post.postId);
+      const postRef = doc(db, "posts", post.postId);
+      const userRef = doc(db, "users", currentUserId);
+
+      if (post.isLiked) {
+        batch.delete(likeRef);
+        batch.update(postRef, { likes: increment(-1) });
+      } else {
+        batch.set(likeRef, {
+          timestamp: new Date(),
+          businessType: post.businessType,
+        });
+        batch.update(postRef, { likes: increment(1) });
+        batch.update(userRef, {
+          businessPreferences: arrayUnion(post.businessType),
+        });
+      }
+
+      await batch.commit();
+      await updateRecentInteractions(post.postId, "Like");
+
+      if (refreshTimeout.current) {
+        clearTimeout(refreshTimeout.current);
+      }
+      refreshTimeout.current = setTimeout(() => {
+        fetchRecommendations(1);
+      }, 2000);
+    } catch (error) {
+      console.error("Error handling like:", error);
+      setPosts((prevPosts) =>
+        prevPosts.map((p) =>
+          p.postId === post.postId
+            ? {
+                ...p,
+                isLiked: p.isLiked,
+                likes: p.likes,
+              }
+            : p
+        )
+      );
+    }
+  };
+
+  // Update recent interactions
   const updateRecentInteractions = async (postId, interactionType) => {
     if (!currentUserId) return;
 
@@ -410,24 +340,12 @@ const FeedPage = () => {
       await updateDoc(userRef, {
         [`recentInteractions.${arrayName}`]: currentInteractions,
       });
-
-      if (interactionType === "Like") {
-        const postDoc = await getDoc(doc(db, "posts", postId));
-        if (postDoc.exists()) {
-          const businessType = postDoc.data()?.businessType;
-          if (businessType) {
-            console.log("Updating business preferences:", businessType);
-            await updateDoc(userRef, {
-              businessPreferences: arrayUnion(businessType),
-            });
-          }
-        }
-      }
     } catch (error) {
       console.error(`Error updating interactions: ${error}`);
     }
   };
 
+  // Handle post views
   const handlePostView = async (postId) => {
     if (!currentUserId || !postId) return;
 
@@ -442,156 +360,29 @@ const FeedPage = () => {
     }
   };
 
-  // const handlePostLike = async (post) => {
-  //   if (!currentUserId || !post?.postId) return;
-
-  //   try {
-  //     const likeRef = doc(db, "users", currentUserId, "likes", post.postId);
-  //     const postRef = doc(db, "posts", post.postId);
-  //     const userRef = doc(db, "users", currentUserId);
-
-  //     const postDoc = await getDoc(postRef);
-
-  //     if (!postDoc.exists()) {
-  //       console.error("Post not found");
-  //       return;
-  //     }
-
-  //     const postData = postDoc.data();
-  //     const businessType = postData.businessType;
-
-  //     if (post.isLiked) {
-  //       // Unlike the post
-  //       await deleteDoc(likeRef);
-  //       await updateDoc(postRef, { likes: increment(-1) });
-  //     } else {
-  //       // Like the post
-  //       await setDoc(likeRef, {
-  //         timestamp: new Date(),
-  //         businessType: businessType, // Store business type in like document
-  //       });
-  //       await updateDoc(postRef, { likes: increment(1) });
-
-  //       // Update user's business preferences
-  //       if (businessType) {
-  //         await updateDoc(userRef, {
-  //           businessPreferences: arrayUnion(businessType),
-  //         });
-  //       }
-  //     }
-
-  //     // Update posts state
-  //     setPosts((prevPosts) =>
-  //       prevPosts.map((p) =>
-  //         p.postId === post.postId
-  //           ? {
-  //               ...p,
-  //               isLiked: !p.isLiked,
-  //               likes: p.likes + (p.isLiked ? -1 : 1),
-  //             }
-  //           : p
-  //       )
-  //     );
-
-  //     // Refresh recommendations after like/unlike
-  //     await fetchCombinedRecommendations(1);
-
-  //     await updateRecentInteractions(post.postId, "Like");
-  //   } catch (error) {
-  //     console.error("Error handling like:", error);
-  //   }
-  // };
-
-  const handlePostLike = async (post) => {
-    if (!currentUserId || !post?.postId) return;
-
-    try {
-      // Find the current post in state to get its accurate isLiked status
-      const currentPosts = [...posts];
-      const postIndex = currentPosts.findIndex((p) => p.postId === post.postId);
-
-      if (postIndex === -1) {
-        console.error("Post not found in current state");
-        return;
-      }
-
-      const currentPost = currentPosts[postIndex];
-      const currentlyLiked = currentPost.isLiked;
-
-      // Optimistic UI update
-      currentPosts[postIndex] = {
-        ...currentPost,
-        isLiked: !currentlyLiked,
-        likes: currentPost.likes + (currentlyLiked ? -1 : 1),
-      };
-
-      // Update state immediately for responsive UI
-      setPosts(currentPosts);
-
-      // References for Firebase operations
-      const likeRef = doc(db, "users", currentUserId, "likes", post.postId);
-      const postRef = doc(db, "posts", post.postId);
-      const userRef = doc(db, "users", currentUserId);
-
-      // Get post data for business type
-      const postDoc = await getDoc(postRef);
-      if (!postDoc.exists()) {
-        console.error("Post not found in Firestore");
-        // Revert optimistic update if post doesn't exist
-        setPosts(posts);
-        return;
-      }
-
-      const postData = postDoc.data();
-      const businessType = postData.businessType;
-
-      // Perform the actual database operations
-      if (currentlyLiked) {
-        // Unlike the post
-        await deleteDoc(likeRef);
-        await updateDoc(postRef, { likes: increment(-1) });
-      } else {
-        // Like the post
-        await setDoc(likeRef, {
-          timestamp: new Date(),
-          businessType: businessType,
-        });
-        await updateDoc(postRef, { likes: increment(1) });
-
-        // Update user's business preferences
-        if (businessType) {
-          await updateDoc(userRef, {
-            businessPreferences: arrayUnion(businessType),
-          });
-        }
-      }
-      await fetchCombinedRecommendations(1);
-
-      // Update recent interactions
-      await updateRecentInteractions(post.postId, "Like");
-
-      // No need to refresh recommendations after every like/unlike
-      // This may be causing part of the lagginess
-      // Consider commenting this out or implementing a debounced refresh
-      // await fetchCombinedRecommendations(1);
-    } catch (error) {
-      console.error("Error handling like:", error);
-      // If an error occurs, revert to the original state
-      const originalPosts = [...posts];
-      setPosts(originalPosts);
+  // Load more posts
+  const loadMore = () => {
+    if (!loading && hasMore) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      fetchRecommendations(nextPage);
     }
   };
+
+  // Initial load and location setup
   useEffect(() => {
     if (currentUserId) {
-      // First try to load saved location
       loadSavedLocation().then((hasSavedLocation) => {
         if (!hasSavedLocation && locationPermission === null) {
-          // If no saved location, request it
           requestLocationPermission();
+        } else if (hasSavedLocation) {
+          const locationUpdateInterval = 15 * 60 * 1000;
+          const lastUpdate = userLocation?.lastUpdated || 0;
+          if (Date.now() - lastUpdate > locationUpdateInterval) {
+            requestLocationPermission();
+          }
         }
-
-        // Fetch recommendations (will use location if available)
-        fetchCombinedRecommendations(1);
+        fetchRecommendations(1);
       });
     } else {
       console.log("No user ID available");
@@ -599,27 +390,16 @@ const FeedPage = () => {
     }
   }, [currentUserId]);
 
-  // Re-fetch when user location changes
+  // Refresh recommendations when location changes
   useEffect(() => {
     if (userLocation && currentUserId) {
-      console.log("Location updated, refreshing recommendations");
-      fetchCombinedRecommendations(1);
+      fetchRecommendations(1);
     }
   }, [userLocation]);
 
-  const loadMore = () => {
-    if (!loading && hasMore) {
-      const nextPage = page + 1;
-      setPage(nextPage);
-      fetchCombinedRecommendations(nextPage);
-    }
-  };
-
-  // UI for requesting location permission
+  // Render location prompt
   const renderLocationPrompt = () => {
-    if (locationPermission === null || locationPermission === "requesting") {
-      return null; // Already handled or in progress
-    } else if (locationPermission === "denied") {
+    if (locationPermission === "denied") {
       return (
         <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <p className="text-sm text-yellow-800">
@@ -646,7 +426,6 @@ const FeedPage = () => {
               <Sidebar />
             </aside>
             <main className="space-y-6">
-              {/* Render multiple skeleton cards */}
               {Array(5)
                 .fill(0)
                 .map((_, index) => (
@@ -703,7 +482,7 @@ const FeedPage = () => {
             {renderLocationPrompt()}
 
             {userLocation && (
-              <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg flex items-center">
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
                 <div className="text-blue-500 mr-2">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -720,12 +499,18 @@ const FeedPage = () => {
                     <circle cx="12" cy="10" r="3"></circle>
                   </svg>
                 </div>
-                <p className="text-sm text-blue-600">
-                  Showing posts from businesses near you
-                </p>
+                <div className="flex flex-col">
+                  <p className="text-sm text-blue-600">
+                    Showing posts from businesses near you
+                  </p>
+                  <div className="mt-2 text-xs text-blue-500">
+                    <p>• Free plan businesses within 2km</p>
+                    <p>• Standard plan businesses within 4km</p>
+                    <p>• Premium plan businesses within 8km</p>
+                  </div>
+                </div>
               </div>
             )}
-
             {posts.map((post) => (
               <PostCard
                 key={post.postId}
