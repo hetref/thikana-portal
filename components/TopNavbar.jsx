@@ -10,7 +10,7 @@ import Image from "next/image";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { redirect, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Menu, X, Plus } from "lucide-react";
+import { Menu, X, Plus, MapPin } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -100,37 +100,46 @@ const TopNavbar = ({ type = "unauthenticated" }) => {
             <>
               {/* Only show Create dropdown if user role is not "user" */}
               {userData.role !== "user" && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary">
-                      <Plus className="h-5 w-5" />
-                      <span className="block">Create</span>
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem asChild>
-                      <Link
-                        href="/create-post"
-                        className="flex items-center gap-2"
+                <>
+                  <Link
+                    key="Map"
+                    href="/map"
+                    className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary"
+                  >
+                    <MapPin /> Set Location
+                  </Link>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary">
+                        <Plus className="h-5 w-5" />
+                        <span className="block">Create</span>
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem asChild>
+                        <Link
+                          href="/create-post"
+                          className="flex items-center gap-2"
+                        >
+                          <span>Create Post</span>
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() => setIsAddPhotoModalOpen(true)}
                       >
-                        <span>Create Post</span>
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onSelect={() => setIsAddPhotoModalOpen(true)}
-                    >
-                      <span>Add Photos</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link
-                        href="/add-product"
-                        className="flex items-center gap-2"
-                      >
-                        <span>Add Product</span>
-                      </Link>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                        <span>Add Photos</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link
+                          href="/add-product"
+                          className="flex items-center gap-2"
+                        >
+                          <span>Add Product</span>
+                        </Link>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </>
               )}
               {authUser && (
                 <AddPhotoModal
