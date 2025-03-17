@@ -37,7 +37,7 @@ const BuilderCanvas = ({ components, onUpdate }) => {
           components={components}
           onUpdate={onUpdate}
         />
-      ))}
+      ))} 
     </div>
   );
 };

@@ -33,7 +33,7 @@ export function ThemeProvider({ children, defaultTheme = "system" }) {
     },
   }
 
-  return <ThemeProviderContext.Provider value={value}>{children}</ThemeProviderContext.Provider>;
+  return <ThemeProviderContext.Provider value={value}>{children}</ThemeProviderContext.Provider>
 }
 
 ThemeProvider.propTypes = {
