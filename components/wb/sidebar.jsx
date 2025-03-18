@@ -40,16 +40,18 @@ import { auth, db } from "@/lib/firebase"
 import { collection, addDoc, query, where, getDocs, deleteDoc, doc, setDoc } from "firebase/firestore"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { defaultSections } from "@/lib/default-sections"
 
 export function Sidebar({ 
   sections, 
   selectedSection, 
   onAddSection, 
   onSelectSection, 
-  tab, 
-  setTab,
+  activeTab, 
+  onTabChange,
   currentPage,
   onPageChange,
+  pages,
   websiteRef
 }) {
   const [searchTerm, setSearchTerm] = useState("")
@@ -57,26 +59,40 @@ export function Sidebar({
   const [isPageDialogOpen, setIsPageDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [pageToDelete, setPageToDelete] = useState(null)
-  const [pages, setPages] = useState([
-    { id: "home", name: "Home Page", sections: [] }
-  ])
 
-  const sectionTemplates = [
-    { type: "hero", name: "Hero Section", icon: <LayoutTemplate className="h-5 w-5" /> },
-    { type: "about", name: "About Us", icon: <FileText className="h-5 w-5" /> },
-    { type: "services", name: "Services", icon: <LayoutGrid className="h-5 w-5" /> },
-    { type: "gallery", name: "Image Gallery", icon: <Image className="h-5 w-5" /> },
-    { type: "testimonials", name: "Testimonials", icon: <Star className="h-5 w-5" /> },
-    { type: "team", name: "Team Members", icon: <Users className="h-5 w-5" /> },
-    { type: "contact", name: "Contact Form", icon: <MessageCircle className="h-5 w-5" /> },
-    { type: "location", name: "Location Map", icon: <MapPin className="h-5 w-5" /> },
-    { type: "cta", name: "Call to Action", icon: <ShoppingCart className="h-5 w-5" /> },
-    { type: "features", name: "Features List", icon: <Type className="h-5 w-5" /> },
-  ]
+  // Group sections by type for better organization
+  const groupedSections = defaultSections.reduce((groups, section) => {
+    const type = section.type;
+    if (!groups[type]) {
+      groups[type] = [];
+    }
+    groups[type].push(section);
+    return groups;
+  }, {});
 
-  const filteredSections = sectionTemplates.filter((section) =>
-    section.name.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  // Section type display names
+  const sectionTypeNames = {
+    "hero": "Hero Sections",
+    "about": "About Sections",
+    "services": "Services Sections", 
+    "contact": "Contact Sections",
+    "testimonials": "Testimonial Sections",
+    "team": "Team Sections",
+    "features": "Feature Sections",
+    "gallery": "Gallery Sections"
+  };
+
+  // Section type icons
+  const sectionTypeIcons = {
+    "hero": <LayoutTemplate className="h-5 w-5" />,
+    "about": <FileText className="h-5 w-5" />,
+    "services": <LayoutGrid className="h-5 w-5" />,
+    "contact": <MessageCircle className="h-5 w-5" />,
+    "testimonials": <Star className="h-5 w-5" />,
+    "team": <Users className="h-5 w-5" />,
+    "features": <Type className="h-5 w-5" />,
+    "gallery": <Image className="h-5 w-5" />
+  };
 
   const elementItems = [
     { type: "heading", name: "Heading", icon: <Type className="h-5 w-5" /> },
@@ -102,9 +118,10 @@ export function Sidebar({
     ...formElements
   ]
 
-  const filteredElements = allElementItems.filter((element) =>
-    element.name.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  // Filter all elements based on search term
+  const filteredElements = [...elementItems, ...formElements].filter(
+    (element) => searchTerm === "" || element.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const handleElementDragStart = (e, element) => {
     // Create a new object with only the serializable properties
@@ -152,14 +169,9 @@ export function Sidebar({
   const handleAddPage = async () => {
     if (newPageName.trim()) {
       const pageId = newPageName.toLowerCase().replace(/\s+/g, "-")
-      const newPage = {
-        id: pageId,
-        name: newPageName,
-        sections: [],
-      }
       
-      setPages([...pages, newPage])
-      onPageChange(newPage.id) // Switch to the new page
+      // Instead of updating pages state directly, call the parent component's handler
+      onPageChange(pageId) // Switch to the new page
       setNewPageName("")
       setIsPageDialogOpen(false)
       
@@ -186,59 +198,10 @@ export function Sidebar({
     }
   }
 
-  // Load user's pages from Firebase
-  useEffect(() => {
-    const loadPages = async () => {
-      if (!auth?.currentUser?.uid || !websiteRef) return
-      
-      try {
-        // Get the pages subcollection from the website document
-        const pagesRef = collection(websiteRef, "pages")
-        const pagesSnapshot = await getDocs(pagesRef)
-        
-        const loadedPages = []
-        
-        pagesSnapshot.forEach((doc) => {
-          const pageData = doc.data()
-          loadedPages.push({
-            id: pageData.pageId,
-            name: pageData.pageName,
-            documentId: doc.id, // Store the document ID for easier deletion
-          })
-        })
-        
-        if (loadedPages.length > 0) {
-          // Create a map of page IDs to deduplicate
-          const uniquePages = {}
-          
-          // Add the default home page first if it doesn't exist in loaded pages
-          if (!loadedPages.some(p => p.id === "home")) {
-            uniquePages["home"] = { id: "home", name: "Home Page", sections: [] }
-          }
-          
-          // Add loaded pages, ensuring no duplicates
-          loadedPages.forEach(page => {
-            uniquePages[page.id] = page
-          })
-          
-          // Convert the map back to an array
-          setPages(Object.values(uniquePages))
-        }
-      } catch (error) {
-        console.error("Error loading pages:", error)
-      }
-    }
-    
-    loadPages()
-  }, [auth?.currentUser?.uid, websiteRef])
-
   // Handle deleting a page
   const handleDeletePage = async () => {
     if (!pageToDelete || pageToDelete.id === "home") return
 
-    // Update local state
-    setPages(pages.filter(page => page.id !== pageToDelete.id))
-    
     // If currently selected page is being deleted, switch to home
     if (currentPage === pageToDelete.id) {
       onPageChange("home")
@@ -260,13 +223,13 @@ export function Sidebar({
 
   return (
     <div className="w-64 border-r border-border bg-muted/40 flex flex-col h-full">
-      <Tabs value={tab} onValueChange={setTab} className="flex flex-col h-full">
+      <Tabs value={activeTab} onValueChange={onTabChange} className="flex flex-col h-full">
         <TabsList className="grid grid-cols-2 mx-4 my-2">
           <TabsTrigger value="pages">Pages</TabsTrigger>
           <TabsTrigger value="sections">Sections</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="pages" className="flex-1 flex flex-col">
+        <TabsContent value="pages" className="flex-1 flex flex-col overflow-hidden">
           <div className="flex items-center justify-between p-4 border-b border-border">
             <h2 className="text-sm font-medium">Your Pages</h2>
             <Dialog open={isPageDialogOpen} onOpenChange={setIsPageDialogOpen}>
@@ -293,51 +256,64 @@ export function Sidebar({
             </Dialog>
           </div>
           
-          <ScrollArea className="flex-1">
-            <div className="p-4 space-y-1">
-              {pages.map((page) => (
-                <div key={`page-${page.id}`} className="flex items-center justify-between group">
-                  <Button
-                    variant={currentPage === page.id ? "secondary" : "ghost"}
-                    className="w-full justify-start"
-                    onClick={() => onPageChange(page.id)}
-                  >
-                    <File className="h-4 w-4 mr-2" />
-                    {page.name}
-                  </Button>
-                  {page.id !== "home" && (
-                    <AlertDialog open={deleteDialogOpen && pageToDelete?.id === page.id} onOpenChange={(open) => {
-                      if (!open) setPageToDelete(null);
-                      setDeleteDialogOpen(open);
-                    }}>
-                      <AlertDialogTrigger asChild>
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          className="opacity-0 group-hover:opacity-100"
-                          onClick={() => setPageToDelete(page)}
+          <div className="flex-1 overflow-hidden relative">
+            <ScrollArea className="h-full w-full" type="always">
+              <div className="p-4 space-y-1">
+                {pages.map((pageId) => {
+                  // Create a page object with id and name for rendering
+                  const page = {
+                    id: pageId,
+                    name: pageId.charAt(0).toUpperCase() + pageId.slice(1)
+                  };
+                  
+                  return (
+                    <div key={`page-${page.id}`} className="flex items-center justify-between group">
+                      <Button
+                        variant={currentPage === page.id ? "secondary" : "ghost"}
+                        className="w-full justify-start"
+                        onClick={() => onPageChange(page.id)}
+                      >
+                        <File className="h-4 w-4 mr-2" />
+                        {page.name}
+                      </Button>
+                      {page.id !== "home" && (
+                        <AlertDialog 
+                          open={deleteDialogOpen && pageToDelete?.id === page.id} 
+                          onOpenChange={(open) => {
+                            if (!open) setPageToDelete(null);
+                            setDeleteDialogOpen(open);
+                          }}
                         >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This will permanently delete the page "{page.name}". This action cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={handleDeletePage}>Delete</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  )}
-                </div>
-              ))}
-            </div>
-          </ScrollArea>
+                          <AlertDialogTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              className="opacity-0 group-hover:opacity-100"
+                              onClick={() => setPageToDelete(page)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will permanently delete the page "{page.name}". This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={handleDeletePage}>Delete</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </ScrollArea>
+          </div>
         </TabsContent>
         
         <TabsContent value="sections" className="flex-1 flex flex-col">
@@ -354,42 +330,84 @@ export function Sidebar({
             </div>
           </div>
 
-          <ScrollArea className="flex-1 p-4">
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-sm font-medium mb-3">Add Sections</h3>
-                <div className="grid grid-cols-1 gap-2">
-                  {filteredSections.map((section) => (
-                    <button
-                      key={`section-${section.type}`}
-                      className="flex items-center p-3 rounded-md border border-border hover:bg-accent transition-colors text-left"
-                      onClick={() => onAddSection(section.type)}
-                    >
-                      <div className="mr-3 text-primary">{section.icon}</div>
-                      <span className="text-sm">{section.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+          <div 
+            style={{ 
+              maxHeight: 'calc(100vh - 130px)', 
+              overflowY: 'auto !important',
+              overflowX: 'hidden',
+              display: 'block !important',
+              paddingRight: '5px'
+            }}
+          >
+            <div className="p-4 space-y-4 pb-20">
+              {/* Display all section types with their templates */}
+              {Object.keys(groupedSections)
+                .filter(type => 
+                  searchTerm === "" || 
+                  sectionTypeNames[type]?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                  groupedSections[type].some(section => 
+                    section.content?.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    section.content?.subtitle?.toLowerCase().includes(searchTerm.toLowerCase())
+                  )
+                )
+                .map(type => (
+                  <div key={`section-type-${type}`} className="mb-4">
+                    <div className="flex items-center mb-2 sticky top-0 bg-background/80 backdrop-blur-sm py-1 z-10">
+                      <div className="mr-2 text-primary">{sectionTypeIcons[type] || <LayoutTemplate className="h-5 w-5" />}</div>
+                      <h3 className="text-sm font-medium">{sectionTypeNames[type] || type.charAt(0).toUpperCase() + type.slice(1)}</h3>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2">
+                      {groupedSections[type].map(section => (
+                        <button
+                          key={section.id}
+                          className="flex flex-col p-2 rounded-md border border-border hover:bg-accent transition-colors text-left"
+                          onClick={() => onAddSection(section.type, section.id)}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-medium truncate max-w-[120px]">{section.content.title}</span>
+                            <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-sm">{section.id.split('-')[1]}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mb-1 line-clamp-1">{section.content.subtitle}</p>
+                          <div 
+                            className="w-full h-16 rounded-sm overflow-hidden bg-accent/20 flex items-center justify-center text-xs text-muted-foreground"
+                            style={{
+                              backgroundColor: section.style?.backgroundColor || "#f8f9fa",
+                              color: section.style?.textColor || "#000000"
+                            }}
+                          >
+                            <div className="text-center p-1">
+                              <div className="font-medium text-2xs">{section.content.title}</div>
+                              <div className="text-2xs opacity-70 line-clamp-1">{section.content.subtitle}</div>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
 
+              {/* Elements section */}
               <div>
-                <h3 className="text-sm font-medium mb-3">Add Elements</h3>
+                <div className="flex items-center mb-2 sticky top-0 bg-background/80 backdrop-blur-sm py-1 z-10">
+                  <div className="mr-2 text-primary"><Layers className="h-5 w-5" /></div>
+                  <h3 className="text-sm font-medium">Add Elements</h3>
+                </div>
                 <div className="grid grid-cols-2 gap-2">
                   {filteredElements.map((element) => (
                     <div
                       key={`element-${element.type}`}
-                      className="flex flex-col items-center p-3 rounded-md border border-border hover:bg-accent transition-colors cursor-grab"
+                      className="flex flex-col items-center p-2 rounded-md border border-border hover:bg-accent transition-colors cursor-grab"
                       draggable
                       onDragStart={(e) => handleElementDragStart(e, element)}
                     >
-                      <div className="text-primary mb-2">{element.icon}</div>
+                      <div className="text-primary mb-1">{element.icon}</div>
                       <span className="text-xs text-center">{element.name}</span>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
-          </ScrollArea>
+          </div>
         </TabsContent>
 
         <TabsContent value="theme" className="flex-1 p-4 m-0">
@@ -527,10 +545,11 @@ Sidebar.propTypes = {
   selectedSection: PropTypes.object,
   onAddSection: PropTypes.func.isRequired,
   onSelectSection: PropTypes.func.isRequired,
-  tab: PropTypes.string.isRequired,
-  setTab: PropTypes.func.isRequired,
+  activeTab: PropTypes.string.isRequired,
+  onTabChange: PropTypes.func.isRequired,
   currentPage: PropTypes.string.isRequired,
   onPageChange: PropTypes.func.isRequired,
+  pages: PropTypes.array,
   websiteRef: PropTypes.object
 }
 

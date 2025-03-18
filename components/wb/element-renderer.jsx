@@ -83,11 +83,44 @@ export function ElementRenderer({
         )
       
       case "button":
+        // Generate button classNames based on style properties
+        const buttonStyleClass = style.buttonStyle ? `btn-${style.buttonStyle}` : "btn-default";
+        const buttonSizeClass = style.buttonSize ? `btn-${style.buttonSize}` : "btn-default";
+        const hoverEffectClass = style.hoverEffect ? "hover:opacity-80" : "";
+        
+        // Apply animation class if specified
+        const animationClass = style.animation && style.animation !== "none" 
+          ? `hover:animate-${style.animation}` 
+          : "";
+        
+        // Create button style object with all possible style properties
+        const buttonStyle = {
+          color: style.color || undefined,
+          backgroundColor: style.backgroundColor || undefined,
+          borderRadius: style.borderRadius || undefined,
+          padding: style.paddingX || style.paddingY ? 
+            `${style.paddingY || '5px'} ${style.paddingX || '10px'}` : undefined,
+          fontWeight: style.fontWeight || undefined,
+          fontSize: style.fontSize || undefined,
+          textAlign: style.textAlign || undefined,
+          border: style.border || undefined,
+          ...elementStyle // Include any additional styles from elementStyle
+        };
+        
         return (
           <button
-            className={cn(elementClassName, "transition-colors")}
-            style={elementStyle}
-            onClick={isPreview ? undefined : handleClick}
+            className={cn(
+              elementClassName,
+              "transition-colors",
+              buttonStyleClass,
+              buttonSizeClass,
+              hoverEffectClass,
+              animationClass,
+              style.customClass // Add custom class if specified
+            )}
+            style={buttonStyle}
+            id={style.id} // Add ID if specified
+            onClick={isPreview && content.url ? () => window.open(content.url, '_blank') : handleClick}
           >
             {content.text}
           </button>

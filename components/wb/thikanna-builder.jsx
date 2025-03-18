@@ -5,19 +5,25 @@ import { Sidebar } from "@/components/wb/sidebar"
 import { EditorCanvas } from "@/components/wb/editor-canvas"
 import { PropertiesPanel } from "@/components/wb/properties-panel"
 import { Header } from "@/components/wb/header"
-import { useTheme } from "@/components/wb/theme-provider"
-import { defaultSections } from "@/lib/default-sections"
+import { defaultSections, fetchUserProducts } from "@/lib/default-sections"
 import { auth, db } from "@/lib/firebase"
 import { doc, setDoc, getDoc, collection, query, where, getDocs } from "firebase/firestore"
+import { cn } from "@/lib/utils"
 
 export function ThikannaBuilder() {
   // Base state
   const [currentPage, setCurrentPage] = useState("home")
   const [device, setDevice] = useState("desktop")
   const [sidebarTab, setSidebarTab] = useState("pages")
-  const { theme } = useTheme()
   const [isSaving, setIsSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState(null) // "success", "error", or null
+  const [mounted, setMounted] = useState(false)
+  const [userProducts, setUserProducts] = useState([]) // State to store fetched products
+
+  // Mount effect to prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Content state - now keyed by page ID
   const [pagesContent, setPagesContent] = useState({
@@ -30,6 +36,72 @@ export function ThikannaBuilder() {
   // Selected elements state
   const [selectedSection, setSelectedSection] = useState(null)
   const [selectedElement, setSelectedElement] = useState(null)
+
+  // Fetch user's products when component mounts
+  useEffect(() => {
+    const loadUserProducts = async () => {
+      if (!auth?.currentUser?.uid) {
+        console.warn("[ThikannaBuilder] No authenticated user found. Cannot fetch products.");
+        return;
+      }
+      
+      console.log("[ThikannaBuilder] Loading products for user:", auth.currentUser.uid);
+      console.log("[ThikannaBuilder] Current auth state:", { 
+        uid: auth.currentUser.uid,
+        email: auth.currentUser.email,
+        displayName: auth.currentUser.displayName
+      });
+      
+      try {
+        const products = await fetchUserProducts(auth.currentUser.uid);
+        setUserProducts(products);
+        
+        // Enhanced logging for product data
+        console.log("==== PRODUCT DATA FROM DATABASE ====");
+        console.log(`Total products found: ${products.length}`);
+        
+        if (products.length > 0) {
+          // Log each product with its properties
+          products.forEach((product, index) => {
+            console.log(`Product ${index + 1}:`, product);
+            console.log(`  - ID: ${product.id}`);
+            console.log(`  - Name: ${product.name || 'No name'}`);
+            console.log(`  - Price: ${product.price || 'No price'}`);
+            console.log(`  - Description: ${product.description?.substring(0, 50) || 'No description'}${product.description?.length > 50 ? '...' : ''}`);
+            console.log(`  - Image URL: ${product.imageUrl || 'No image'}`);
+            console.log(`  - Categories: ${product.category || product.categories || 'No categories'}`);
+            console.log(`  - Featured: ${product.featured ? 'Yes' : 'No'}`);
+            console.log(`  - New: ${product.isNew ? 'Yes' : 'No'}`);
+            console.log(`  - Properties:`, Object.keys(product));
+          });
+          
+          // Log the structure of the first product as a template
+          console.log("Product data structure example:", JSON.stringify(products[0], null, 2));
+        } else {
+          console.warn("No products found in the database. Make sure your collection path is correct.");
+          
+          // Try to give the user guidance about what to check
+          console.log("==== TROUBLESHOOTING TIPS ====");
+          console.log("1. Check that you have products in Firebase at: Users/{userId}/products");
+          console.log("2. Verify that you're signed in with the correct account");
+          console.log("3. Check Firebase security rules - make sure your authenticated user has read access to this path");
+          console.log("4. Verify that the products collection exists and contains documents");
+          console.log("5. Check Firebase console for any errors related to your products collection");
+          console.log("==============================");
+        }
+        console.log("====================================");
+        
+      } catch (error) {
+        console.error("[ThikannaBuilder] Error loading products:", error);
+      }
+    };
+    
+    if (auth?.currentUser?.uid) {
+      loadUserProducts();
+    } else {
+      console.warn("[ThikannaBuilder] No authenticated user available for product fetching");
+    }
+  }, [auth?.currentUser?.uid]);
 
   // Load saved data from Firebase on component mount
   useEffect(() => {
@@ -128,14 +200,9 @@ export function ThikannaBuilder() {
     loadSavedData()
   }, [auth?.currentUser?.uid])
 
-  // Handle page change
+  // Handle page changes
   const handlePageChange = (pageId) => {
-    // Clear selected items when switching pages
-    setSelectedSection(null)
-    setSelectedElement(null)
-    setCurrentPage(pageId)
-    
-    // If page doesn't exist in pagesContent yet, initialize it
+    // If page doesn't exist yet, create it
     if (!pagesContent[pageId]) {
       setPagesContent(prev => ({
         ...prev,
@@ -143,9 +210,13 @@ export function ThikannaBuilder() {
           sections: [],
           elements: {}
         }
-      }))
+      }));
     }
-  }
+    
+    setCurrentPage(pageId);
+    setSelectedSection(null);
+    setSelectedElement(null);
+  };
 
   // Save data to Firebase
   const handleSaveToFirebase = async () => {
@@ -165,7 +236,11 @@ export function ThikannaBuilder() {
       await setDoc(
         websiteRef,
         {
-          lastUpdated: new Date().toISOString()
+          lastUpdated: new Date().toISOString(),
+          // Store user ID for product retrieval
+          userId: auth.currentUser.uid,
+          // Store product collection path reference
+          productPath: `users/${auth.currentUser.uid}/products`
         },
         { merge: true }
       )
@@ -187,7 +262,11 @@ export function ThikannaBuilder() {
             {
               sections: JSON.stringify(content.sections),
               elements: JSON.stringify(content.elements),
-              lastUpdated: new Date().toISOString()
+              lastUpdated: new Date().toISOString(),
+              // Add reference to current products for this page
+              userProductsCount: userProducts.length,
+              // Store user ID for product retrieval
+              userId: auth.currentUser.uid
             },
             { merge: true }
           )
@@ -201,11 +280,14 @@ export function ThikannaBuilder() {
             sections: JSON.stringify(content.sections),
             elements: JSON.stringify(content.elements),
             createdAt: new Date().toISOString(),
-            lastUpdated: new Date().toISOString()
+            lastUpdated: new Date().toISOString(),
+            // Add reference to current products for this page
+            userProductsCount: userProducts.length
           })
         }
       }
       
+      console.log("Website saved successfully with product references. Product count:", userProducts.length);
       setSaveStatus("success")
       setTimeout(() => setSaveStatus(null), 3000)
     } catch (error) {
@@ -222,10 +304,25 @@ export function ThikannaBuilder() {
   }
 
   // Section handlers - updated to work with page-specific content
-  const handleAddSection = (type) => {
-    const newSection = defaultSections.find((s) => s.type === type)
+  const handleAddSection = (type, sectionId) => {
+    let newSection;
+    
+    if (sectionId) {
+      // Find the specific section by ID if provided
+      newSection = defaultSections.find((s) => s.id === sectionId);
+    }
+    
+    // Fallback to finding by type if no ID or ID not found
+    if (!newSection) {
+      newSection = defaultSections.find((s) => s.type === type);
+    }
+    
     if (newSection) {
-      const newSectionWithId = { ...newSection, id: `section-${Date.now()}` }
+      // Create a deep copy with a new unique ID
+      const newSectionWithId = {
+        ...JSON.parse(JSON.stringify(newSection)),
+        id: `section-${Date.now()}`
+      };
       
       setPagesContent(prev => ({
         ...prev,
@@ -233,7 +330,10 @@ export function ThikannaBuilder() {
           ...prev[currentPage],
           sections: [...prev[currentPage].sections, newSectionWithId]
         }
-      }))
+      }));
+      
+      // Auto-select the newly added section
+      setSelectedSection(newSectionWithId);
     }
   }
 
@@ -243,15 +343,33 @@ export function ThikannaBuilder() {
   }
 
   const handleUpdateSection = (updatedSection) => {
-    setPagesContent(prev => ({
-      ...prev,
-      [currentPage]: {
-        ...prev[currentPage],
-        sections: prev[currentPage].sections.map(s => 
-          s.id === updatedSection.id ? updatedSection : s
-        )
-      }
-    }))
+    console.log("Updating section:", updatedSection);
+    // Create a new copy of the section to ensure React detects the change
+    const newUpdatedSection = {
+      ...updatedSection,
+      content: { ...updatedSection.content },
+      style: { ...updatedSection.style }
+    };
+    
+    // Update the section in state
+    setPagesContent(prev => {
+      const updatedSections = prev[currentPage].sections.map(s => 
+        s.id === newUpdatedSection.id ? newUpdatedSection : s
+      );
+      
+      return {
+        ...prev,
+        [currentPage]: {
+          ...prev[currentPage],
+          sections: updatedSections
+        }
+      };
+    });
+    
+    // Also update the selected section reference
+    if (selectedSection?.id === updatedSection.id) {
+      setSelectedSection(newUpdatedSection);
+    }
   }
 
   const handleDeleteSection = (sectionId) => {
@@ -351,8 +469,8 @@ export function ThikannaBuilder() {
   const currentSections = currentPageData.sections || []
   const currentElements = currentPageData.elements || {}
 
-  return (
-    <div className={`h-screen flex flex-col bg-background ${theme}`}>
+  return !mounted ? null : (
+    <div className={cn("flex flex-col h-screen")}>
       <Header 
         device={device} 
         setDevice={setDevice} 
@@ -360,44 +478,40 @@ export function ThikannaBuilder() {
         isSaving={isSaving}
         saveStatus={saveStatus}
       />
-      <div className="flex-1 flex overflow-hidden relative">
-        <Sidebar
-          sections={currentSections}
-          selectedSection={selectedSection}
+      <div className="flex flex-1 overflow-hidden">
+        <Sidebar 
+          activeTab={sidebarTab}
+          onTabChange={setSidebarTab}
           onAddSection={handleAddSection}
-          onSelectSection={handleSelectSection}
-          tab={sidebarTab}
-          setTab={setSidebarTab}
           currentPage={currentPage}
+          pages={Object.keys(pagesContent)}
           onPageChange={handlePageChange}
-          websiteRef={auth?.currentUser?.uid ? doc(db, "websites", auth.currentUser.uid) : null}
         />
-        <div className="flex-1 overflow-hidden">
-          <EditorCanvas
-            key={`editor-canvas-${selectedElement?.id || selectedSection?.id || 'default'}`}
-            sections={currentSections}
-            elements={currentElements}
-            selectedSection={selectedSection}
-            selectedElement={selectedElement}
-            onSelectSection={handleSelectSection}
-            onSelectElement={handleSelectElement}
-            onReorderSections={handleReorderSections}
-            onAddElement={handleAddElement}
+        <div className="flex flex-1 overflow-hidden">
+          <EditorCanvas 
             device={device}
-          />
-        </div>
-        {(selectedSection || selectedElement) && (
-          <PropertiesPanel
-            key={`properties-panel-${selectedElement?.id || selectedSection?.id || 'empty'}`}
+            sections={getCurrentPageContent().sections}
+            onSelectSection={handleSelectSection}
             selectedSection={selectedSection}
-            selectedElement={selectedElement}
             onUpdateSection={handleUpdateSection}
-            onDeleteSection={handleDeleteSection}
+            elements={getCurrentPageContent().elements || {}}
+            onSelectElement={handleSelectElement}
+            selectedElement={selectedElement}
             onUpdateElement={handleUpdateElement}
             onAddElement={handleAddElement}
+            onDeleteSection={handleDeleteSection}
+            onReorderSections={handleReorderSections}
+            userProducts={userProducts}
+          />
+          <PropertiesPanel 
+            selectedSection={selectedSection}
+            onUpdateSection={handleUpdateSection}
+            selectedElement={selectedElement}
+            onUpdateElement={handleUpdateElement}
+            onDeleteSection={handleDeleteSection}
             onDeleteElement={handleDeleteElement}
           />
-        )}
+        </div>
       </div>
     </div>
   )

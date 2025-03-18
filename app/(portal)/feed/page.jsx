@@ -60,32 +60,60 @@ const FeedPage = () => {
 
   // Request user location if not already available
   const requestLocationPermission = () => {
-    if (navigator.geolocation) {
+    if (!navigator.geolocation) {
+      setLocationPermission("unavailable");
+      toast.error("Geolocation is not supported by your browser.");
+      return;
+    }
+    
+    try {
       setLocationPermission("requesting");
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          const { latitude, longitude } = position.coords;
-          setUserLocation({ latitude, longitude });
-          setLocationPermission("granted");
+          try {
+            const { latitude, longitude } = position.coords;
+            setUserLocation({ latitude, longitude });
+            setLocationPermission("granted");
 
-          // Store user location in Firestore for future use
-          if (currentUserId) {
-            const userRef = doc(db, "users", currentUserId);
-            updateDoc(userRef, {
-              location: { latitude, longitude },
-              locationUpdatedAt: new Date(),
-            }).catch((err) => console.error("Error saving location:", err));
+            // Store user location in Firestore for future use
+            if (currentUserId) {
+              const userRef = doc(db, "users", currentUserId);
+              updateDoc(userRef, {
+                location: { latitude, longitude },
+                locationUpdatedAt: new Date(),
+              }).catch((err) => console.error("Error saving location:", err));
+            }
+          } catch (e) {
+            console.error("Error processing position:", e);
+            setLocationPermission("error");
           }
         },
         (error) => {
           console.error("Error getting location:", error);
-          setLocationPermission("denied");
-          toast.error("Location access denied. Some features may be limited.");
+          if (error.code === 1) { // PERMISSION_DENIED
+            setLocationPermission("denied");
+            toast.error("Location access denied. Some features may be limited.");
+          } else if (error.code === 2) { // POSITION_UNAVAILABLE
+            setLocationPermission("unavailable");
+            toast.error("Unable to determine your location. Please try again later.");
+          } else if (error.code === 3) { // TIMEOUT
+            setLocationPermission("timeout");
+            toast.error("Location request timed out. Please try again.");
+          } else {
+            setLocationPermission("error");
+            toast.error("An error occurred while getting your location.");
+          }
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
         }
       );
-    } else {
-      setLocationPermission("unavailable");
-      toast.error("Geolocation is not supported by your browser.");
+    } catch (e) {
+      console.error("Error requesting location:", e);
+      setLocationPermission("error");
+      toast.error("An error occurred while accessing location services.");
     }
   };
 
@@ -153,39 +181,66 @@ const FeedPage = () => {
           requestLocationPermission();
         } else if (hasSavedLocation) {
           // If we have a saved location, periodically check for updates in background
-          const watchId = navigator.geolocation.watchPosition(
-            (position) => {
-              const newLocation = {
-                latitude: position.coords.latitude,
-                longitude: position.coords.longitude,
-              };
+          // Check if geolocation is available in the browser
+          if (!navigator.geolocation) {
+            console.log("Geolocation is not supported by this browser");
+            return;
+          }
 
-              // Check if location changed significantly
-              if (shouldUpdateLocation(userLocation, newLocation)) {
-                setUserLocation(newLocation);
+          // Check if the browser supports watchPosition
+          try {
+            const watchId = navigator.geolocation.watchPosition(
+              (position) => {
+                const newLocation = {
+                  latitude: position.coords.latitude,
+                  longitude: position.coords.longitude,
+                };
 
-                // Store updated location in Firestore
-                if (currentUserId) {
-                  const userRef = doc(db, "users", currentUserId);
-                  updateDoc(userRef, {
-                    location: newLocation,
-                    locationUpdatedAt: new Date(),
-                  }).catch((err) =>
-                    console.error("Error saving location:", err)
-                  );
+                // Check if location changed significantly
+                if (shouldUpdateLocation(userLocation, newLocation)) {
+                  setUserLocation(newLocation);
+
+                  // Store updated location in Firestore
+                  if (currentUserId) {
+                    const userRef = doc(db, "users", currentUserId);
+                    updateDoc(userRef, {
+                      location: newLocation,
+                      locationUpdatedAt: new Date(),
+                    }).catch((err) =>
+                      console.error("Error saving location:", err)
+                    );
+                  }
                 }
+              },
+              (error) => {
+                // Handle specific error codes
+                if (error.code === error.PERMISSION_DENIED) {
+                  console.log("Location permission denied by user");
+                } else if (error.code === error.POSITION_UNAVAILABLE) {
+                  console.log("Location information is unavailable");
+                } else if (error.code === error.TIMEOUT) {
+                  console.log("The request to get user location timed out");
+                }
+                console.error("Error watching position:", error);
+              },
+              {
+                enableHighAccuracy: true,
+                maximumAge: 10 * 60 * 1000, // 10 minutes
+                timeout: 10000, // 10 seconds
               }
-            },
-            (error) => console.error("Error watching position:", error),
-            {
-              enableHighAccuracy: true,
-              maximumAge: 10 * 60 * 1000, // 10 minutes
-              timeout: 10000, // 10 seconds
-            }
-          );
+            );
 
-          // Clean up watch when component unmounts
-          return () => navigator.geolocation.clearWatch(watchId);
+            // Clean up watch when component unmounts
+            return () => {
+              try {
+                navigator.geolocation.clearWatch(watchId);
+              } catch (e) {
+                console.log("Error clearing geolocation watch:", e);
+              }
+            };
+          } catch (e) {
+            console.error("Error setting up location watching:", e);
+          }
         }
 
         // Fetch recommendations (will use location if available)

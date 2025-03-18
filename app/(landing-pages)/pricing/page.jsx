@@ -4,11 +4,11 @@ import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Check, CreditCard } from "lucide-react";
-import { ThemeProvider } from "next-themes";
 import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import toast from "react-hot-toast";
 import { onAuthStateChanged } from "firebase/auth";
+import { ThemeProvider } from "next-themes";
 
 const fadeIn = {
   initial: { opacity: 0, y: 20 },
@@ -311,7 +311,7 @@ export default function PricingPage() {
   };
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
       <div className="min-h-screen transition-colors duration-300 bg-white dark:bg-black">
         <div className="mx-auto max-w-7xl px-6 lg:px-8 py-24">
           <motion.div

@@ -1,4 +1,4 @@
-import './globals.css';
+import '@/app/globals.css';
 import { ToastProvider } from "@/components/ui/use-toast";
 
 export const metadata = {
@@ -8,12 +8,8 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
-      <body>
-        <ToastProvider>
-          {children}
-        </ToastProvider>
-      </body>
-    </html>
+    <ToastProvider>
+      {children}
+    </ToastProvider>
   )
 } 
