@@ -119,3 +119,9 @@ body {
 button:hover {
   background-color: #45a049;
 } */
+
+/* Custom utilities */
+.text-2xs {
+  font-size: 0.65rem;
+  line-height: 1rem;
+}

@@ -3,6 +3,7 @@
 import { cn } from "@/lib/utils"
 import PropTypes from "prop-types"
 import { ElementRenderer } from "./element-renderer"
+import React from "react"
 
 const getGridClass = (type) => {
   switch (type) {
@@ -21,6 +22,96 @@ const getGridClass = (type) => {
   }
 }
 
+const ProductCard = ({ product, layout, style }) => {
+  if (!product) return null;
+  
+  console.log("[ProductCard] Rendering product:", product.id, product.name);
+  
+  return (
+    <div 
+      className="product-card bg-white rounded-md overflow-hidden transition-all hover:shadow-lg"
+      style={{
+        backgroundColor: style?.backgroundColor || "#ffffff",
+        color: style?.textColor || "#111827",
+        borderRadius: style?.borderRadius || "8px",
+        boxShadow: style?.boxShadow || "0 1px 3px rgba(0,0,0,0.1)",
+      }}
+    >
+      {product.imageUrl ? (
+        <div className="product-image relative aspect-[1/1]">
+          <img 
+            src={product.imageUrl} 
+            alt={product.name || "Product"} 
+            className="object-cover w-full h-full"
+          />
+          {product.quantity <= 5 && product.quantity > 0 && (
+            <span className="absolute top-2 right-2 bg-amber-500 text-white text-xs font-semibold px-2 py-1 rounded">
+              Only {product.quantity} left
+            </span>
+          )}
+          {product.quantity === 0 && (
+            <span className="absolute top-2 right-2 bg-red-500 text-white text-xs font-semibold px-2 py-1 rounded">
+              Out of stock
+            </span>
+          )}
+          {product.category && (
+            <span className="absolute bottom-2 left-2 bg-gray-800 bg-opacity-70 text-white text-xs font-semibold px-2 py-1 rounded">
+              {product.category}
+            </span>
+          )}
+        </div>
+      ) : (
+        <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">
+          <div className="text-center p-4">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <p>No image</p>
+          </div>
+        </div>
+      )}
+      
+      <div className="p-4">
+        <h3 className="font-semibold text-lg mb-1 line-clamp-2">{product.name}</h3>
+        
+        {product.price !== undefined && (
+          <div className="text-lg font-bold mb-2">
+            ₹{typeof product.price === 'number' ? product.price.toFixed(2) : product.price}
+          </div>
+        )}
+        
+        {product.description && (
+          <p className="text-sm text-gray-600 mb-3 line-clamp-2">{product.description}</p>
+        )}
+        
+        <div className="flex justify-between items-center mt-2 mb-3">
+          {product.purchaseCount !== undefined && (
+            <span className="text-xs text-gray-500">
+              {product.purchaseCount} sold
+            </span>
+          )}
+          {product.quantity !== undefined && (
+            <span className="text-xs text-gray-500">
+              {product.quantity > 0 ? `${product.quantity} in stock` : 'Out of stock'}
+            </span>
+          )}
+        </div>
+        
+        <button 
+          className={`w-full py-2 px-4 rounded transition-colors ${
+            product.quantity > 0 
+              ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+              : 'bg-gray-300 text-gray-600 cursor-not-allowed'
+          }`}
+          disabled={product.quantity <= 0}
+        >
+          {product.quantity > 0 ? 'View Details' : 'Out of Stock'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 export function SectionRenderer({
   section,
   elements = [],
@@ -28,13 +119,23 @@ export function SectionRenderer({
   onSelect,
   onReorder,
   onAddElement,
-  isPreview = false
+  isPreview = false,
+  onDeleteSection,
+  userProducts
 }) {
   const { type, content = {}, style = {} } = section
 
-  console.log("Rendering section:", { type, content, style })
-  console.log("Section elements:", elements)
+  console.log(`[SectionRenderer] Rendering section: ${type}, isPreview: ${isPreview}, userProducts: ${userProducts?.length || 0}`)
+  
+  // If this is a product section and we have products, log them for debugging
+  if (type === "products" && userProducts && userProducts.length > 0) {
+    console.log(`[SectionRenderer] Product section with ${userProducts.length} products:`)
+    console.log(`[SectionRenderer] First product:`, userProducts[0])
+  }
 
+  // Use an ID + content hash as key to force re-renders when content changes
+  const contentKey = `${section.id}-${JSON.stringify(content).slice(0, 50)}`;
+  
   const sectionStyle = {
     backgroundColor: style?.backgroundColor || undefined,
     color: style?.textColor || undefined,
@@ -43,16 +144,17 @@ export function SectionRenderer({
     paddingBottom: style?.paddingBottom || undefined,
     paddingLeft: style?.paddingLeft || undefined,
     borderRadius: style?.borderRadius || undefined,
+    textAlign: style?.textAlign || undefined,
+    fontSize: style?.fontSize || undefined,
+    fontWeight: style?.fontWeight || undefined,
   }
 
-  // Add default content if not provided
-  const defaultContent = {
-    title: "",
-    subtitle: "",
-    description: "",
-    buttonText: "",
-    ...content
-  }
+  // Directly use content values without default fallbacks
+  const title = content?.title || "";
+  const subtitle = content?.subtitle || "";
+  const description = content?.description || "";
+  const buttonText = content?.buttonText || "";
+  const buttonUrl = content?.buttonUrl || "#";
 
   const handleDragOver = (e) => {
     if (isPreview) return
@@ -77,15 +179,15 @@ export function SectionRenderer({
     switch (type) {
       case "hero":
         return (
-          <div className="text-center py-20 px-4" style={sectionStyle}>
-            <h1 className="text-4xl font-bold mb-4">{defaultContent.title || "Welcome to Your Website"}</h1>
-            <p className="text-xl mb-8">{defaultContent.subtitle || "Create beautiful websites with ease"}</p>
+          <div className="text-center py-20 px-4" style={sectionStyle} key={`hero-${section.id}-${contentKey}`}>
+            <h1 className="text-4xl font-bold mb-4">{title}</h1>
+            <p className="text-xl mb-8">{subtitle}</p>
             <p className="mb-8 max-w-2xl mx-auto">
-              {defaultContent.description || "This is a hero section. Edit this text to make it your own."}
+              {description}
             </p>
-            {defaultContent.buttonText && (
+            {buttonText && (
               <button className="bg-primary text-white px-6 py-2 rounded-md font-medium hover:bg-primary/90 transition-colors">
-                {defaultContent.buttonText}
+                {buttonText}
               </button>
             )}
           </div>
@@ -95,8 +197,8 @@ export function SectionRenderer({
         return (
           <div className="py-16 px-4">
             <div className="max-w-4xl mx-auto">
-              <h2 className="text-3xl font-bold mb-6 text-center">{defaultContent.title || "About Us"}</h2>
-              <p className="text-lg mb-6 text-center">{defaultContent.subtitle || "Learn more about our company"}</p>
+              <h2 className="text-3xl font-bold mb-6 text-center">{title}</h2>
+              <p className="text-lg mb-6 text-center">{subtitle}</p>
               <div className="grid md:grid-cols-2 gap-8 items-center">
                 <div>
                   <div className="rounded-lg overflow-hidden bg-accent/20 h-64 flex items-center justify-center">
@@ -109,11 +211,11 @@ export function SectionRenderer({
                 </div>
                 <div>
                   <p className="mb-4">
-                    {defaultContent.description || "This is the about section. Add your company description here."}
+                    {description}
                   </p>
-                  {defaultContent.buttonText && (
+                  {buttonText && (
                     <button className="bg-primary text-white px-4 py-2 rounded-md font-medium hover:bg-primary/90 transition-colors">
-                      {defaultContent.buttonText}
+                      {buttonText}
                     </button>
                   )}
                 </div>
@@ -126,11 +228,11 @@ export function SectionRenderer({
         return (
           <div className="py-16 px-4">
             <div className="max-w-6xl mx-auto">
-              <h2 className="text-3xl font-bold mb-6 text-center">{defaultContent.title || "Our Services"}</h2>
-              <p className="text-lg mb-12 text-center">{defaultContent.subtitle || "What we can do for you"}</p>
+              <h2 className="text-3xl font-bold mb-6 text-center">{title}</h2>
+              <p className="text-lg mb-12 text-center">{subtitle}</p>
               <div className="grid md:grid-cols-3 gap-8">
-                {[1, 2, 3].map((i) => (
-                  <div key={`service-${section.id}-${i}`} className="bg-background p-6 rounded-lg shadow-sm border border-border">
+                {content.services && content.services.map((service, index) => (
+                  <div key={`service-${section.id}-${index}`} className="bg-background p-6 rounded-lg shadow-sm border border-border">
                     <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-primary mb-4">
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path
@@ -156,12 +258,17 @@ export function SectionRenderer({
                         />
                       </svg>
                     </div>
-                    <h3 className="text-xl font-medium mb-2">Service {i}</h3>
-                    <p className="text-muted-foreground">
-                      This is a service description. Edit this text to describe your service.
-                    </p>
+                    <h3 className="text-xl font-medium mb-2">{service.title}</h3>
+                    <p className="text-muted-foreground">{service.description}</p>
                   </div>
                 ))}
+                {(!content.services || content.services.length === 0) && (
+                  <div className="col-span-3 text-center p-8 border border-dashed border-border rounded-lg">
+                    <p className="text-muted-foreground">
+                      No service cards defined. Add cards in the properties panel.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -171,13 +278,12 @@ export function SectionRenderer({
         return (
           <div className="py-16 px-4">
             <div className="max-w-4xl mx-auto">
-              <h2 className="text-3xl font-bold mb-6 text-center">{defaultContent.title || "Contact Us"}</h2>
-              <p className="text-lg mb-8 text-center">{defaultContent.subtitle || "Get in touch with our team"}</p>
+              <h2 className="text-3xl font-bold mb-6 text-center">{title}</h2>
+              <p className="text-lg mb-8 text-center">{subtitle}</p>
               <div className="grid md:grid-cols-2 gap-8">
                 <div>
                   <p className="mb-6">
-                    {defaultContent.description ||
-                      "We'd love to hear from you. Fill out the form and we'll get back to you as soon as possible."}
+                    {description}
                   </p>
                   <div className="space-y-4">
                     <div className="flex items-center">
@@ -208,7 +314,7 @@ export function SectionRenderer({
                       </div>
                       <div>
                         <h3 className="font-medium">Email</h3>
-                        <p className="text-sm text-muted-foreground">contact@example.com</p>
+                        <p className="text-sm text-muted-foreground">{content.email || "contact@example.com"}</p>
                       </div>
                     </div>
                     <div className="flex items-center">
@@ -225,7 +331,7 @@ export function SectionRenderer({
                       </div>
                       <div>
                         <h3 className="font-medium">Phone</h3>
-                        <p className="text-sm text-muted-foreground">+1 (555) 123-4567</p>
+                        <p className="text-sm text-muted-foreground">{content.phone || "+1 (555) 123-4567"}</p>
                       </div>
                     </div>
                   </div>
@@ -258,8 +364,8 @@ export function SectionRenderer({
         return (
           <div className="py-16 px-4">
             <div className="max-w-5xl mx-auto">
-              <h2 className="text-3xl font-bold mb-6 text-center">{defaultContent.title || "Testimonials"}</h2>
-              <p className="text-lg mb-12 text-center">{defaultContent.subtitle || "What our clients say"}</p>
+              <h2 className="text-3xl font-bold mb-6 text-center">{title}</h2>
+              <p className="text-lg mb-12 text-center">{subtitle}</p>
               <div className="grid md:grid-cols-3 gap-8">
                 {[1, 2, 3].map((i) => (
                   <div key={`testimonial-${section.id}-${i}`} className="bg-background p-6 rounded-lg shadow-sm border border-border text-center">
@@ -285,8 +391,8 @@ export function SectionRenderer({
         return (
           <div className="py-16 px-4">
             <div className="max-w-6xl mx-auto">
-              <h2 className="text-3xl font-bold mb-6 text-center">{defaultContent.title || "Our Team"}</h2>
-              <p className="text-lg mb-12 text-center">{defaultContent.subtitle || "Meet the people behind our success"}</p>
+              <h2 className="text-3xl font-bold mb-6 text-center">{title}</h2>
+              <p className="text-lg mb-12 text-center">{subtitle}</p>
               <div className="grid md:grid-cols-4 gap-8">
                 {[1, 2, 3, 4].map((i) => (
                   <div key={`team-member-${section.id}-${i}`} className="text-center">
@@ -312,8 +418,8 @@ export function SectionRenderer({
         return (
           <div className="py-16 px-4">
             <div className="max-w-6xl mx-auto">
-              <h2 className="text-3xl font-bold mb-6 text-center">{defaultContent.title || "Features"}</h2>
-              <p className="text-lg mb-12 text-center">{defaultContent.subtitle || "What makes us different"}</p>
+              <h2 className="text-3xl font-bold mb-6 text-center">{title}</h2>
+              <p className="text-lg mb-12 text-center">{subtitle}</p>
               <div className="grid md:grid-cols-2 gap-8">
                 {[1, 2, 3, 4].map((i) => (
                   <div key={`feature-${section.id}-${i}`} className="flex items-start">
@@ -345,8 +451,8 @@ export function SectionRenderer({
         return (
           <div className="py-16 px-4">
             <div className="max-w-6xl mx-auto">
-              <h2 className="text-3xl font-bold mb-6 text-center">{defaultContent.title || "Gallery"}</h2>
-              <p className="text-lg mb-12 text-center">{defaultContent.subtitle || "Our work in pictures"}</p>
+              <h2 className="text-3xl font-bold mb-6 text-center">{title}</h2>
+              <p className="text-lg mb-12 text-center">{subtitle}</p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {[1, 2, 3].map((i) => (
                   <div key={`gallery-item-${section.id}-${i}`} className="aspect-square bg-accent/20 rounded-lg overflow-hidden">
@@ -362,31 +468,79 @@ export function SectionRenderer({
           </div>
         )
 
+      case "products":
+        console.log(`[Section ${section.id}] Rendering products section with userProducts:`, userProducts);
+        
+        // Show test product if userProducts is empty or not provided
+        let productsToDisplay = userProducts && userProducts.length > 0 
+          ? userProducts 
+          : [{ 
+              id: "sample-1",
+              name: "Sample Product",
+              description: "This is a sample product to show how the card looks",
+              price: 299,
+              imageUrl: "/placeholder.svg?height=300&width=300",
+              category: "Sample",
+              quantity: 10,
+              purchaseCount: 5
+            }];
+            
+        console.log(`[Section ${section.id}] Products to display:`, productsToDisplay);
+        
+        return (
+          <div className="p-6">
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold mb-2">{content.title || "Our Products"}</h2>
+              <p className="text-xl mb-2">{content.subtitle || "Browse our collection"}</p>
+              <p>{content.description || "Discover our carefully curated selection of products."}</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+              {productsToDisplay.map(product => (
+                <ProductCard 
+                  key={product.id} 
+                  product={product} 
+                  style={style.productCardStyle || {}}
+                />
+              ))}
+            </div>
+            
+            {content.buttonText && content.buttonUrl && (
+              <div className="text-center mt-8">
+                <a 
+                  href={content.buttonUrl} 
+                  className="inline-block bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded-md"
+                >
+                  {content.buttonText}
+                </a>
+              </div>
+            )}
+          </div>
+        );
+
       default:
         return (
-          <div className="py-12 px-4 text-center">
-            <h2 className="text-2xl font-bold mb-4">
-              {defaultContent.title || `${type.charAt(0).toUpperCase() + type.slice(1)} Section`}
-            </h2>
-            <p>{defaultContent.description || `This is a ${type} section. Edit the properties to customize it.`}</p>
+          <div className="p-12 text-center border rounded">
+            <h3 className="text-xl">Unknown section type: {type}</h3>
           </div>
-        )
+        );
     }
   }
 
   return (
     <div
+      id={`section-${section.id}`}
+      key={contentKey}
       className={cn(
-        "relative p-4 my-8 rounded-lg transition-all",
-        !isPreview && "hover:outline hover:outline-2 hover:outline-primary/20",
-        isSelected && !isPreview && "outline outline-2 outline-primary"
+        "w-full section-wrapper relative",
+        isSelected && !isPreview && "outline outline-2 outline-blue-500",
+        !isPreview && "cursor-pointer"
       )}
       style={sectionStyle}
       onClick={(e) => {
-        if (!isPreview) {
-          e.stopPropagation()
-          onSelect?.(section)
-        }
+        if (isPreview) return;
+        e.stopPropagation();
+        onSelect?.(section.id);
       }}
       {...(!isPreview && {
         onDragOver: handleDragOver,
@@ -397,6 +551,23 @@ export function SectionRenderer({
         <div className="absolute -top-3 left-4 bg-muted px-2 py-0.5 rounded text-xs font-medium text-muted-foreground">
           {type}
         </div>
+      )}
+
+      {isSelected && !isPreview && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            console.log(`Attempting to delete section: ${section.id}, type: ${type}`);
+            if (onDeleteSection) {
+              onDeleteSection(section.id);
+            } else {
+              console.error('onDeleteSection is not defined!');
+            }
+          }}
+          className="absolute -top-3 right-4 bg-destructive/10 hover:bg-destructive/20 text-destructive px-2 py-0.5 rounded text-xs font-medium transition-colors z-50"
+        >
+          Delete
+        </button>
       )}
 
       {renderSection()}
@@ -422,5 +593,7 @@ SectionRenderer.propTypes = {
   onReorder: PropTypes.func,
   onAddElement: PropTypes.func,
   isPreview: PropTypes.bool,
+  onDeleteSection: PropTypes.func,
+  userProducts: PropTypes.array,
 }
 
