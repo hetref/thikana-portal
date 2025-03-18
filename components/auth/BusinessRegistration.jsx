@@ -89,6 +89,7 @@ const BusinessRegistration = () => {
         profilePic:
           "https://firebasestorage.googleapis.com/v0/b/recommendation-system-62a42.appspot.com/o/assets%2Favatar.png?alt=media&token=7782c79f-c178-4b02-8778-bb3b93965aa5",
         uid,
+        plan: "free",
         gumastaField: gumastaLicenseURL, // Updated to match your field name
         gumastaVerified: "pending", // Updated to match your field value
         createdAt: new Date(),

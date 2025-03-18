@@ -184,7 +184,7 @@ export default function Profile() {
   };
 
   return (
-    <div className="flex items-center justify-center w-full mt-16">
+    <div className="flex items-center justify-center w-full">
       <div className="max-w-7xl w-full flex justify-center gap-6">
         <main className="mx-auto w-full md:w-4/6 px-2 mt-[15px]">
           <div className="grid grid-cols-1 gap-6">
@@ -539,7 +539,7 @@ export default function Profile() {
             )}
           </div>
         </main>
-        <aside className="hidden lg:block w-2/6">
+        <aside className="hidden lg:block w-2/6 mt-[15px]">
           <WhoToFollow />
         </aside>
       </div>
