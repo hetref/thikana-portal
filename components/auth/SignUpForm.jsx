@@ -105,6 +105,7 @@ export function SignUpForm() {
             Math.floor(Math.random() * 90000) + 10000
           }`,
           profilePic: "https://via.placeholder.com/600x600",
+          plan: "free",
           uid,
           createdAt: new Date(),
           updatedAt: new Date(),

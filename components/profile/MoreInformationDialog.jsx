@@ -15,7 +15,7 @@ const MoreInformationDialog = ({ userData }) => {
   return (
     <div>
       <Dialog>
-        <DialogTrigger>
+        <DialogTrigger asChild>
           <Button variant="ghost">
             <Info className="w-4 h-4" />
           </Button>

@@ -137,6 +137,14 @@ const TopNavbar = ({ type = "unauthenticated" }) => {
                           <span>Add Product</span>
                         </Link>
                       </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link
+                          href="/add-bulk-products"
+                          className="flex items-center gap-2"
+                        >
+                          <span>Add Bulk Product</span>
+                        </Link>
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </>

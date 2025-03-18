@@ -1,42 +1,51 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState } from "react"
+import PropTypes from "prop-types"
 
-const ThemeContext = createContext({
+const initialState = {
   theme: "light",
   setTheme: () => null,
-})
+}
 
-export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState(() => {
-    // Try to get theme from localStorage on initial render
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('theme') || 'light'
-    }
-    return 'light'
-  })
+const ThemeProviderContext = createContext(initialState)
+
+export function ThemeProvider({ children, defaultTheme = "light" }) {
+  const [theme, setTheme] = useState(defaultTheme)
 
   useEffect(() => {
-    // Update localStorage when theme changes
-    localStorage.setItem('theme', theme)
-    
-    // Update document class
     const root = window.document.documentElement
     root.classList.remove("light", "dark")
+
+    if (theme === "system") {
+      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+      root.classList.add(systemTheme)
+      return
+    }
+
     root.classList.add(theme)
   }, [theme])
 
-  return (
-    <ThemeContext.Provider value={{ theme, setTheme }}>
-      {children}
-    </ThemeContext.Provider>
-  )
+  const value = {
+    theme,
+    setTheme: (theme) => {
+      setTheme(theme)
+    },
+  }
+
+  return <ThemeProviderContext.Provider value={value}>{children}</ThemeProviderContext.Provider>;
+}
+
+ThemeProvider.propTypes = {
+  children: PropTypes.node.isRequired,
+  defaultTheme: PropTypes.oneOf(["dark", "light", "system"]),
 }
 
 export const useTheme = () => {
-  const context = useContext(ThemeContext)
-  if (!context) {
-    throw new Error("useTheme must be used within a ThemeProvider")
-  }
+  const context = useContext(ThemeProviderContext)
+
+  if (context === undefined) throw new Error("useTheme must be used within a ThemeProvider")
+
   return context
-} 
+}
+

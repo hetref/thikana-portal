@@ -264,7 +264,23 @@ export default function Profile() {
                     <p className="mt-2 text-sm">
                       {userData?.bio || "Amazing Bio..."}
                     </p>
-                    <Link href="/builder">Edit Website</Link>
+                    
+                    <div className="flex mt-4 gap-4 justify-center">
+                      <Button asChild variant="outline" className="flex gap-2 items-center">
+                        <Link href="/builder">
+                          <EditIcon className="h-4 w-4" />
+                          Edit Website
+                        </Link>
+                      </Button>
+                      
+                      <Button asChild variant="default" className="bg-blue-600 hover:bg-blue-700 flex gap-2 items-center">
+                        <Link href="/website-builder">
+                          <Globe className="h-4 w-4" />
+                          Create Website
+                        </Link>
+                      </Button>
+                    </div>
+                    
                     <div className="w-full mt-6">
                       <div className="flex justify-between mb-4">
                         <FollowingDialog
