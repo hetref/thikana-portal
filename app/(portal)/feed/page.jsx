@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import toast from "react-hot-toast";
 import Loader from "@/components/Loader";
 import PostCardSkeleton from "@/components/PostCardSkeleton";
+import NearbyBusinessMap from "@/components/NearbyBusinessMap";
 
 const FeedPage = () => {
   const [posts, setPosts] = useState([]);
@@ -476,7 +477,14 @@ const FeedPage = () => {
       <div className="max-w-7xl w-full">
         <div className="container grid grid-cols-1 lg:grid-cols-[300px_1fr_300px] gap-6 py-8">
           <aside className="hidden md:block">
-            <Sidebar />
+            <div className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto">
+              <div className="mb-6">
+                <Sidebar />
+              </div>
+              <div className="h-[500px]">
+                <NearbyBusinessMap />
+              </div>
+            </div>
           </aside>
           <main className="space-y-6">
             {renderLocationPrompt()}
