@@ -24,7 +24,7 @@ const BusinessRegistration = () => {
   const [businessType, setBusinessType] = useState("");
   const [gumastaLicense, setGumastaLicense] = useState(null);
   const [gumastaLicenseError, setGumastaLicenseError] = useState("");
-  
+
   const fileInputRef = useRef(null);
 
   const router = useRouter();
@@ -32,10 +32,13 @@ const BusinessRegistration = () => {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      if (file.size > 5 * 1024 * 1024) {
+        // 5MB limit
         setGumastaLicenseError("File size should be less than 5MB");
         setGumastaLicense(null);
-      } else if (!["application/pdf", "image/jpeg", "image/png"].includes(file.type)) {
+      } else if (
+        !["application/pdf", "image/jpeg", "image/png"].includes(file.type)
+      ) {
         setGumastaLicenseError("Only PDF, JPEG, and PNG files are allowed");
         setGumastaLicense(null);
       } else {
@@ -50,7 +53,9 @@ const BusinessRegistration = () => {
     setIsLoading(true);
 
     if (!gumastaLicense) {
-      setGumastaLicenseError("Gumasta License is required for business registration");
+      setGumastaLicenseError(
+        "Gumasta License is required for business registration"
+      );
       setIsLoading(false);
       return;
     }
@@ -63,12 +68,12 @@ const BusinessRegistration = () => {
         password
       );
       const uid = userCredential.user.uid;
-      
+
       // Upload Gumasta License file to Firebase Storage
       const storageRef = ref(storage, `licenses/${uid}_gumasta_license`);
       await uploadBytes(storageRef, gumastaLicense);
       const gumastaLicenseURL = await getDownloadURL(storageRef);
-      
+
       const username = `${businessName.toLowerCase()}-${
         Math.floor(Math.random() * 90000) + 10000
       }`;
@@ -90,7 +95,7 @@ const BusinessRegistration = () => {
         updatedAt: new Date(),
         lastSignIn: new Date(),
       };
-      
+
       const business = {
         businessName,
         business_type: businessType,
@@ -109,8 +114,8 @@ const BusinessRegistration = () => {
         setDoc(doc(db, "users", uid), businessData),
         setDoc(doc(db, "businesses", uid), business),
       ]);
-      
-      router.push("/feed");
+
+      router.push("/map");
     } catch (error) {
       const { code, message } = error;
       console.error(code, message);
@@ -241,14 +246,16 @@ const BusinessRegistration = () => {
                     accept=".pdf,.jpg,.jpeg,.png"
                     onChange={handleFileChange}
                   />
-                  <Button 
-                    type="button" 
+                  <Button
+                    type="button"
                     variant="outline"
                     className="w-full"
                     onClick={() => fileInputRef.current.click()}
                   >
                     <Upload className="mr-2 h-4 w-4" />
-                    {gumastaLicense ? gumastaLicense.name : "Upload Gumasta License"}
+                    {gumastaLicense
+                      ? gumastaLicense.name
+                      : "Upload Gumasta License"}
                   </Button>
                 </div>
                 {gumastaLicenseError && (

@@ -4,6 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import Map from "./Map";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   collection,
   getDocs,
   doc,
@@ -25,27 +32,8 @@ export default function WhoToFollow() {
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
+  const [recommendationType, setRecommendationType] = useState("location");
   const LIMIT = 4;
-
-  // if (userEmailStatus() === false) {
-  //   const verifyEmailHandler = async () => {
-  //     await sendEmailVerification(auth.currentUser)
-  //       .then(() => {
-  //         toast.success("Verification email sent!");
-  //       })
-  //       .catch((error) => {
-  //         toast.error("Error sending verification email: " + error.code);
-  //       });
-  //   };
-  //   return (
-  //     <div className="flex flex-col gap-4 justify-center items-center min-h-[500px]">
-  //       <p>Please verify your email to continue</p>
-  //       <Button onClick={verifyEmailHandler} className="bg-emerald-800 mt-1">
-  //         Verify Email
-  //       </Button>
-  //     </div>
-  //   );
-  // }
 
   const fetchRecommendedBusinesses = async (currentOffset = 0) => {
     if (!auth.currentUser || loading) return;
@@ -53,7 +41,7 @@ export default function WhoToFollow() {
     try {
       setLoading(true);
       const response = await fetch(
-        `https://thikana-recommendation-model.onrender.com/business-recommendations/${auth.currentUser.uid}?limit=${LIMIT}&offset=${currentOffset}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/business-recommendations/${auth.currentUser.uid}?limit=${LIMIT}&offset=${currentOffset}&recommendation_type=${recommendationType}`,
         {
           method: "GET",
           headers: {
@@ -119,7 +107,7 @@ export default function WhoToFollow() {
     return () => {
       unsubscribeFollowing();
     };
-  }, [auth.currentUser]);
+  }, [auth.currentUser, recommendationType]);
 
   const handleFollow = async (businessId) => {
     if (!auth.currentUser) return;
@@ -180,11 +168,32 @@ export default function WhoToFollow() {
     }
   };
 
+  const handleRecommendationTypeChange = (value) => {
+    setRecommendationType(value);
+    setOffset(0);
+    setBusinesses([]);
+    fetchRecommendedBusinesses(0);
+  };
+
   return (
     <div className="space-y-4 sticky top-[80px] max-h-[80vh] overflow-y-auto">
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl">Who to Follow</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-xl">Who to Follow</CardTitle>
+            <Select
+              value={recommendationType}
+              onValueChange={handleRecommendationTypeChange}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Select type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="location">Location Based</SelectItem>
+                <SelectItem value="activity">Activity Based</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <hr />
         </CardHeader>
         <CardContent className="grid gap-4">
@@ -207,13 +216,23 @@ export default function WhoToFollow() {
                           href={`/${business.username}?user=${business.id}`}
                           className="grid gap-0.5 text-sm"
                         >
-                          <span className="font-medium">{business.name}</span>
+                          <span className="font-medium">
+                            {business.businessName}
+                          </span>
                           <span className="text-muted-foreground">
                             @{business.username}
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            {business.business_type}
+                            {business.businessType}
+                            {business.distance_km &&
+                              ` • ${business.distance_km}km away`}
+                            {` • ${business.business_plan} plan`}
                           </span>
+                          {business.recommendation_type && (
+                            <span className="text-xs text-muted-foreground capitalize">
+                              {business.recommendation_type} recommendation
+                            </span>
+                          )}
                         </Link>
                       </div>
                       <Button

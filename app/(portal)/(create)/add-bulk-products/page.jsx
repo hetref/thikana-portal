@@ -1,165 +1,205 @@
 "use client";
 
 import React, { useState } from "react";
-import * as Papa from "papaparse";
+import { auth, db, storage } from "@/lib/firebase"; // Firebase setup
+import { collection, addDoc } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { TableDa } from "@/components/ui/table";
-import { auth, db } from "@/lib/firebase"; // Ensure Firebase is set up correctly
-import { collection, addDoc } from "firebase/firestore";
-import toast from "react-hot-toast";
 
-const REQUIRED_COLUMNS = [
-  "Title",
-  "Description",
-  "Price",
-  "Category",
-  "Quantity",
-];
-
-const AddProductsBulkPage = () => {
+const BulkProductUpload = () => {
   const [file, setFile] = useState(null);
-  const [tableData, setTableData] = useState(null);
+  const [tableData, setTableData] = useState([]);
+  const [images, setImages] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleFileChange = (event) => {
-    const uploadedFile = event.target.files[0];
+  const user = auth.currentUser;
 
-    if (!uploadedFile || uploadedFile.type !== "text/csv") {
-      toast.error("Please upload a valid CSV file.");
-      setFile(null);
-      setTableData(null);
+  // Handle CSV File Selection
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files[0];
+    if (selectedFile) {
+      setFile(selectedFile);
+      parseCSV(selectedFile);
+    }
+  };
+
+  // Parse CSV File
+  const parseCSV = (file) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target.result;
+      const rows = text.split("\n").map((row) => row.split(","));
+
+      if (rows.length > 1) {
+        const headers = rows[0].map((h) => h.trim());
+        const data = rows.slice(1).map((row) => {
+          let obj = {};
+          row.forEach((val, i) => {
+            obj[headers[i]] = val.trim();
+          });
+          return obj;
+        });
+
+        setTableData(data);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Upload Image to Firebase Storage
+  const uploadImage = async (file, index) => {
+    if (!file) throw new Error(`Image is required for product ${index + 1}`);
+
+    const storageRef = ref(storage, `${user.uid}/products/${file.name}`);
+    const snapshot = await uploadBytes(storageRef, file);
+    return getDownloadURL(snapshot.ref);
+  };
+
+  // Save Products with Image Upload
+  const handleSaveProducts = async () => {
+    if (!tableData || tableData.length === 0) {
+      toast.error("No products to save.");
       return;
     }
 
-    setFile(uploadedFile);
-
-    // Parse CSV file
-    Papa.parse(uploadedFile, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        const { data, errors } = results;
-
-        if (errors.length > 0) {
-          toast.error("Error parsing CSV file. Please check the file format.");
-          setTableData(null);
-          return;
-        }
-
-        // Check if all required columns are present
-        const columns = Object.keys(data[0]);
-        const missingColumns = REQUIRED_COLUMNS.filter(
-          (col) => !columns.includes(col)
-        );
-
-        if (missingColumns.length > 0) {
-          toast.error(
-            `The following columns are missing: ${missingColumns.join(
-              ", "
-            )}. Please refer to the template.`
-          );
-          setTableData(null);
-          return;
-        }
-
-        setTableData(data);
-        toast.success("File uploaded and validated successfully.");
-      },
-      error: () => {
-        toast.error("Failed to read the file. Please try again.");
-      },
-    });
-  };
-
-  const handleSaveProducts = async () => {
-    if (!tableData || tableData.length === 0) return;
+    if (!user) {
+      toast.error("User not authenticated.");
+      return;
+    }
 
     setIsSubmitting(true);
-    const user = auth.currentUser;
 
     try {
-      if (!user) {
-        throw new Error("User not authenticated");
-      }
-
       const productsRef = collection(db, "users", user.uid, "products");
 
-      const promises = tableData.map((product) =>
-        addDoc(productsRef, {
-          title: product.title,
-          description: product.description,
-          price: parseFloat(product.price),
-          category: product.category,
-          quantity: parseInt(product.quantity),
-        })
-      );
+      // Upload images & store URLs
+      const imageUploadPromises = tableData.map(async (product, index) => {
+        if (!images[index]) {
+          throw new Error(`Image is required for product: ${product.Name}`);
+        }
+        return uploadImage(images[index], index);
+      });
 
-      await Promise.all(promises);
+      const imageUrls = await Promise.all(imageUploadPromises);
+
+      // Save products to Firestore
+      const productUploadPromises = tableData.map(async (product, index) => {
+        return addDoc(productsRef, {
+          name: product.Name || "",
+          description: product.Description || "",
+          price: parseFloat(product.Price) || 0,
+          category: product.Category || "",
+          quantity: parseInt(product.Quantity) || 0,
+          imageUrl: imageUrls[index],
+        });
+      });
+
+      await Promise.all(productUploadPromises);
+
       toast.success("Products added successfully!");
       setFile(null);
-      setTableData(null);
+      setTableData([]);
+      setImages({});
     } catch (error) {
       console.error("Error saving products:", error);
-      toast.error("Failed to save products. Please try again.");
+      toast.error(error.message || "Failed to save products.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const downloadTemplate = () => {
-    const templateData = REQUIRED_COLUMNS.join(",") + "\n";
-    const blob = new Blob([templateData], { type: "text/csv" });
+  // **View Template Function**
+  const handleViewTemplate = () => {
+    const csvContent =
+      "Name,Description,Price,Category,Quantity\nSample Product,This is a sample description,100,Electronics,10";
+    const blob = new Blob([csvContent], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
-
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "product_template.csv";
-    link.click();
-    URL.revokeObjectURL(url);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "product_template.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   return (
-    <div className="mt-20 max-w-3xl mx-auto p-4 sm:p-6 md:p-8 shadow-md rounded-md text-primary border border-primary-foreground">
-      <h1 className="text-2xl font-bold text-center text-primary mb-6">
-        Add Products in Bulk
-      </h1>
+    <div className="mt-10 max-w-2xl mx-auto p-6 shadow-md border rounded-md">
+      <h2 className="text-2xl font-bold text-center mb-6">Bulk Product Upload</h2>
 
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-lg font-medium">View Template</p>
-        <Button
-          onClick={downloadTemplate}
-          className="bg-primary hover:bg-primary-dark"
-        >
-          Download
+      <div className="flex justify-normal mb-4">
+        <Button onClick={handleViewTemplate} className="bg-primary text-white py-2 px-4 rounded-md mr-10">
+          View Template
         </Button>
+        <Input type="file" accept=".csv" onChange={handleFileChange} />
       </div>
 
-      <div className="mb-6">
-        <p className="text-lg font-medium mb-2">Upload Products CSV File</p>
-        <Input
-          type="file"
-          accept=".csv"
-          onChange={handleFileChange}
-          className="text-primary w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
-        />
-      </div>
+      {tableData.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse border border-gray-300">
+            <thead>
+              <tr className="bg-gray-200">
+                <th className="border px-4 py-2">Name</th>
+                <th className="border px-4 py-2">Description</th>
+                <th className="border px-4 py-2">Price</th>
+                <th className="border px-4 py-2">Category</th>
+                <th className="border px-4 py-2">Quantity</th>
+                <th className="border w-full">Image</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tableData.map((product, index) => (
+                <tr key={index} className="border">
+                  <td className="border px-4 py-2">{product.Name}</td>
+                  <td className="border px-4 py-2">{product.Description}</td>
+                  <td className="border px-4 py-2">{product.Price}</td>
+                  <td className="border px-4 py-2">{product.Category}</td>
+                  <td className="border px-4 py-2">{product.Quantity}</td>
+                  <td className="border px-4 py-2 text-center">
+                    <div className="flex flex-col items-center">
+                      {/* Show image preview if uploaded */}
+                      {images[index] && (
+                        <img
+                          src={URL.createObjectURL(images[index])}
+                          alt={`Uploaded preview for ${product.Name}`}
+                          className="w-16 h-16 object-cover rounded mb-2"
+                        />
+                      )}
 
-      {tableData && (
-        <div className="overflow-x-auto mb-6">
-          <TableDa columns={REQUIRED_COLUMNS} data={tableData} />
+                      {/* Image Upload Section */}
+                      <span className="text-sm text-gray-600 mb-1">
+                        {images[index] ? "✅ Image Uploaded" : "📂 Choose Image"}
+                      </span>
+                      <label className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded cursor-pointer">
+                        Upload
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            setImages((prev) => ({ ...prev, [index]: file }));
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
-
       <Button
         onClick={handleSaveProducts}
-        disabled={!tableData || tableData.length === 0 || isSubmitting}
-        className="w-full bg-primary hover:bg-primary-dark font-semibold py-2 px-4 rounded-md transition-all duration-200 disabled:opacity-50"
+        disabled={isSubmitting}
+        className="mt-4 w-full bg-primary text-white py-2 rounded-md"
       >
-        {isSubmitting ? "Saving..." : "Save Products"}
+        {isSubmitting ? "Uploading..." : "Upload Products"}
       </Button>
     </div>
   );
 };
 
-export default AddProductsBulkPage;
+export default BulkProductUpload;
