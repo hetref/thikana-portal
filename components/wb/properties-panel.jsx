@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -24,6 +24,24 @@ export function PropertiesPanel({
     style: {},
     content: {}
   });
+
+  // Component state to track text input fields independently
+  const [textInputs, setTextInputs] = useState({});
+  
+  // Initialize text inputs when selectedSection changes
+  useEffect(() => {
+    if (selectedSection) {
+      setTextInputs({
+        title: selectedSection.content?.title || "",
+        subtitle: selectedSection.content?.subtitle || "",
+        description: selectedSection.content?.description || "",
+        buttonText: selectedSection.content?.buttonText || "",
+        buttonUrl: selectedSection.content?.buttonUrl || "",
+        email: selectedSection.content?.email || "",
+        phone: selectedSection.content?.phone || "",
+      });
+    }
+  }, [selectedSection?.id]); // Only reinitialize when section ID changes
 
   // Determine which type of element is selected
   const isPanelForSection = !!selectedSection
@@ -53,33 +71,79 @@ export function PropertiesPanel({
   const elementStyle = selectedElement?.style || {}
   const elementContent = selectedElement?.content || {}
 
+  // Add debounce functionality to prevent too many updates
+  const debounce = (func, wait) => {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  };
+
+  // Create debounced update functions for better performance
+  const debouncedUpdateSection = useCallback(
+    debounce((updatedSection) => {
+      console.log("Debounced section update:", updatedSection);
+      onUpdateSection(updatedSection);
+    }, 300),
+    [onUpdateSection]
+  );
+
+  // When text changes, update local state immediately and debounce the parent update
   const handleTextChange = (field, value) => {
-    if (!selectedSection) return
+    if (!selectedSection) return;
     
-    onUpdateSection({
+    // Update local state immediately for responsive UI
+    setTextInputs(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    
+    // Create updated section object
+    const updatedSection = {
       ...selectedSection,
       content: {
         ...selectedSection.content,
         [field]: value,
       },
-    })
-  }
+    };
+    
+    // Use debounced update for performance
+    debouncedUpdateSection(updatedSection);
+  };
 
   const handleStyleChange = (field, value) => {
-    if (!selectedSection) return
+    if (!selectedSection) return;
     
-    onUpdateSection({
+    const updatedSection = {
       ...selectedSection,
       style: {
         ...selectedSection.style,
         [field]: value,
       },
-    })
-  }
+    };
+    
+    console.log("Updating section with new style:", updatedSection.style);
+    onUpdateSection(updatedSection);
+  };
 
   const handleElementContentChange = (property, value) => {
     if (!selectedElement) return
 
+    // Update local state
+    setLocalElementValues(prev => ({
+      ...prev,
+      content: {
+        ...prev.content,
+        [property]: value
+      }
+    }));
+
+    // Update parent component
     const updatedContent = {
       ...(selectedElement.content || {}),
       [property]: value
@@ -94,15 +158,29 @@ export function PropertiesPanel({
   const handleElementStyleChange = (property, value) => {
     if (!selectedElement) return
 
+    // Update local state first
+    setLocalElementValues(prev => ({
+      ...prev,
+      style: {
+        ...prev.style,
+        [property]: value
+      }
+    }));
+
+    // Create a new style object with all existing styles
     const updatedStyle = {
       ...(selectedElement.style || {}),
       [property]: value
-    }
+    };
 
+    // Log the updated style for debugging
+    console.log('Updating element style:', updatedStyle);
+
+    // Update the parent component with the complete style object
     onUpdateElement({
       ...selectedElement,
       style: updatedStyle
-    })
+    });
   }
 
   return (
@@ -128,13 +206,53 @@ export function PropertiesPanel({
       {!isCollapsed && (
         <ScrollArea className="h-full">
           <div className="p-4">
-            <h2 className="text-lg font-semibold mb-4">
-              {isPanelForSection
-                ? "Section Properties"
-                : isPanelForElement
-                ? `${selectedElement?.type?.charAt(0).toUpperCase()}${selectedElement?.type?.slice(1)} Properties`
-                : "Properties"}
-            </h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">
+                {isPanelForSection
+                  ? "Section Properties"
+                  : isPanelForElement
+                  ? `${selectedElement?.type?.charAt(0).toUpperCase()}${selectedElement?.type?.slice(1)} Properties`
+                  : "Properties"}
+              </h2>
+              
+              {isPanelForSection && selectedSection && (
+                <button
+                  onClick={() => {
+                    if (onDeleteSection && selectedSection && selectedSection.id) {
+                      console.log(`Deleting section with ID: ${selectedSection.id}`);
+                      onDeleteSection(selectedSection.id);
+                    } else {
+                      console.error('Cannot delete section: onDeleteSection is not defined or section ID is missing');
+                    }
+                  }}
+                  className="px-3 py-1 bg-destructive text-destructive-foreground text-xs rounded hover:bg-destructive/90 transition-colors flex items-center gap-1"
+                >
+                  <Trash2 size={14} />
+                  Delete
+                </button>
+              )}
+              
+              {isPanelForElement && (
+                <button
+                  onClick={() => {
+                    if (onDeleteElement && selectedElement && selectedElement.id) {
+                      console.log(`Deleting element with ID: ${selectedElement.id}`);
+                      if (selectedElement.sectionId) {
+                        onDeleteElement(selectedElement.sectionId, selectedElement.id);
+                      } else {
+                        console.error('Cannot delete element: section ID is missing');
+                      }
+                    } else {
+                      console.error('Cannot delete element: onDeleteElement is not defined or element ID is missing');
+                    }
+                  }}
+                  className="px-3 py-1 bg-destructive text-destructive-foreground text-xs rounded hover:bg-destructive/90 transition-colors flex items-center gap-1"
+                >
+                  <Trash2 size={14} />
+                  Delete
+                </button>
+              )}
+            </div>
             
             {isPanelForSection && selectedSection && (
               // Section properties
@@ -165,49 +283,192 @@ export function PropertiesPanel({
                     <div>
                       <label className="text-xs text-muted-foreground">Title</label>
                       <Input
-                        value={selectedSection.content.title || ""}
+                        value={textInputs.title || ""}
                         onChange={(e) => handleTextChange("title", e.target.value)}
                         className={inputClassName}
+                        placeholder="Enter title"
                       />
                     </div>
 
                     <div>
                       <label className="text-xs text-muted-foreground">Subtitle</label>
                       <Input
-                        value={selectedSection.content.subtitle || ""}
+                        value={textInputs.subtitle || ""}
                         onChange={(e) => handleTextChange("subtitle", e.target.value)}
                         className={inputClassName}
+                        placeholder="Enter subtitle"
                       />
                     </div>
 
                     <div>
                       <label className="text-xs text-muted-foreground">Description</label>
                       <Textarea
-                        value={selectedSection.content.description || ""}
+                        value={textInputs.description || ""}
                         onChange={(e) => handleTextChange("description", e.target.value)}
-                        className={inputClassName}
+                        className={textareaClassName}
+                        placeholder="Enter section description"
                       />
                     </div>
 
-                    {selectedSection.content.buttonText !== undefined && (
+                    {selectedSection?.type === "contact" && (
+                      <>
+                        <div>
+                          <label className="text-xs text-muted-foreground">Email</label>
+                          <Input
+                            value={textInputs.email}
+                            onChange={(e) => handleTextChange("email", e.target.value)}
+                            className={inputClassName}
+                            placeholder="Enter contact email"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="text-xs text-muted-foreground">Phone</label>
+                          <Input
+                            value={textInputs.phone}
+                            onChange={(e) => handleTextChange("phone", e.target.value)}
+                            className={inputClassName}
+                            placeholder="Enter contact phone"
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {selectedSection?.content?.buttonText !== undefined && (
                       <div>
                         <label className="text-xs text-muted-foreground">Button Text</label>
                         <Input
-                          value={selectedSection.content.buttonText || ""}
+                          value={textInputs.buttonText || ""}
                           onChange={(e) => handleTextChange("buttonText", e.target.value)}
                           className={inputClassName}
+                          placeholder="Enter button text"
                         />
                       </div>
                     )}
 
-                    {selectedSection.content.buttonUrl !== undefined && (
+                    {selectedSection?.content?.buttonUrl !== undefined && (
                       <div>
                         <label className="text-xs text-muted-foreground">Button URL</label>
                         <Input
-                          value={selectedSection.content.buttonUrl || ""}
+                          value={textInputs.buttonUrl || ""}
                           onChange={(e) => handleTextChange("buttonUrl", e.target.value)}
                           className={inputClassName}
+                          placeholder="Enter URL"
                         />
+                      </div>
+                    )}
+
+                    {/* Service Cards Editor - only for services sections */}
+                    {selectedSection?.type === "services" && selectedSection?.content?.services && (
+                      <div className="mt-6 border-t pt-4">
+                        <div className="flex justify-between items-center mb-3">
+                          <label className="text-sm font-medium">Service Cards</label>
+                          <button
+                            onClick={() => {
+                              const newService = {
+                                title: "New Service",
+                                description: "Description of the new service",
+                              };
+                              
+                              const updatedSection = {
+                                ...selectedSection,
+                                content: {
+                                  ...selectedSection.content,
+                                  services: [
+                                    ...(selectedSection.content.services || []),
+                                    newService
+                                  ],
+                                },
+                              };
+                              
+                              onUpdateSection(updatedSection);
+                            }}
+                            className="px-2 py-1 bg-primary text-primary-foreground text-xs rounded hover:bg-primary/90 transition-colors"
+                          >
+                            Add Card
+                          </button>
+                        </div>
+                        
+                        {selectedSection.content.services.map((service, index) => (
+                          <div key={index} className="mb-4 p-3 border rounded-md">
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="text-xs font-medium">Card {index + 1}</span>
+                              <button
+                                onClick={() => {
+                                  const updatedServices = [...selectedSection.content.services];
+                                  updatedServices.splice(index, 1);
+                                  
+                                  const updatedSection = {
+                                    ...selectedSection,
+                                    content: {
+                                      ...selectedSection.content,
+                                      services: updatedServices,
+                                    },
+                                  };
+                                  
+                                  onUpdateSection(updatedSection);
+                                }}
+                                className="text-destructive hover:text-destructive/80"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <div>
+                                <label className="text-xs text-muted-foreground">Title</label>
+                                <Input
+                                  value={service.title || ""}
+                                  onChange={(e) => {
+                                    const updatedServices = [...selectedSection.content.services];
+                                    updatedServices[index] = {
+                                      ...service,
+                                      title: e.target.value,
+                                    };
+                                    
+                                    const updatedSection = {
+                                      ...selectedSection,
+                                      content: {
+                                        ...selectedSection.content,
+                                        services: updatedServices,
+                                      },
+                                    };
+                                    
+                                    onUpdateSection(updatedSection);
+                                  }}
+                                  className={inputClassName}
+                                  placeholder="Service title"
+                                />
+                              </div>
+                              
+                              <div>
+                                <label className="text-xs text-muted-foreground">Description</label>
+                                <Textarea
+                                  value={service.description || ""}
+                                  onChange={(e) => {
+                                    const updatedServices = [...selectedSection.content.services];
+                                    updatedServices[index] = {
+                                      ...service,
+                                      description: e.target.value,
+                                    };
+                                    
+                                    const updatedSection = {
+                                      ...selectedSection,
+                                      content: {
+                                        ...selectedSection.content,
+                                        services: updatedServices,
+                                      },
+                                    };
+                                    
+                                    onUpdateSection(updatedSection);
+                                  }}
+                                  className={textareaClassName}
+                                  placeholder="Service description"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -219,8 +480,8 @@ export function PropertiesPanel({
                       <label className="text-xs text-muted-foreground">Text Color</label>
                       <Input
                         type="color"
-                        value={elementStyle.color || "#000000"}
-                        onChange={(e) => handleElementStyleChange("color", e.target.value)}
+                        value={selectedSection?.style?.textColor || "#000000"}
+                        onChange={(e) => handleStyleChange("textColor", e.target.value)}
                         className={inputClassName}
                       />
                     </div>
@@ -229,9 +490,31 @@ export function PropertiesPanel({
                       <label className="text-xs text-muted-foreground">Background Color</label>
                       <Input
                         type="color"
-                        value={elementStyle.backgroundColor || "#ffffff"}
-                        onChange={(e) => handleElementStyleChange("backgroundColor", e.target.value)}
+                        value={selectedSection?.style?.backgroundColor || "#ffffff"}
+                        onChange={(e) => handleStyleChange("backgroundColor", e.target.value)}
                         className={inputClassName}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-muted-foreground">Padding Top</label>
+                      <Input
+                        type="text"
+                        value={selectedSection?.style?.paddingTop || ""}
+                        onChange={(e) => handleStyleChange("paddingTop", e.target.value)}
+                        className={inputClassName}
+                        placeholder="80px"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-muted-foreground">Padding Bottom</label>
+                      <Input
+                        type="text"
+                        value={selectedSection?.style?.paddingBottom || ""}
+                        onChange={(e) => handleStyleChange("paddingBottom", e.target.value)}
+                        className={inputClassName}
+                        placeholder="80px"
                       />
                     </div>
 
@@ -239,8 +522,8 @@ export function PropertiesPanel({
                       <label className="text-xs text-muted-foreground">Font Size</label>
                       <Input
                         type="text"
-                        value={elementStyle.fontSize || ""}
-                        onChange={(e) => handleElementStyleChange("fontSize", e.target.value)}
+                        value={selectedSection?.style?.fontSize || ""}
+                        onChange={(e) => handleStyleChange("fontSize", e.target.value)}
                         className={inputClassName}
                         placeholder="16px"
                       />
@@ -249,8 +532,8 @@ export function PropertiesPanel({
                     <div>
                       <label className="text-xs text-muted-foreground">Font Weight</label>
                       <select
-                        value={elementStyle.fontWeight || "normal"}
-                        onChange={(e) => handleElementStyleChange("fontWeight", e.target.value)}
+                        value={selectedSection?.style?.fontWeight || "normal"}
+                        onChange={(e) => handleStyleChange("fontWeight", e.target.value)}
                         className={selectClassName}
                       >
                         <option value="normal">Normal</option>
@@ -262,8 +545,8 @@ export function PropertiesPanel({
                     <div>
                       <label className="text-xs text-muted-foreground">Text Align</label>
                       <select
-                        value={elementStyle.textAlign || "left"}
-                        onChange={(e) => handleElementStyleChange("textAlign", e.target.value)}
+                        value={selectedSection?.style?.textAlign || "left"}
+                        onChange={(e) => handleStyleChange("textAlign", e.target.value)}
                         className={selectClassName}
                       >
                         <option value="left">Left</option>
@@ -280,8 +563,8 @@ export function PropertiesPanel({
                     <div>
                       <label className="text-xs text-muted-foreground">CSS Class</label>
                       <Input
-                        value={localElementValues.style.customClass || selectedElement.style.customClass || ""}
-                        onChange={(e) => handleElementStyleChange("customClass", e.target.value)}
+                        value={selectedSection?.style?.customClass || ""}
+                        onChange={(e) => handleStyleChange("customClass", e.target.value)}
                         className={inputClassName}
                         placeholder="my-custom-class"
                       />
@@ -289,7 +572,7 @@ export function PropertiesPanel({
                     <div>
                       <label className="text-xs text-muted-foreground">Animation</label>
                       <select
-                        value={selectedSection.style.animation || "none"}
+                        value={selectedSection?.style?.animation || "none"}
                         onChange={(e) => handleStyleChange("animation", e.target.value)}
                         className={selectClassName}
                       >
@@ -304,8 +587,8 @@ export function PropertiesPanel({
                     <div>
                       <label className="text-xs text-muted-foreground">HTML ID</label>
                       <Input
-                        value={localElementValues.style.id || selectedElement.style.id || ""}
-                        onChange={(e) => handleElementStyleChange("id", e.target.value)}
+                        value={selectedSection?.style?.id || ""}
+                        onChange={(e) => handleStyleChange("id", e.target.value)}
                         className={inputClassName}
                         placeholder="my-element-id"
                       />
@@ -563,76 +846,213 @@ export function PropertiesPanel({
 
                 <TabsContent value="style" className="p-4 m-0">
                   <div className="space-y-4">
-                    <div>
-                      <label className="text-xs text-muted-foreground">Margin</label>
-                      <Input
-                        type="text"
-                        value={localElementValues.style.margin || selectedElement.style.margin || "0px"}
-                        onChange={(e) => handleElementStyleChange("margin", e.target.value)}
-                        className={inputClassName}
-                        placeholder="0px or 10px 20px"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs text-muted-foreground">Padding</label>
-                      <Input
-                        type="text"
-                        value={localElementValues.style.padding || selectedElement.style.padding || "0px"}
-                        onChange={(e) => handleElementStyleChange("padding", e.target.value)}
-                        className={inputClassName}
-                        placeholder="0px or 10px 20px"
-                      />
-                    </div>
-
-                    {(selectedElement.type === "heading" ||
-                      selectedElement.type === "paragraph" ||
-                      selectedElement.type === "button" ||
-                      selectedElement.type === "textbox" ||
-                      selectedElement.type === "textarea" ||
-                      selectedElement.type === "checkbox" ||
-                      selectedElement.type === "email" ||
-                      selectedElement.type === "date" ||
-                      selectedElement.type === "submit" ||
-                      selectedElement.type === "list") && (
+                    {selectedElement?.type === "button" ? (
                       <>
                         <div>
-                          <label className="text-xs text-muted-foreground">Font Size</label>
-                          <Input
-                            type="number"
-                            value={localElementValues.style.fontSize?.replace('px', '') || selectedElement.style.fontSize?.replace('px', '') || "16"}
-                            onChange={(e) => handleElementStyleChange("fontSize", `${e.target.value}px`)}
-                            className={inputClassName}
-                            min="8"
-                            max="72"
-                          />
+                          <label className="text-xs text-muted-foreground">Button Style</label>
+                          <select
+                            value={localElementValues.style.buttonStyle || "default"}
+                            onChange={(e) => handleElementStyleChange("buttonStyle", e.target.value)}
+                            className={selectClassName}
+                          >
+                            <option value="default">Default</option>
+                            <option value="primary">Primary</option>
+                            <option value="secondary">Secondary</option>
+                            <option value="outline">Outline</option>
+                            <option value="link">Link</option>
+                          </select>
                         </div>
+
+                        <div>
+                          <label className="text-xs text-muted-foreground">Button Size</label>
+                          <select
+                            value={localElementValues.style.buttonSize || "default"}
+                            onChange={(e) => handleElementStyleChange("buttonSize", e.target.value)}
+                            className={selectClassName}
+                          >
+                            <option value="sm">Small</option>
+                            <option value="default">Default</option>
+                            <option value="lg">Large</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-muted-foreground">Text Color</label>
+                          <div className="flex mt-1">
+                            <Input
+                              type="color"
+                              value={localElementValues.style.color || "#000000"}
+                              onChange={(e) => handleElementStyleChange("color", e.target.value)}
+                              className="w-12 h-8 p-1 border border-gray-300"
+                            />
+                            <Input
+                              value={localElementValues.style.color || "#000000"}
+                              onChange={(e) => handleElementStyleChange("color", e.target.value)}
+                              className={`flex-1 ml-2 ${inputClassName}`}
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-muted-foreground">Background Color</label>
+                          <div className="flex mt-1">
+                            <Input
+                              type="color"
+                              value={localElementValues.style.backgroundColor || "#ffffff"}
+                              onChange={(e) => handleElementStyleChange("backgroundColor", e.target.value)}
+                              className="w-12 h-8 p-1 border border-gray-300"
+                            />
+                            <Input
+                              value={localElementValues.style.backgroundColor || "#ffffff"}
+                              onChange={(e) => handleElementStyleChange("backgroundColor", e.target.value)}
+                              className={`flex-1 ml-2 ${inputClassName}`}
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-muted-foreground">Border Radius</label>
+                          <Input
+                            type="range"
+                            min="0"
+                            max="50"
+                            step="1"
+                            value={parseInt(localElementValues.style.borderRadius || "0")}
+                            onChange={(e) => handleElementStyleChange("borderRadius", `${e.target.value}px`)}
+                            className="w-full mt-1"
+                          />
+                          <div className="text-center text-xs mt-1">
+                            {localElementValues.style.borderRadius || "0px"}
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-muted-foreground">Padding</label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-xs text-muted-foreground">Horizontal</label>
+                              <Input
+                                type="range"
+                                min="0"
+                                max="50"
+                                step="1"
+                                value={parseInt(localElementValues.style.paddingX || "10")}
+                                onChange={(e) => handleElementStyleChange("paddingX", `${e.target.value}px`)}
+                                className="w-full mt-1"
+                              />
+                              <div className="text-center text-xs mt-1">
+                                {localElementValues.style.paddingX || "10px"}
+                              </div>
+                            </div>
+                            <div>
+                              <label className="text-xs text-muted-foreground">Vertical</label>
+                              <Input
+                                type="range"
+                                min="0"
+                                max="50"
+                                step="1"
+                                value={parseInt(localElementValues.style.paddingY || "5")}
+                                onChange={(e) => handleElementStyleChange("paddingY", `${e.target.value}px`)}
+                                className="w-full mt-1"
+                              />
+                              <div className="text-center text-xs mt-1">
+                                {localElementValues.style.paddingY || "5px"}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
                         <div>
                           <label className="text-xs text-muted-foreground">Font Weight</label>
                           <select 
-                            value={localElementValues.style.fontWeight || selectedElement.style.fontWeight || "normal"}
+                            value={localElementValues.style.fontWeight || "normal"}
                             onChange={(e) => handleElementStyleChange("fontWeight", e.target.value)}
                             className={selectClassName}
                           >
                             <option value="normal">Normal</option>
                             <option value="bold">Bold</option>
-                            <option value="lighter">Lighter</option>
-                            <option value="bolder">Bolder</option>
-                            <option value="100">100</option>
-                            <option value="200">200</option>
-                            <option value="300">300</option>
-                            <option value="400">400</option>
-                            <option value="500">500</option>
-                            <option value="600">600</option>
-                            <option value="700">700</option>
-                            <option value="800">800</option>
-                            <option value="900">900</option>
+                            <option value="500">Medium</option>
+                            <option value="600">Semibold</option>
                           </select>
                         </div>
+
+                        <div className="flex items-center mt-2">
+                          <input
+                            type="checkbox"
+                            id="hover-effect"
+                            checked={localElementValues.style.hoverEffect || false}
+                            onChange={(e) => handleElementStyleChange("hoverEffect", e.target.checked)}
+                            className={checkboxClassName}
+                          />
+                          <label htmlFor="hover-effect" className="text-xs text-muted-foreground">
+                            Enable hover effect
+                          </label>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div>
+                          <label className="text-xs text-muted-foreground">Text Color</label>
+                          <div className="flex mt-1">
+                            <Input
+                              type="color"
+                              value={elementStyle.color || "#000000"}
+                              onChange={(e) => handleElementStyleChange("color", e.target.value)}
+                              className="w-12 h-8 p-1 border border-gray-300"
+                            />
+                            <Input
+                              value={elementStyle.color || "#000000"}
+                              onChange={(e) => handleElementStyleChange("color", e.target.value)}
+                              className={`flex-1 ml-2 ${inputClassName}`}
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-muted-foreground">Background Color</label>
+                          <div className="flex mt-1">
+                            <Input
+                              type="color"
+                              value={elementStyle.backgroundColor || "#ffffff"}
+                              onChange={(e) => handleElementStyleChange("backgroundColor", e.target.value)}
+                              className="w-12 h-8 p-1 border border-gray-300"
+                            />
+                            <Input
+                              value={elementStyle.backgroundColor || "#ffffff"}
+                              onChange={(e) => handleElementStyleChange("backgroundColor", e.target.value)}
+                              className={`flex-1 ml-2 ${inputClassName}`}
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-muted-foreground">Font Size</label>
+                          <Input
+                            type="text"
+                            value={elementStyle.fontSize || ""}
+                            onChange={(e) => handleElementStyleChange("fontSize", e.target.value)}
+                            className={inputClassName}
+                            placeholder="16px"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-muted-foreground">Font Weight</label>
+                          <select 
+                            value={elementStyle.fontWeight || "normal"}
+                            onChange={(e) => handleElementStyleChange("fontWeight", e.target.value)}
+                            className={selectClassName}
+                          >
+                            <option value="normal">Normal</option>
+                            <option value="bold">Bold</option>
+                            <option value="lighter">Light</option>
+                          </select>
+                        </div>
+
                         <div>
                           <label className="text-xs text-muted-foreground">Text Align</label>
                           <select
-                            value={localElementValues.style.textAlign || selectedElement.style.textAlign || "left"}
+                            value={elementStyle.textAlign || "left"}
                             onChange={(e) => handleElementStyleChange("textAlign", e.target.value)}
                             className={selectClassName}
                           >
@@ -642,393 +1062,85 @@ export function PropertiesPanel({
                             <option value="justify">Justify</option>
                           </select>
                         </div>
-                        <div>
-                          <label className="text-xs text-muted-foreground">Line Height</label>
-                          <Input
-                            value={selectedElement.style.lineHeight || ""}
-                            onChange={(e) => handleElementStyleChange("lineHeight", e.target.value)}
-                            className={inputClassName}
-                            placeholder="1.5"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-muted-foreground">Letter Spacing</label>
-                          <Input
-                            value={selectedElement.style.letterSpacing || ""}
-                            onChange={(e) => handleElementStyleChange("letterSpacing", e.target.value)}
-                            className={inputClassName}
-                            placeholder="normal"
-                          />
-                        </div>
                       </>
                     )}
-
-                    <div>
-                      <label className="text-xs text-muted-foreground">Text Color</label>
-                      <div className="flex mt-1">
-                        <Input
-                          type="color"
-                          value={localElementValues.style.color || selectedElement.style.color || "#000000"}
-                          onChange={(e) => handleElementStyleChange("color", e.target.value)}
-                          className="w-12 h-8 p-1 border border-gray-300"
-                        />
-                        <Input
-                          value={localElementValues.style.color || selectedElement.style.color || "#000000"}
-                          onChange={(e) => handleElementStyleChange("color", e.target.value)}
-                          className={`flex-1 ml-2 ${inputClassName}`}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="text-xs text-muted-foreground">Background Color</label>
-                      <div className="flex mt-1">
-                        <Input
-                          type="color"
-                          value={localElementValues.style.backgroundColor || selectedElement.style.backgroundColor || "#ffffff"}
-                          onChange={(e) => handleElementStyleChange("backgroundColor", e.target.value)}
-                          className="w-12 h-8 p-1 border border-gray-300"
-                        />
-                        <Input
-                          value={localElementValues.style.backgroundColor || selectedElement.style.backgroundColor || "#ffffff"}
-                          onChange={(e) => handleElementStyleChange("backgroundColor", e.target.value)}
-                          className={`flex-1 ml-2 ${inputClassName}`}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="text-xs text-muted-foreground">Border Style</label>
-                      <select
-                        value={localElementValues.style.borderStyle || selectedElement.style.borderStyle || "solid"}
-                        onChange={(e) => handleElementStyleChange("borderStyle", e.target.value)}
-                        className={selectClassName}
-                      >
-                        <option value="none">None</option>
-                        <option value="solid">Solid</option>
-                        <option value="dashed">Dashed</option>
-                        <option value="dotted">Dotted</option>
-                        <option value="double">Double</option>
-                      </select>
-                    </div>
-                    
-                    {localElementValues.style.borderStyle && localElementValues.style.borderStyle !== "none" && (
-                      <>
-                        <div>
-                          <label className="text-xs text-muted-foreground">Border Width</label>
-                          <Input
-                            type="text"
-                            value={localElementValues.style.borderWidth || selectedElement.style.borderWidth || "0px"}
-                            onChange={(e) => handleElementStyleChange("borderWidth", e.target.value)}
-                            className={inputClassName}
-                            placeholder="0px or 1px"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-muted-foreground">Border Color</label>
-                          <div className="flex mt-1">
-                            <Input
-                              type="color"
-                              value={localElementValues.style.borderColor || selectedElement.style.borderColor || "#000000"}
-                              onChange={(e) => handleElementStyleChange("borderColor", e.target.value)}
-                              className="w-12 h-8 p-1 border border-gray-300"
-                            />
-                            <Input
-                              value={localElementValues.style.borderColor || selectedElement.style.borderColor || "#000000"}
-                              onChange={(e) => handleElementStyleChange("borderColor", e.target.value)}
-                              className={`flex-1 ml-2 ${inputClassName}`}
-                            />
-                          </div>
-                        </div>
-                      </>
-                    )}
-
-                    <div>
-                      <label className="text-xs text-muted-foreground">Border Radius</label>
-                      <Input
-                        type="text"
-                        value={localElementValues.style.borderRadius || selectedElement.style.borderRadius || "0px"}
-                        onChange={(e) => handleElementStyleChange("borderRadius", e.target.value)}
-                        className={inputClassName}
-                        placeholder="0px or 5px"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs text-muted-foreground">Width</label>
-                      <Input
-                        type="text"
-                        value={localElementValues.style.width || selectedElement.style.width || ""}
-                        onChange={(e) => handleElementStyleChange("width", e.target.value)}
-                        className={inputClassName}
-                        placeholder="auto, 100%, 200px"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Height</label>
-                      <Input
-                        type="text"
-                        value={localElementValues.style.height || selectedElement.style.height || ""}
-                        onChange={(e) => handleElementStyleChange("height", e.target.value)}
-                        className={inputClassName}
-                        placeholder="auto, 100%, 200px"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Min Width</label>
-                      <Input
-                        value={selectedElement.style.minWidth || ""}
-                        onChange={(e) => handleElementStyleChange("minWidth", e.target.value)}
-                        className={inputClassName}
-                        placeholder="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Min Height</label>
-                      <Input
-                        value={selectedElement.style.minHeight || ""}
-                        onChange={(e) => handleElementStyleChange("minHeight", e.target.value)}
-                        className={inputClassName}
-                        placeholder="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Max Width</label>
-                      <Input
-                        value={selectedElement.style.maxWidth || ""}
-                        onChange={(e) => handleElementStyleChange("maxWidth", e.target.value)}
-                        className={inputClassName}
-                        placeholder="none"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Max Height</label>
-                      <Input
-                        value={selectedElement.style.maxHeight || ""}
-                        onChange={(e) => handleElementStyleChange("maxHeight", e.target.value)}
-                        className={inputClassName}
-                        placeholder="none"
-                      />
-                    </div>
                   </div>
                 </TabsContent>
 
                 <TabsContent value="advanced" className="p-4 m-0">
                   <div className="space-y-4">
-                    <div>
-                      <label className="text-xs text-muted-foreground">CSS Class</label>
-                      <Input
-                        value={localElementValues.style.customClass || selectedElement.style.customClass || ""}
-                        onChange={(e) => handleElementStyleChange("customClass", e.target.value)}
-                        className={inputClassName}
-                        placeholder="my-custom-class"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">HTML ID</label>
-                      <Input
-                        value={localElementValues.style.id || selectedElement.style.id || ""}
-                        onChange={(e) => handleElementStyleChange("id", e.target.value)}
-                        className={inputClassName}
-                        placeholder="my-element-id"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="text-xs text-muted-foreground">Display</label>
-                      <select
-                        value={localElementValues.style.display || selectedElement.style.display || ""}
-                        onChange={(e) => handleElementStyleChange("display", e.target.value)}
-                        className={selectClassName}
-                      >
-                        <option value="">Default</option>
-                        <option value="block">Block</option>
-                        <option value="inline">Inline</option>
-                        <option value="inline-block">Inline Block</option>
-                        <option value="flex">Flex</option>
-                        <option value="grid">Grid</option>
-                        <option value="none">None</option>
-                      </select>
-                    </div>
-                    
-                    {localElementValues.style.display === "flex" && (
+                    {selectedElement?.type === "button" ? (
                       <>
                         <div>
-                          <label className="text-xs text-muted-foreground">Flex Direction</label>
-                          <select
-                            value={localElementValues.style.flexDirection || selectedElement.style.flexDirection || "row"}
-                            onChange={(e) => handleElementStyleChange("flexDirection", e.target.value)}
-                            className={selectClassName}
-                          >
-                            <option value="row">Row</option>
-                            <option value="column">Column</option>
-                            <option value="row-reverse">Row Reverse</option>
-                            <option value="column-reverse">Column Reverse</option>
-                          </select>
+                          <label className="text-xs text-muted-foreground">CSS Class</label>
+                          <Input
+                            value={localElementValues.style.customClass || ""}
+                            onChange={(e) => handleElementStyleChange("customClass", e.target.value)}
+                            className={inputClassName}
+                            placeholder="my-custom-class"
+                          />
                         </div>
                         <div>
-                          <label className="text-xs text-muted-foreground">Justify Content</label>
-                          <select
-                            value={localElementValues.style.justifyContent || selectedElement.style.justifyContent || "flex-start"}
-                            onChange={(e) => handleElementStyleChange("justifyContent", e.target.value)}
-                            className={selectClassName}
-                          >
-                            <option value="flex-start">Start</option>
-                            <option value="flex-end">End</option>
-                            <option value="center">Center</option>
-                            <option value="space-between">Space Between</option>
-                            <option value="space-around">Space Around</option>
-                            <option value="space-evenly">Space Evenly</option>
-                          </select>
+                          <label className="text-xs text-muted-foreground">HTML ID</label>
+                          <Input
+                            value={localElementValues.style.id || ""}
+                            onChange={(e) => handleElementStyleChange("id", e.target.value)}
+                            className={inputClassName}
+                            placeholder="my-element-id"
+                          />
                         </div>
                         <div>
-                          <label className="text-xs text-muted-foreground">Align Items</label>
+                          <label className="text-xs text-muted-foreground">Animation on Hover</label>
                           <select
-                            value={localElementValues.style.alignItems || selectedElement.style.alignItems || "stretch"}
-                            onChange={(e) => handleElementStyleChange("alignItems", e.target.value)}
+                            value={localElementValues.style.animation || "none"}
+                            onChange={(e) => handleElementStyleChange("animation", e.target.value)}
                             className={selectClassName}
                           >
-                            <option value="stretch">Stretch</option>
-                            <option value="flex-start">Start</option>
-                            <option value="flex-end">End</option>
-                            <option value="center">Center</option>
-                            <option value="baseline">Baseline</option>
+                            <option value="none">None</option>
+                            <option value="pulse">Pulse</option>
+                            <option value="bounce">Bounce</option>
+                            <option value="scale">Scale</option>
+                            <option value="shadow">Shadow</option>
                           </select>
                         </div>
                       </>
-                    )}
-                    
-                    <div>
-                      <label className="text-xs text-muted-foreground">Position</label>
-                      <select
-                        value={selectedElement.style.position || ""}
-                        onChange={(e) => handleElementStyleChange("position", e.target.value)}
-                        className={selectClassName}
-                      >
-                        <option value="">Default</option>
-                        <option value="static">Static</option>
-                        <option value="relative">Relative</option>
-                        <option value="absolute">Absolute</option>
-                        <option value="fixed">Fixed</option>
-                        <option value="sticky">Sticky</option>
-                      </select>
-                    </div>
-                    
-                    {selectedElement.style.position && selectedElement.style.position !== "static" && (
-                      <div className="grid grid-cols-2 gap-2">
+                    ) : (
+                      <>
                         <div>
-                          <label className="text-xs text-muted-foreground">Top</label>
+                          <label className="text-xs text-muted-foreground">CSS Class</label>
                           <Input
-                            value={selectedElement.style.top || ""}
-                            onChange={(e) => handleElementStyleChange("top", e.target.value)}
+                            value={localElementValues.style.customClass || ""}
+                            onChange={(e) => handleElementStyleChange("customClass", e.target.value)}
                             className={inputClassName}
-                            placeholder="auto"
+                            placeholder="my-custom-class"
                           />
                         </div>
                         <div>
-                          <label className="text-xs text-muted-foreground">Right</label>
-                          <Input
-                            value={selectedElement.style.right || ""}
-                            onChange={(e) => handleElementStyleChange("right", e.target.value)}
-                            className={inputClassName}
-                            placeholder="auto"
-                          />
+                          <label className="text-xs text-muted-foreground">Animation</label>
+                          <select
+                            value={localElementValues.style.animation || "none"}
+                            onChange={(e) => handleElementStyleChange("animation", e.target.value)}
+                            className={selectClassName}
+                          >
+                            <option value="none">None</option>
+                            <option value="fade-in">Fade In</option>
+                            <option value="slide-up">Slide Up</option>
+                            <option value="slide-down">Slide Down</option>
+                            <option value="zoom-in">Zoom In</option>
+                          </select>
                         </div>
-                        <div>
-                          <label className="text-xs text-muted-foreground">Bottom</label>
-                          <Input
-                            value={selectedElement.style.bottom || ""}
-                            onChange={(e) => handleElementStyleChange("bottom", e.target.value)}
-                            className={inputClassName}
-                            placeholder="auto"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-muted-foreground">Left</label>
-                          <Input
-                            value={selectedElement.style.left || ""}
-                            onChange={(e) => handleElementStyleChange("left", e.target.value)}
-                            className={inputClassName}
-                            placeholder="auto"
-                          />
-                        </div>
-                      </div>
-                    )}
 
-                    <div>
-                      <label className="text-xs text-muted-foreground">Opacity</label>
-                      <Input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.1"
-                        value={selectedElement.style.opacity || "1"}
-                        onChange={(e) => handleElementStyleChange("opacity", e.target.value)}
-                        className="w-full mt-1"
-                      />
-                      <div className="text-center text-xs mt-1">
-                        {selectedElement.style.opacity || "1"}
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <label className="text-xs text-muted-foreground">Transition</label>
-                      <Input
-                        value={selectedElement.style.transition || ""}
-                        onChange={(e) => handleElementStyleChange("transition", e.target.value)}
-                        className={inputClassName}
-                        placeholder="all 0.3s ease"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="text-xs text-muted-foreground">Transform</label>
-                      <Input
-                        value={selectedElement.style.transform || ""}
-                        onChange={(e) => handleElementStyleChange("transform", e.target.value)}
-                        className={inputClassName}
-                        placeholder="translate(0, 0) rotate(0) scale(1)"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="text-xs text-muted-foreground">Box Shadow</label>
-                      <Input
-                        value={selectedElement.style.boxShadow || ""}
-                        onChange={(e) => handleElementStyleChange("boxShadow", e.target.value)}
-                        className={inputClassName}
-                        placeholder="0px 0px 10px rgba(0,0,0,0.1)"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="text-xs text-muted-foreground">Z-Index</label>
-                      <Input
-                        value={selectedElement.style.zIndex || ""}
-                        onChange={(e) => handleElementStyleChange("zIndex", e.target.value)}
-                        className={inputClassName}
-                        placeholder="auto"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="text-xs text-muted-foreground">Cursor</label>
-                      <select
-                        value={selectedElement.style.cursor || ""}
-                        onChange={(e) => handleElementStyleChange("cursor", e.target.value)}
-                        className={selectClassName}
-                      >
-                        <option value="">Default</option>
-                        <option value="pointer">Pointer</option>
-                        <option value="default">Default</option>
-                        <option value="text">Text</option>
-                        <option value="move">Move</option>
-                        <option value="not-allowed">Not Allowed</option>
-                        <option value="grab">Grab</option>
-                        <option value="help">Help</option>
-                        <option value="wait">Wait</option>
-                      </select>
-                    </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground">HTML ID</label>
+                          <Input
+                            value={localElementValues.style.id || ""}
+                            onChange={(e) => handleElementStyleChange("id", e.target.value)}
+                            className={inputClassName}
+                            placeholder="my-element-id"
+                          />
+                        </div>
+                      </>
+                    )}
                   </div>
                 </TabsContent>
               </Tabs>
@@ -1049,4 +1161,5 @@ PropertiesPanel.propTypes = {
   onDeleteElement: PropTypes.func.isRequired,
   onAddElement: PropTypes.func.isRequired,
 }
+
 

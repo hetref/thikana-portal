@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import WebsiteBuilder from "@/components/builder/WebsiteBuilder";
+import { ThikannaBuilder } from "@/components/wb/thikanna-builder";
 
 export default function WebsiteBuilderPage() {
-  return <WebsiteBuilder />;
+  return <ThikannaBuilder />;
 } 

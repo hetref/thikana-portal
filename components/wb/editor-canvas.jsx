@@ -17,7 +17,9 @@ export function EditorCanvas({
   onSelectElement,
   onReorderSections,
   onAddElement,
+  onDeleteSection,
   device,
+  userProducts = [],
 }) {
   const [isDragging, setIsDragging] = useState(false)
 
@@ -59,14 +61,14 @@ export function EditorCanvas({
   }
 
   return (
-    <div className="flex-1 bg-accent/10 flex items-center justify-center p-6 overflow-hidden">
+    <div className="flex-1 bg-accent/10 flex items-center justify-center p-6 overflow-auto">
       <div
         className={cn(
-          "bg-white h-full rounded-lg shadow-md overflow-hidden flex flex-col transition-all duration-300",
+          "bg-white rounded-lg shadow-md overflow-auto flex flex-col transition-all duration-300",
           getDeviceWidth(),
         )}
       >
-        <ScrollArea className="flex-1">
+        <ScrollArea className="h-[calc(100vh-3rem)]">
           <DragDropContext onDragStart={() => setIsDragging(true)} onDragEnd={handleDragEnd}>
             <Droppable droppableId="sections">
               {(provided) => (
@@ -109,7 +111,13 @@ export function EditorCanvas({
                               <path d="M11 10H13V12H11V10Z" fill="currentColor" />
                             </svg>
                           </div>
-                          <SectionRenderer section={section} />
+                          <SectionRenderer 
+                            section={section} 
+                            isSelected={selectedSection?.id === section.id}
+                            onSelect={onSelectSection}
+                            onDeleteSection={onDeleteSection}
+                            userProducts={userProducts}
+                          />
 
                           {/* Element Drop Zone */}
                           <div
@@ -171,6 +179,8 @@ EditorCanvas.propTypes = {
   onSelectElement: PropTypes.func.isRequired,
   onReorderSections: PropTypes.func.isRequired,
   onAddElement: PropTypes.func.isRequired,
+  onDeleteSection: PropTypes.func.isRequired,
   device: PropTypes.oneOf(["desktop", "tablet", "mobile"]).isRequired,
+  userProducts: PropTypes.array,
 }
 

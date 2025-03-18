@@ -1,5 +1,4 @@
 "use client"
-
 import { ThikannaBuilder } from "@/components/wb/thikanna-builder"
 
 export default function WebBuilder() {

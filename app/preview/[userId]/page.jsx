@@ -5,6 +5,7 @@ import { doc, collection, getDocs, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { SectionRenderer } from "@/components/wb/section-renderer"
 import { ElementRenderer } from "@/components/wb/element-renderer"
+import { fetchUserProducts } from "@/lib/default-sections"
 
 export default function PreviewPage({ params }) {
   // Unwrap params using React.use()
@@ -15,6 +16,7 @@ export default function PreviewPage({ params }) {
   const [currentPage, setCurrentPage] = useState("home")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [userProducts, setUserProducts] = useState([])
 
   useEffect(() => {
     const loadWebsiteData = async () => {
@@ -61,6 +63,17 @@ export default function PreviewPage({ params }) {
 
         console.log("Processed pages data:", pagesData)
         setWebsiteData(pagesData)
+        
+        // Also load user products
+        try {
+          console.log("Fetching products for user:", userId)
+          const products = await fetchUserProducts(userId)
+          console.log("Preview: Found products:", products.length)
+          setUserProducts(products)
+        } catch (productError) {
+          console.error("Error fetching products:", productError)
+        }
+        
         setLoading(false)
       } catch (error) {
         console.error("Error loading website data:", error)
@@ -92,6 +105,12 @@ export default function PreviewPage({ params }) {
   }
 
   const currentPageData = websiteData?.[currentPage]
+
+  // For debugging
+  console.log("Preview: Rendering with products:", userProducts.length)
+  if (userProducts.length > 0) {
+    console.log("Preview: Sample product:", userProducts[0])
+  }
 
   if (!currentPageData) {
     return (
@@ -140,6 +159,7 @@ export default function PreviewPage({ params }) {
             section={section}
             elements={currentPageData.elements[section.id] || []}
             isPreview={true}
+            userProducts={userProducts}
           />
         ))}
       </main>
