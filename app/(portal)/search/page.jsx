@@ -182,8 +182,8 @@ const SearchPage = () => {
           businessesRef,
           where("role", "==", "business"),
           where("businessType", "==", businessType),
-          where("businessNameLower", ">=", queryLower),
-          where("businessNameLower", "<=", queryLower + "\uf8ff"),
+          where("businessName", ">=", queryLower),
+          where("businessName", "<=", queryLower + "\uf8ff"),
           limit(50)
         );
       } else if (searchQuery) {
@@ -192,8 +192,8 @@ const SearchPage = () => {
         businessQuery = query(
           businessesRef,
           where("role", "==", "business"),
-          where("businessNameLower", ">=", queryLower),
-          where("businessNameLower", "<=", queryLower + "\uf8ff"),
+          where("businessName", ">=", queryLower),
+          where("businessName", "<=", queryLower + "\uf8ff"),
           limit(50)
         );
       } else if (businessType && businessType !== "all") {
