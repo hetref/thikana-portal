@@ -15,15 +15,29 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { doc, updateDoc, onSnapshot, deleteDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 const ProfilePosts = ({ post: initialPost, userData, onPostDelete }) => {
   const [post, setPost] = useState(initialPost);
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
+  const [title, setTitle] = useState(initialPost.title || "");
+  const [content, setContent] = useState(
+    initialPost.content || initialPost.description || ""
+  );
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLikeProcessing, setIsLikeProcessing] = useState(false);
+  const [isPostOwner, setIsPostOwner] = useState(false);
+
+  useEffect(() => {
+    // Check if the current user is the post owner
+    const currentUser = auth.currentUser;
+    if (currentUser && post) {
+      setIsPostOwner(currentUser.uid === post.authorId);
+    }
+  }, [post]);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(doc(db, "posts", initialPost.id), (doc) => {
@@ -36,6 +50,12 @@ const ProfilePosts = ({ post: initialPost, userData, onPostDelete }) => {
 
     return () => unsubscribe();
   }, [initialPost.id, onPostDelete]);
+
+  useEffect(() => {
+    // Update title and content when post changes
+    setTitle(post.title || "");
+    setContent(post.content || post.description || "");
+  }, [post]);
 
   const handleDeletePost = async (postId) => {
     if (!window.confirm("Are you sure you want to delete this post?")) {
@@ -65,14 +85,14 @@ const ProfilePosts = ({ post: initialPost, userData, onPostDelete }) => {
       const postsRef = doc(db, "posts", postId);
       await updateDoc(postsRef, {
         title,
-        content,
+        description: content,
         lastUpdated: new Date(),
       });
 
       setPost((prev) => ({
         ...prev,
         title,
-        content,
+        description: content,
         lastUpdated: new Date(),
       }));
 
@@ -85,8 +105,7 @@ const ProfilePosts = ({ post: initialPost, userData, onPostDelete }) => {
 
   const openEditDialog = () => {
     setTitle(post.title || "");
-    setContent(post.content || "");
-    console.log("Post data:", post);
+    setContent(post.description || post.content || "");
     setIsEditing(true);
   };
 
@@ -126,60 +145,72 @@ const ProfilePosts = ({ post: initialPost, userData, onPostDelete }) => {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <AlertDialog open={isEditing} onOpenChange={setIsEditing}>
-            <AlertDialogTrigger
-              className="text-blue-500 hover:text-blue-600"
-              onClick={openEditDialog}
-            >
-              <Edit className="w-5 h-5" />
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Edit Post</AlertDialogTitle>
-              </AlertDialogHeader>
-              <form
-                className="space-y-4"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleEditPost(post.id);
-                }}
+        {isPostOwner && (
+          <div className="flex items-center gap-2">
+            <AlertDialog open={isEditing} onOpenChange={setIsEditing}>
+              <AlertDialogTrigger
+                className="text-blue-500 hover:text-blue-600"
+                onClick={openEditDialog}
               >
-                <input
-                  type="text"
-                  placeholder="Title"
-                  className="border border-black w-full p-2 rounded"
-                  onChange={(e) => setTitle(e.target.value)}
-                  value={title}
-                />
-                <textarea
-                  placeholder="Description"
-                  className="border border-black w-full p-2 rounded"
-                  onChange={(e) => setDescription(e.target.value)}
-                  value={content}
-                />
-                <AlertDialogFooter>
-                  <AlertDialogCancel onClick={() => setIsEditing(false)}>
-                    Cancel
-                  </AlertDialogCancel>
-                  <AlertDialogAction type="submit">Submit</AlertDialogAction>
-                </AlertDialogFooter>
-              </form>
-            </AlertDialogContent>
-          </AlertDialog>
-          <button
-            onClick={() => handleDeletePost(post.id)}
-            disabled={isDeleting}
-            className="text-red-500 hover:text-red-600 disabled:opacity-50"
-          >
-            <Trash2 className="w-5 h-5" />
-          </button>
-        </div>
+                <Edit className="w-5 h-5" />
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Edit Post</AlertDialogTitle>
+                </AlertDialogHeader>
+                <form
+                  className="space-y-4"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleEditPost(post.id);
+                  }}
+                >
+                  <div className="space-y-2">
+                    <Label htmlFor="title">Title</Label>
+                    <Input
+                      id="title"
+                      type="text"
+                      placeholder="Title"
+                      className="w-full"
+                      onChange={(e) => setTitle(e.target.value)}
+                      value={title}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="content">Description</Label>
+                    <Textarea
+                      id="content"
+                      placeholder="Description"
+                      className="w-full min-h-[100px] resize-y"
+                      onChange={(e) => setContent(e.target.value)}
+                      value={content}
+                      rows={5}
+                    />
+                  </div>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => setIsEditing(false)}>
+                      Cancel
+                    </AlertDialogCancel>
+                    <AlertDialogAction type="submit">Submit</AlertDialogAction>
+                  </AlertDialogFooter>
+                </form>
+              </AlertDialogContent>
+            </AlertDialog>
+            <button
+              onClick={() => handleDeletePost(post.id)}
+              disabled={isDeleting}
+              className="text-red-500 hover:text-red-600 disabled:opacity-50"
+            >
+              <Trash2 className="w-5 h-5" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Post Content */}
       <div className="space-y-4">
-        <p>{post.content || "No description"}</p>
+        <h3 className="font-semibold text-lg">{post.title}</h3>
+        <p>{post.content || post.description || "No description"}</p>
         {/* Image */}
         {post.mediaUrl && (
           <div className="relative rounded-lg overflow-hidden bg-muted">
