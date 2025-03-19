@@ -52,21 +52,23 @@ const InventoryPage = () => {
   const [bulkUpdates, setBulkUpdates] = useState({});
   const [userId, setUserId] = useState(null);
   const [selectedProducts, setSelectedProducts] = useState([]);
+  const [imageFile, setImageFile] = useState(null);
 
-const handleSelectProduct = (productId) => {
-  setSelectedProducts((prevSelected) =>
-    prevSelected.includes(productId)
-      ? prevSelected.filter((id) => id !== productId) // Deselect
-      : [...prevSelected, productId] // Select
-  );
-};
+  const handleSelectProduct = (productId) => {
+    setSelectedProducts(
+      (prevSelected) =>
+        prevSelected.includes(productId)
+          ? prevSelected.filter((id) => id !== productId) // Deselect
+          : [...prevSelected, productId] // Select
+    );
+  };
 
-// Function to determine products to edit
-const getProductsToEdit = () => {
-  return selectedProducts.length > 0
-    ? products.filter((p) => selectedProducts.includes(p.id))
-    : products;
-};
+  // Function to determine products to edit
+  const getProductsToEdit = () => {
+    return selectedProducts.length > 0
+      ? products.filter((p) => selectedProducts.includes(p.id))
+      : products;
+  };
 
   useEffect(() => {
     const fetchUserId = async () => {
@@ -116,7 +118,6 @@ const getProductsToEdit = () => {
       product.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-
   function handleBulkChange(productId, field, value) {
     setBulkUpdates((prev) => ({
       ...prev,
@@ -139,6 +140,37 @@ const getProductsToEdit = () => {
     }
   }
 
+  async function handleAddProduct(e) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const newProduct = {
+      name: formData.get("name"),
+      description: formData.get("description"),
+      price: Number.parseFloat(formData.get("price")),
+      quantity: Number.parseInt(formData.get("quantity"), 10),
+      category: formData.get("category"),
+      imageUrl: "",
+      totalSales: 0,
+      totalRevenue: 0,
+      purchaseCount: 0,
+    };
+
+    if (!imageFile) {
+      toast.error("Please select an image for the product.");
+      return;
+    }
+
+    try {
+      await addProduct(userId, newProduct, imageFile);
+      setIsAddDialogOpen(false);
+      subscribeToProducts(userId);
+      toast.success("Product added successfully.");
+    } catch (error) {
+      console.error("Error adding product:", error);
+      toast.error("Failed to add product. Please try again.");
+    }
+  }
+
   return (
     <div className="container mx-auto p-4">
       {/* Top Bar - Search and Add Product */}
@@ -154,7 +186,10 @@ const getProductsToEdit = () => {
             className="border px-3 py-2 rounded"
           />
           {/* Bulk Edit Button */}
-          <Button onClick={() => setIsBulkEditDialogOpen(true)} variant="outline">
+          <Button
+            onClick={() => setIsBulkEditDialogOpen(true)}
+            variant="outline"
+          >
             Bulk Edit
           </Button>
           {/* Add New Product Button */}
@@ -162,13 +197,60 @@ const getProductsToEdit = () => {
             <DialogTrigger asChild>
               <Button>Add New Product</Button>
             </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Product</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleAddProduct} className="space-y-4">
+                <div>
+                  <Label htmlFor="name">Name</Label>
+                  <Input id="name" name="name" required />
+                </div>
+                <div>
+                  <Label htmlFor="description">Description</Label>
+                  <Input id="description" name="description" required />
+                </div>
+                <div>
+                  <Label htmlFor="price">Price</Label>
+                  <Input
+                    id="price"
+                    name="price"
+                    type="number"
+                    step="0.01"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="quantity">Quantity</Label>
+                  <Input id="quantity" name="quantity" type="number" required />
+                </div>
+                <div>
+                  <Label htmlFor="category">Category</Label>
+                  <Input id="category" name="category" required />
+                </div>
+                <div>
+                  <Label htmlFor="image">Image</Label>
+                  <Input
+                    id="image"
+                    name="image"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                    required
+                  />
+                </div>
+                <Button type="submit">Add Product</Button>
+              </form>
+            </DialogContent>
           </Dialog>
         </div>
       </div>
 
       {/* Product Table */}
       {filteredProducts.length === 0 ? (
-        <div className="text-center text-muted-foreground">No products found.</div>
+        <div className="text-center text-muted-foreground">
+          No products found.
+        </div>
       ) : (
         <Table>
           <TableHeader>
@@ -186,11 +268,12 @@ const getProductsToEdit = () => {
           <TableBody>
             {filteredProducts.map((product) => (
               <TableRow key={product.id}>
-                <TableCell><input
-                  type="checkbox"
-                  checked={selectedProducts.includes(product.id)}
-                  onChange={() => handleSelectProduct(product.id)}
-                />
+                <TableCell>
+                  <input
+                    type="checkbox"
+                    checked={selectedProducts.includes(product.id)}
+                    onChange={() => handleSelectProduct(product.id)}
+                  />
                 </TableCell>
                 <TableCell>
                   <Image
@@ -225,7 +308,10 @@ const getProductsToEdit = () => {
       )}
 
       {/* Bulk Edit Dialog */}
-      <Dialog open={isBulkEditDialogOpen} onOpenChange={setIsBulkEditDialogOpen}>
+      <Dialog
+        open={isBulkEditDialogOpen}
+        onOpenChange={setIsBulkEditDialogOpen}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Bulk Edit Products</DialogTitle>
@@ -250,17 +336,23 @@ const getProductsToEdit = () => {
                 <Input
                   type="text"
                   defaultValue={product.name}
-                  onChange={(e) => handleBulkChange(product.id, "name", e.target.value)}
+                  onChange={(e) =>
+                    handleBulkChange(product.id, "name", e.target.value)
+                  }
                 />
                 <Input
                   type="number"
                   defaultValue={product.price}
-                  onChange={(e) => handleBulkChange(product.id, "price", e.target.value)}
+                  onChange={(e) =>
+                    handleBulkChange(product.id, "price", e.target.value)
+                  }
                 />
                 <Input
                   type="number"
                   defaultValue={product.quantity}
-                  onChange={(e) => handleBulkChange(product.id, "quantity", e.target.value)}
+                  onChange={(e) =>
+                    handleBulkChange(product.id, "quantity", e.target.value)
+                  }
                 />
               </div>
             ))}
