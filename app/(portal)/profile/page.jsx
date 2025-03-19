@@ -24,6 +24,8 @@ import {
   Images,
   SquareChartGantt,
   Globe,
+  Heart,
+  MessageCircle,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import WhoToFollow from "@/components/WhoToFollow";
@@ -118,8 +120,13 @@ export default function Profile() {
     return (
       <div className="space-y-4">
         {posts.map((post) => (
-          <Card key={post.id} className="p-4">
-            <ProfilePosts post={post} userData={userData} />
+          <Card
+            key={post.id}
+            className="cursor-pointer hover:shadow-md transition-shadow"
+          >
+            <CardContent className="pt-6">
+              <ProfilePosts post={post} userData={userData} />
+            </CardContent>
           </Card>
         ))}
         {hasMore && (

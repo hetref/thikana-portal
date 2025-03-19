@@ -4,12 +4,16 @@ import { useState, useEffect, useRef } from "react";
 import Head from "next/head";
 import Script from "next/script";
 import { auth, db } from "@/lib/firebase";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { useLocationAlert } from "@/lib/context/LocationAlertContext";
 
 export default function StoreLocationPicker() {
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [error, setError] = useState(null);
+  const [existingLocation, setExistingLocation] = useState(null);
+  const [userRole, setUserRole] = useState(null);
+  const { setShowLocationAlert } = useLocationAlert();
   const mapRef = useRef(null);
   const markerRef = useRef(null);
   const autocompleteRef = useRef(null);
@@ -96,6 +100,49 @@ export default function StoreLocationPicker() {
       setError("Failed to initialize map. Please refresh the page.");
     }
   }, [isMapLoaded]);
+
+  // Add new useEffect to fetch existing location and user role
+  useEffect(() => {
+    const fetchLocationAndRole = async () => {
+      if (!auth.currentUser) return;
+
+      try {
+        // Fetch business document
+        const businessDoc = await getDoc(
+          doc(db, "businesses", auth.currentUser.uid)
+        );
+        const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
+
+        if (userDoc.exists()) {
+          setUserRole(userDoc.data().role);
+        }
+
+        if (businessDoc.exists() && businessDoc.data().location) {
+          const location = businessDoc.data().location;
+          setExistingLocation(location);
+
+          // If map is loaded, update the marker and center
+          if (isMapLoaded && mapRef.current) {
+            const coordinates = {
+              lat: location.latitude,
+              lng: location.longitude,
+            };
+
+            mapRef.current.setCenter(coordinates);
+            mapRef.current.setZoom(17);
+            updateMarker(coordinates);
+            reverseGeocode(coordinates);
+          }
+        } else if (userRole === "business") {
+          setShowLocationAlert(true);
+        }
+      } catch (err) {
+        console.error("Error fetching location:", err);
+      }
+    };
+
+    fetchLocationAndRole();
+  }, [isMapLoaded, auth.currentUser]);
 
   // Handle getting current location
   const handleGetCurrentLocation = () => {
@@ -210,29 +257,33 @@ export default function StoreLocationPicker() {
       return;
     }
 
-    // Here you would save the selected location to your backend
-    console.log("Confirming store location:", selectedLocation);
-    const location = {
-      latitude: selectedLocation.coordinates.lat,
-      longitude: selectedLocation.coordinates.lng,
-    };
+    try {
+      const location = {
+        latitude: selectedLocation.coordinates.lat,
+        longitude: selectedLocation.coordinates.lng,
+      };
 
-    const businessesRef = doc(db, "businesses", auth.currentUser.uid);
-    await updateDoc(businessesRef, {
-      location: location,
-    });
-    const usersRef = doc(db, "users", auth.currentUser.uid);
-    await updateDoc(usersRef, {
-      location: location,
-    });
+      const businessesRef = doc(db, "businesses", auth.currentUser.uid);
+      await updateDoc(businessesRef, {
+        location: location,
+      });
+      const usersRef = doc(db, "users", auth.currentUser.uid);
+      await updateDoc(usersRef, {
+        location: location,
+      });
 
-    // In a real implementation, you would redirect to the next step or save the data
+      // Update the global alert state
+      setShowLocationAlert(false);
 
-    alert(
-      `Location confirmed! Coordinates: ${JSON.stringify(
-        selectedLocation.coordinates
-      )}`
-    );
+      alert(
+        `Location confirmed! Coordinates: ${JSON.stringify(
+          selectedLocation.coordinates
+        )}`
+      );
+    } catch (err) {
+      console.error("Error updating location:", err);
+      setError("Failed to update location. Please try again.");
+    }
   };
 
   return (
