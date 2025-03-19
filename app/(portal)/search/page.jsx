@@ -52,7 +52,6 @@ const SearchPage = () => {
   const [userLocation, setUserLocation] = useState(null);
 
   useEffect(() => {
-    // Get user location on initial load
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
