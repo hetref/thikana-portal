@@ -307,7 +307,6 @@ const InventoryPage = () => {
         </Table>
       )}
 
-      {/* Bulk Edit Dialog */}
       <Dialog
         open={isBulkEditDialogOpen}
         onOpenChange={setIsBulkEditDialogOpen}
