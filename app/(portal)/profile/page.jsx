@@ -24,6 +24,8 @@ import {
   Images,
   SquareChartGantt,
   Globe,
+  Heart,
+  MessageCircle,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import WhoToFollow from "@/components/WhoToFollow";
@@ -118,8 +120,13 @@ export default function Profile() {
     return (
       <div className="space-y-4">
         {posts.map((post) => (
-          <Card key={post.id} className="p-4">
-            <ProfilePosts post={post} userData={userData} />
+          <Card
+            key={post.id}
+            className="cursor-pointer hover:shadow-md transition-shadow"
+          >
+            <CardContent className="pt-6">
+              <ProfilePosts post={post} userData={userData} />
+            </CardContent>
           </Card>
         ))}
         {hasMore && (
@@ -257,23 +264,33 @@ export default function Profile() {
                     <p className="mt-2 text-sm">
                       {userData?.bio || "Amazing Bio..."}
                     </p>
-                    
-                    <div className="flex mt-4 gap-4 justify-center">
-                      <Button asChild variant="outline" className="flex gap-2 items-center">
-                        <Link href="/builder">
-                          <EditIcon className="h-4 w-4" />
-                          Edit Website
-                        </Link>
-                      </Button>
-                      
-                      <Button asChild variant="default" className="bg-blue-600 hover:bg-blue-700 flex gap-2 items-center">
-                        <Link href="/website-builder">
-                          <Globe className="h-4 w-4" />
-                          Create Website
-                        </Link>
-                      </Button>
-                    </div>
-                    
+
+                    {userData?.role === "business" && (
+                      <div className="flex mt-4 gap-4 justify-center">
+                        <Button
+                          asChild
+                          variant="outline"
+                          className="flex gap-2 items-center"
+                        >
+                          <Link href="/website-builder">
+                            <EditIcon className="h-4 w-4" />
+                            Edit Website
+                          </Link>
+                        </Button>
+
+                        <Button
+                          asChild
+                          variant="default"
+                          className="bg-blue-600 hover:bg-blue-700 flex gap-2 items-center"
+                        >
+                          <Link href="/website-builder">
+                            <Globe className="h-4 w-4" />
+                            Create Website
+                          </Link>
+                        </Button>
+                      </div>
+                    )}
+
                     <div className="w-full mt-6">
                       <div className="flex justify-between mb-4">
                         <FollowingDialog
@@ -322,26 +339,31 @@ export default function Profile() {
                           Edit Profile
                         </Link>
                       )}
-                      <Button variant="ghost" asChild>
-                        <Link href={userData?.website || "#"} target="_blank">
-                          <Globe className="w-4 h-4" />
-                        </Link>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        onClick={() =>
-                          setShowLocationIFrame(!showLocationIFrame)
-                        }
-                      >
-                        {/* <Link href={userData?.website || "#"} target="_blank"> */}
-                        <MapPinIcon className="w-4 h-4" />
-                        {/* </Link> */}
-                      </Button>
-                      {userData && (
-                        <MoreInformationDialog userData={userData} />
+                      {userData?.role === "business" && (
+                        <>
+                          <Button variant="ghost" asChild>
+                            <Link
+                              href={userData?.website || "#"}
+                              target="_blank"
+                            >
+                              <Globe className="w-4 w-4" />
+                            </Link>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            onClick={() =>
+                              setShowLocationIFrame(!showLocationIFrame)
+                            }
+                          >
+                            <MapPinIcon className="w-4 h-4" />
+                          </Button>
+                          {userData && (
+                            <MoreInformationDialog userData={userData} />
+                          )}
+                        </>
                       )}
                     </div>
-                    {showLocationIFrame && (
+                    {showLocationIFrame && userData?.role === "business" && (
                       <div className="w-full mt-4">
                         <iframe
                           src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d7544.081477968485!2d73.08964204800337!3d19.017926421940366!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3be7e9d390c16fad%3A0x45a26096b6c171fd!2sKamothe%2C%20Panvel%2C%20Navi%20Mumbai%2C%20Maharashtra!5e0!3m2!1sen!2sin!4v1739571469059!5m2!1sen!2sin"
@@ -428,7 +450,7 @@ export default function Profile() {
                 </Button>
               </div>
             )}
-            {userEmailStatus() === true && (
+            {userEmailStatus() === true && userData?.role === "business" && (
               <Tabs defaultValue="posts" className="w-full">
                 <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent overflow-x-auto whitespace-nowrap sm:text-sm">
                   <TabsTrigger

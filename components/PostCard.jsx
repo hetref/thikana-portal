@@ -2,42 +2,143 @@ import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "./ui/card";
 import { Avatar, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
-import { Heart, MessageCircle, MapPin } from "lucide-react";
+import { Heart, MessageCircle, MapPin, Send } from "lucide-react";
+import { Input } from "./ui/input";
+import { useRouter } from "next/navigation";
+import { auth, db } from "@/lib/firebase";
+import {
+  doc,
+  setDoc,
+  updateDoc,
+  increment,
+  getDoc,
+  serverTimestamp,
+  arrayUnion,
+  onSnapshot,
+} from "firebase/firestore";
+import toast from "react-hot-toast";
 
 function PostCard({ post, onLike, onView, showDistance, distanceText }) {
-  // Track if we're currently processing a like operation
   const [isLikeProcessing, setIsLikeProcessing] = useState(false);
+  const [showCommentBox, setShowCommentBox] = useState(false);
+  const [comment, setComment] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [commentsCount, setCommentsCount] = useState(post?.commentsCount || 0);
+  const router = useRouter();
 
-  // Ref to track the actual liked state from props
   const isLikedRef = useRef(post?.isLiked);
   const likesCountRef = useRef(post?.likes);
 
-  // Update the ref when props change
   useEffect(() => {
     isLikedRef.current = post?.isLiked;
     likesCountRef.current = post?.likes;
   }, [post?.isLiked, post?.likes]);
 
+  // Set up realtime listener for comment count
+  useEffect(() => {
+    if (!post?.postId) return;
+
+    const postRef = doc(db, "posts", post.postId);
+    const unsubscribe = onSnapshot(postRef, (doc) => {
+      if (doc.exists()) {
+        setCommentsCount(doc.data().commentsCount || 0);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [post?.postId]);
+
   const handleLike = async (e) => {
     e.stopPropagation();
     e.preventDefault();
 
-    // If we're already processing a like operation, don't start another one
-    if (isLikeProcessing) {
-      return;
-    }
+    if (isLikeProcessing) return;
 
     try {
       setIsLikeProcessing(true);
-
-      // Call the parent's onLike function
       await onLike();
-
-      // Processing is complete
       setIsLikeProcessing(false);
     } catch (error) {
       console.error("Error handling like:", error);
       setIsLikeProcessing(false);
+    }
+  };
+
+  const handleCommentClick = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setShowCommentBox(!showCommentBox);
+  };
+
+  const handleViewComments = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    router.push(`/feed/${post.postId}`);
+  };
+
+  const handleSubmitComment = async (e) => {
+    e.preventDefault();
+    if (!comment.trim() || isSubmitting) return;
+
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      console.error("No user logged in");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Get current user data
+      const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+      const userData = userDoc.data();
+
+      const now = new Date();
+      const commentData = {
+        comment: comment.trim(),
+        timestamp: now,
+        username: userData.username,
+        name: userData.name,
+        profilePic: userData.profilePic,
+        uid: currentUser.uid,
+      };
+
+      // Reference to the user's comments document in the post
+      const userCommentsRef = doc(
+        db,
+        "posts",
+        post.postId,
+        "comments",
+        currentUser.uid
+      );
+
+      // Get current comments array or initialize it
+      const userCommentsDoc = await getDoc(userCommentsRef);
+      const currentComments = userCommentsDoc.exists()
+        ? userCommentsDoc.data().comments || []
+        : [];
+
+      // Add new comment to array
+      const updatedComments = [...currentComments, commentData];
+
+      // Update the document with filtered comments
+      await setDoc(userCommentsRef, {
+        comments: updatedComments,
+      });
+
+      // Update comment count
+      await updateDoc(doc(db, "posts", post.postId), {
+        commentsCount: increment(1),
+      });
+
+      setComment("");
+      setShowCommentBox(false);
+      toast.success("Comment added successfully");
+    } catch (error) {
+      console.error("Error submitting comment:", error);
+      toast.error("Failed to add comment");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -106,12 +207,47 @@ function PostCard({ post, onLike, onView, showDistance, distanceText }) {
               <span>{post?.likes || 0}</span>
             </Button>
 
-            <Button variant="ghost" size="sm" className="flex gap-2">
-              <MessageCircle className="h-5 w-5" />
-              <span>{post?.comments?.length || 0}</span>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCommentClick}
+                className="p-2"
+              >
+                <MessageCircle className="h-5 w-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleViewComments}
+                className="p-2"
+              >
+                <span>{commentsCount}</span>
+              </Button>
+            </div>
           </div>
         </div>
+
+        {/* Comment Box */}
+        {showCommentBox && (
+          <div className="mt-4" onClick={(e) => e.stopPropagation()}>
+            <form onSubmit={handleSubmitComment} className="flex gap-2">
+              <Input
+                placeholder="Write a comment..."
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                className="flex-1"
+              />
+              <Button
+                type="submit"
+                disabled={isSubmitting || !comment.trim()}
+                size="sm"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </form>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
