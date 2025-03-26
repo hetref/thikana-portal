@@ -1,16 +1,15 @@
-'use client'
-import React from 'react';
 import '@/app/globals.css';
-import { Inter } from 'next/font/google';
+import { ToastProvider } from "@/components/ui/use-toast";
 
-const inter = Inter({ subsets: ['latin'] });
+export const metadata = {
+  title: 'Thikanna - Website Builder, SEO Management, and AI Chatbot',
+  description: 'Empower your business with Thikanna - create beautiful websites, optimize SEO, and integrate AI chatbots seamlessly.',
+}
 
-const RootLayout = ({ children }) => {
+export default function RootLayout({ children }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>{children}</body>
-    </html>
-  );
-};
-
-export default RootLayout;
+    <ToastProvider>
+      {children}
+    </ToastProvider>
+  )
+} 
