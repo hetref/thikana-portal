@@ -8,10 +8,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   collection,
-  addDoc,
   doc,
   getDoc,
   updateDoc,
@@ -21,58 +19,108 @@ import {
 import { db, storage } from "@/lib/firebase";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 
+// Utility function to format date and create dynamic time display
+function formatDate(isoDateString) {
+  const date = new Date(isoDateString);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now - date) / 1000);
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  const diffInDays = Math.floor(diffInHours / 24);
+
+  // Format as dd/mm/yyyy
+  const formattedDate = date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  });
+
+  // Dynamic time display
+  if (diffInSeconds < 60) {
+    return 'Just now';
+  } else if (diffInMinutes < 60) {
+    return `${diffInMinutes} minute${diffInMinutes !== 1 ? 's' : ''} ago`;
+  } else if (diffInHours < 24) {
+    return `${diffInHours} hour${diffInHours !== 1 ? 's' : ''} ago`;
+  } else if (diffInDays < 7) {
+    return `${diffInDays} day${diffInDays !== 1 ? 's' : ''} ago`;
+  } else if (diffInDays < 30) {
+    const weeks = Math.floor(diffInDays / 7);
+    return `${weeks} week${weeks !== 1 ? 's' : ''} ago`;
+  } else {
+    return formattedDate; // Fallback to formatted date
+  }
+}
+
 export default function AddPhotoModal({ isOpen, onClose, userId }) {
-  const [title, setTitle] = useState("");
-  const [imageFile, setImageFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(null);
+  const [imageFiles, setImageFiles] = useState([]);
+  const [previewUrls, setPreviewUrls] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  console.log("USERID", userId);
 
   const handleImageChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewUrl(reader.result);
-      };
-      reader.readAsDataURL(file);
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      setImageFiles(files);
+      
+      // Create preview URLs
+      const previews = files.map(file => {
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            resolve(reader.result);
+          };
+          reader.readAsDataURL(file);
+        });
+      });
+
+      Promise.all(previews).then(setPreviewUrls);
     }
   };
 
-  const handleRemoveImage = () => {
-    setImageFile(null);
-    setPreviewUrl(null);
+  const handleRemoveImage = (indexToRemove) => {
+    setImageFiles(prev => prev.filter((_, index) => index !== indexToRemove));
+    setPreviewUrls(prev => prev.filter((_, index) => index !== indexToRemove));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!imageFile || !title) return;
+    if (imageFiles.length === 0) return;
 
     setIsLoading(true);
     setUploadProgress(0);
 
     try {
-      const imageUrl = await uploadImage(imageFile, (progress) => {
-        setUploadProgress(progress);
-      });
-      await addPhotoToFirestore(userId, {
-        title,
-        imageUrl,
-        createdAt: new Date().toISOString(),
-      });
-      setUploadProgress(100);
+      // Upload images sequentially
+      const uploadedPhotos = [];
+      for (let i = 0; i < imageFiles.length; i++) {
+        const imageUrl = await uploadImage(imageFiles[i], (progress) => {
+          // Calculate overall progress across all files
+          const individualProgress = progress / imageFiles.length;
+          setUploadProgress(prevProgress => prevProgress + individualProgress);
+        });
+
+        const uploadTimestamp = new Date().toISOString();
+        uploadedPhotos.push({
+          photoUrl: imageUrl,
+          title: uploadTimestamp, // Use ISO timestamp
+          addedOn: uploadTimestamp,
+        });
+      }
+
+      // Add all photos to Firestore
+      await addPhotosToFirestore(userId, uploadedPhotos);
+
+      // Reset state after successful upload
       setTimeout(() => {
         onClose();
-        setTitle("");
-        setImageFile(null);
-        setPreviewUrl(null);
+        setImageFiles([]);
+        setPreviewUrls([]);
         setIsLoading(false);
         setUploadProgress(0);
       }, 2000);
     } catch (error) {
-      console.error("Error adding photo:", error);
+      console.error("Error adding photos:", error);
       setIsLoading(false);
       setUploadProgress(0);
     }
@@ -106,105 +154,83 @@ export default function AddPhotoModal({ isOpen, onClose, userId }) {
     });
   }
 
-  async function addPhotoToFirestore(userId, photoData) {
-    // const userPhotosRef = collection(db, "users", userId, "photos");
-    // await addDoc(userPhotosRef, photoData);
-
-    // Update the user document to include the new photo object
+  async function addPhotosToFirestore(userId, photosData) {
     const userRef = doc(db, "users", userId);
     const userDoc = await getDoc(userRef);
 
     if (userDoc.exists()) {
-      const userData = userDoc.data();
-      const photosArray = userData.photos || []; // Check if photos array exists
-
-      // Create the new photo object
-      const newPhotoObject = {
-        photoUrl: photoData.imageUrl,
-        title: photoData.title,
-        addedOn: new Date().toISOString(),
-      };
-
-      // Update the user document
+      // Update existing user document with new photos
       await updateDoc(userRef, {
-        photos: arrayUnion(newPhotoObject), // Add the new photo object to the array
+        photos: arrayUnion(...photosData),
       });
     } else {
-      // If the user document does not exist, handle accordingly (optional)
-      console.error("User document does not exist.");
-
-      // Optionally, create the user document with an empty photos array
+      // Create user document if it doesn't exist
       await setDoc(userRef, {
-        photos: [
-          {
-            photoUrl: photoData.imageUrl,
-            title: photoData.title,
-            addedOn: new Date().toISOString(),
-          },
-        ],
+        photos: photosData,
       });
     }
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add Photo</DialogTitle>
+          <DialogTitle>Add Photos</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="title">Title</Label>
             <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="image">Image</Label>
-            <Input
-              id="image"
+              id="images"
               type="file"
               accept="image/*"
+              multiple
               onChange={handleImageChange}
               required
             />
           </div>
-          {previewUrl && (
-            <div className="space-y-2">
-              <div className="w-full h-40 relative">
-                <img
-                  src={previewUrl || "/placeholder.svg"}
-                  alt="Preview"
-                  className="w-full h-full object-cover rounded-md"
-                />
-              </div>
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={handleRemoveImage}
-              >
-                Remove Image
-              </Button>
+          
+          {previewUrls.length > 0 && (
+            <div className="grid grid-cols-3 gap-2">
+              {previewUrls.map((url, index) => (
+                <div key={index} className="relative">
+                  <img
+                    src={url}
+                    alt={`Preview ${index + 1}`}
+                    className="w-full h-24 object-cover rounded-md"
+                  />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    className="absolute top-1 right-1"
+                    onClick={() => handleRemoveImage(index)}
+                  >
+                    X
+                  </Button>
+                </div>
+              ))}
             </div>
           )}
+          
           {isLoading && (
             <div className="text-center">
               <p>Uploading... {uploadProgress.toFixed(0)}%</p>
               {uploadProgress === 100 && <p>Upload complete!</p>}
             </div>
           )}
+          
           <Button
             type="submit"
             className="w-full bg-primary hover:bg-blend-darken"
-            disabled={!imageFile || !title || isLoading}
+            disabled={imageFiles.length === 0 || isLoading}
           >
-            {isLoading ? "Uploading..." : "Add Photo"}
+            {isLoading ? "Uploading..." : `Add ${imageFiles.length} Photo(s)`}
           </Button>
         </form>
       </DialogContent>
     </Dialog>
   );
 }
+
+// Export the formatDate utility function for use in other components
+export { formatDate };
