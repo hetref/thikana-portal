@@ -15,6 +15,7 @@
     "@emotion/styled": "^11.14.0",
     "@fontsource/geist": "^5.0.1",
     "@google/generative-ai": "^0.21.0",
+    "@grapesjs/studio-sdk": "^1.0.35",
     "@hello-pangea/dnd": "^18.0.1",
     "@hookform/resolvers": "^3.10.0",
     "@mui/material": "^6.4.1",
