@@ -81,6 +81,9 @@ const TopNavbar = ({ type = "unauthenticated" }) => {
           } flex-col sm:flex sm:flex-row sm:items-center gap-4 bg-background sm:bg-transparent 
           sm:gap-6 fixed sm:relative top-14 sm:top-auto right-0 sm:right-auto w-full sm:w-auto p-6`}
         >
+          {/* Add Searchbar */}
+          <input placeholder="Enter Business Name" />
+
           <ThemeToggle />
 
           {authUser &&
