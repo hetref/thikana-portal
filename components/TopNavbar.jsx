@@ -83,7 +83,7 @@ const TopNavbar = ({ type = "unauthenticated" }) => {
           sm:gap-6 fixed sm:relative top-14 sm:top-auto right-0 sm:right-auto w-full sm:w-auto p-6`}
         >
           {/* Add Searchbar */}
-          <AlgoliaSearch />
+          {/* <AlgoliaSearch /> */}
 
           <ThemeToggle />
 
