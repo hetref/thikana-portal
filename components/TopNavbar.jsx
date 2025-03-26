@@ -10,7 +10,7 @@ import Image from "next/image";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { redirect, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Menu, X, Plus, MapPin } from "lucide-react";
+import { Menu, X, Plus, MapPin, Search } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import AddPhotoModal from "./AddPhotoModal";
+import AlgoliaSearch from "./searchbar/AlgoliaSearch";
 
 const TopNavbar = ({ type = "unauthenticated" }) => {
   const [authUser, setAuthUser] = useState(null);
@@ -82,9 +83,15 @@ const TopNavbar = ({ type = "unauthenticated" }) => {
           sm:gap-6 fixed sm:relative top-14 sm:top-auto right-0 sm:right-auto w-full sm:w-auto p-6`}
         >
           {/* Add Searchbar */}
-          <input placeholder="Enter Business Name" />
+          {/* <AlgoliaSearch /> */}
 
           <ThemeToggle />
+
+          <div className="flex items-center gap-2">
+            <Link href="/search">
+              <Search className="h-5 w-5" />
+            </Link>
+          </div>
 
           {authUser &&
             type === "authenticated" &&
