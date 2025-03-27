@@ -33,7 +33,7 @@ const searchClient = algoliasearch(
 );
 
 // Replace with your Google Maps API key
-const GOOGLE_MAPS_API_KEY = "AlzaSyd8Wi49NNnSK0vyUIUDWU7UbRGRT601dNm";
+const GOOGLE_MAPS_API_KEY = "AIzaSyDb-fh_vaeGMyzGKIbM5ki8PS7A4jTFQYs";
 
 const Hit = ({ hit, userLocation, googleMapsService }) => {
   const [distance, setDistance] = useState(null);
@@ -283,6 +283,18 @@ const SearchPage = () => {
           indexName="business"
           insights
         >
+          {/* {userLocation ? (
+            <Configure
+              aroundLatLngViaIP={false}
+              aroundLatLng={`${userLocation.latitude}, ${userLocation.longitude}`}
+              aroundRadius={50000} // 50km radius
+              getRankingInfo={true}
+              hitsPerPage={10}
+            />
+          ) : ( */}
+          <Configure hitsPerPage={10} />
+          {/* )} */}
+
           <div className="bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
               <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
@@ -337,8 +349,14 @@ const SearchPage = () => {
                       }}
                       items={[
                         { label: "Featured", value: "business" },
-                        { label: "Name (A-Z)", value: "business_name_asc" },
-                        { label: "Name (Z-A)", value: "business_name_desc" },
+                        {
+                          label: "Business Name (A-Z)",
+                          value: "business_businessName_asc",
+                        },
+                        {
+                          label: "Business Name (Z-A)",
+                          value: "business_businessName_desc",
+                        },
                       ]}
                     />
                   </div>
