@@ -230,7 +230,7 @@ export default function Profile() {
     <div className="flex items-center justify-center w-full">
       <div className="max-w-7xl w-full grid grid-cols-1 gap-0 py-8 lg:grid-cols-[300px_minmax(0,1fr)_300px] lg:gap-0.5">
         <aside className="hidden lg:block">
-          <div className="sticky top-20">
+          <div className="sticky">
             <Sidebar />
           </div>
         </aside>

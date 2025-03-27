@@ -6,7 +6,7 @@ const Layout = ({ children }) => {
     <div className="flex items-center justify-center w-full">
       <div className="max-w-7xl w-full flex justify-center gap-6">
         <aside className="hidden lg:block md:w-[30%] w-full">
-          <div className="sticky top-[80px]">
+          <div className="sticky top-[95px]">
             <Sidebar />
           </div>
         </aside>
