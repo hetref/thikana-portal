@@ -32,7 +32,15 @@ import WhoToFollow from "@/components/WhoToFollow";
 import { useGetUserPosts } from "@/hooks/useGetPosts";
 import useGetUser from "@/hooks/useGetUser";
 import { auth, db } from "@/lib/firebase";
-import { collection, doc, getDoc, onSnapshot } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  onSnapshot,
+  getDocs,
+  query,
+  orderBy,
+} from "firebase/firestore";
 import ProfilePosts from "@/components/ProfilePosts";
 import Link from "next/link";
 import ShowProductsTabContent from "@/components/profile/ShowProductsTabContent";
@@ -43,6 +51,8 @@ import { sendEmailVerification } from "firebase/auth";
 import MoreInformationDialog from "@/components/profile/MoreInformationDialog";
 import FollowingDialog from "@/components/profile/FollowingDialog";
 import FollowerDialog from "@/components/profile/FollowerDialog";
+import PhotosGrid from "@/components/PhotosGrid";
+import AddPhotoModal from "@/components/AddPhotoModal";
 
 export default function Profile() {
   const router = useRouter();
@@ -51,10 +61,13 @@ export default function Profile() {
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const userId = user?.uid;
-  const userData = useGetUser(userId);
+  const [userData, setUserData] = useState(null);
   const { posts, loading, fetchMorePosts, hasMore, error } =
     useGetUserPosts(userId);
   const [showLocationIFrame, setShowLocationIFrame] = useState(false);
+  const [isAddPhotoModalOpen, setIsAddPhotoModalOpen] = useState(false);
+  const [userPhotos, setUserPhotos] = useState([]);
+  const [loadingPhotos, setLoadingPhotos] = useState(false);
   console.log("USERDATA", userData);
 
   useEffect(() => {
@@ -87,6 +100,54 @@ export default function Profile() {
       unsubscribeFollowers(); // Cleanup on unmount
       unsubscribeFollowing(); // Cleanup on unmount
     };
+  }, [userId]);
+
+  // Fetch user data with photos
+  useEffect(() => {
+    if (!userId) return;
+
+    // Set up listener for real-time updates
+    const userRef = doc(db, "users", userId);
+    const unsubscribe = onSnapshot(userRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const userData = docSnap.data();
+        setUserData({
+          uid: userId,
+          ...userData,
+        });
+      } else {
+        setUserData(null);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [userId]);
+
+  // Fetch user photos from subcollection
+  useEffect(() => {
+    if (!userId) return;
+
+    setLoadingPhotos(true);
+    const photosRef = collection(db, "users", userId, "photos");
+    const photosQuery = query(photosRef, orderBy("timestamp", "desc"));
+
+    const unsubscribe = onSnapshot(
+      photosQuery,
+      (snapshot) => {
+        const photos = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setUserPhotos(photos);
+        setLoadingPhotos(false);
+      },
+      (error) => {
+        console.error("Error fetching photos:", error);
+        setLoadingPhotos(false);
+      }
+    );
+
+    return () => unsubscribe();
   }, [userId]);
 
   const handleLoadMore = () => {
@@ -319,7 +380,7 @@ export default function Profile() {
                         <Separator orientation="vertical" />
                         <div>
                           <div className="font-semibold">
-                            {userData?.photos?.length || 0}
+                            {userPhotos.length || 0}
                           </div>
                           <div className="text-sm text-muted-foreground">
                             Photos
@@ -502,59 +563,25 @@ export default function Profile() {
                   </div>
                 </TabsContent>
                 <TabsContent value="photos" className="p-6">
-                  {userData?.photos && userData.photos.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-4">
-                      {userData.photos.map((photo, index) => (
-                        <Dialog key={index}>
-                          {/* Trigger for the Dialog */}
-                          <DialogTrigger asChild>
-                            <div>
-                              <Image
-                                width={1000}
-                                height={1000}
-                                src={photo.photoUrl}
-                                alt={photo.title}
-                                className="w-full h-auto rounded-lg rounded-b-none"
-                              />
-                              <div className="bg-black bg-opacity-90 border-t-2 border-white text-white p-2 rounded-b-lg">
-                                <p>{photo.title}</p>
-                                <p>
-                                  {new Date(photo.addedOn).toLocaleDateString()}
-                                </p>
-                              </div>
-                            </div>
-                          </DialogTrigger>
-                          {/* Dialog Content */}
-                          <DialogContent className="w-full max-w-3xl p-4 flex flex-col gap-2 justify-center items-center">
-                            <DialogTitle>{photo.title}</DialogTitle>
-                            <DialogDescription>
-                              {new Date(photo.addedOn).toLocaleDateString()}
-                            </DialogDescription>
-                            <Image
-                              width={1000}
-                              height={1000}
-                              src={photo.photoUrl}
-                              alt="Full View"
-                              className="max-w-full rounded-lg max-h-[80svh] max-w-[80vw]]"
-                            />
-                          </DialogContent>
-                        </Dialog>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center">
-                      <p className="text-muted-foreground">
-                        No Photos Added Yet
-                      </p>
-                      <Button
-                        className="mt-2"
-                        onClick={() => {
-                          /* Add photo logic */
+                  {userData && (
+                    <>
+                      <PhotosGrid
+                        photos={userPhotos}
+                        userId={userData.uid}
+                        onPhotoDeleted={(photoId) => {
+                          // We don't need to update local state - snapshot will handle it
+                          // The onSnapshot will automatically update userPhotos
                         }}
-                      >
-                        Add Photo
-                      </Button>
-                    </div>
+                        onAddPhoto={() => setIsAddPhotoModalOpen(true)}
+                      />
+                      {auth.currentUser && (
+                        <AddPhotoModal
+                          isOpen={isAddPhotoModalOpen}
+                          onClose={() => setIsAddPhotoModalOpen(false)}
+                          userId={auth.currentUser.uid}
+                        />
+                      )}
+                    </>
                   )}
                 </TabsContent>
                 <TabsContent value="products" className="p-6">
