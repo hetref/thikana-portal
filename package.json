@@ -73,6 +73,7 @@
     "react-instantsearch": "^7.15.5",
     "react-leaflet": "^5.0.0",
     "react-markdown": "^9.0.3",
+    "react-qr-code": "^2.0.15",
     "react-select": "^5.10.1",
     "recharts": "^2.15.0",
     "redux": "^5.0.1",
