@@ -337,7 +337,7 @@ export default function Profile() {
                       <User className="w-4 h-4" />
                       <span>{userData?.name || "Owner Name"}</span>
                     </div>
-                    <div className="flex items-center text-gray-600 gap-1">
+                    {/* <div className="flex items-center text-gray-600 gap-1">
                       <Calendar className="w-4 h-4" />
                       <span className="text-sm">Joined {formattedDate}</span>
                     </div>
@@ -346,13 +346,13 @@ export default function Profile() {
                         <Phone className="w-4 h-4" />
                         <span className="text-sm">{userData.phone}</span>
                       </div>
-                    )}
-                    {userData?.role === "business" && userData?.email && (
+                    )} */}
+                    {/* {userData?.role === "business" && userData?.email && (
                       <div className="flex items-center text-gray-600 gap-1">
                         <Mail className="w-4 h-4" />
                         <span className="text-sm">{userData.email}</span>
                       </div>
-                    )}
+                    )} */}
                     <p className="text-gray-700 mt-2">
                       {userData?.bio || "Amazing Bio..."}
                     </p>
@@ -386,11 +386,11 @@ export default function Profile() {
                           Location
                         </Button>
 
-                        <ShareBusinessDialog userData={userData} />
-
                         {userData && (
                           <MoreInformationDialog userData={userData} />
                         )}
+
+                        <ShareBusinessDialog userData={userData} />
                       </>
                     )}
                   </div>
@@ -401,12 +401,12 @@ export default function Profile() {
                   <FollowingDialog
                     followingCount={followingCount}
                     userId={userId && userId}
-                    className="flex flex-col items-center"
+                    className="flex flex-col items-center cursor-pointer"
                   />
                   <FollowerDialog
                     followerCount={followersCount}
                     userId={userId && userId}
-                    className="flex flex-col items-center pl-4"
+                    className="flex flex-col items-center pl-4 cursor-pointer"
                   />
                   <div className="flex flex-col items-center pl-4">
                     <div className="font-semibold text-gray-900">
