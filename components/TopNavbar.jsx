@@ -17,13 +17,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import { getUnreadNotificationCount } from "@/lib/notifications";
 import AddPhotoModal from "./AddPhotoModal";
-import AlgoliaSearch from "./searchbar/AlgoliaSearch";
 
 const TopNavbar = ({ type = "unauthenticated" }) => {
   const [authUser, setAuthUser] = useState(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAddPhotoModalOpen, setIsAddPhotoModalOpen] = useState(false);
+  const [notificationCount, setNotificationCount] = useState(0);
 
   // Get the complete user data from Firestore
   const userData = useGetUser(authUser?.uid);
@@ -41,6 +43,21 @@ const TopNavbar = ({ type = "unauthenticated" }) => {
 
     return () => unsubscribe();
   }, []);
+
+  // Set up notification count listener
+  useEffect(() => {
+    let unsubscribe = () => {};
+
+    if (authUser?.uid) {
+      unsubscribe = getUnreadNotificationCount((count) => {
+        setNotificationCount(count);
+      }, authUser.uid);
+    } else {
+      setNotificationCount(0);
+    }
+
+    return () => unsubscribe();
+  }, [authUser]);
 
   const logoutHandler = async () => {
     try {
@@ -82,9 +99,6 @@ const TopNavbar = ({ type = "unauthenticated" }) => {
           } flex-col sm:flex sm:flex-row sm:items-center gap-4 bg-background sm:bg-transparent 
           sm:gap-6 fixed sm:relative top-14 sm:top-auto right-0 sm:right-auto w-full sm:w-auto p-6`}
         >
-          {/* Add Searchbar */}
-          {/* <AlgoliaSearch /> */}
-
           <ThemeToggle />
 
           <div className="flex items-center gap-2">
@@ -103,6 +117,14 @@ const TopNavbar = ({ type = "unauthenticated" }) => {
               >
                 {item.icon && <item.icon className="h-5 w-5" />}
                 <span className="block">{item.title}</span>
+                {item.title === "Notifications" && notificationCount > 0 && (
+                  <Badge
+                    variant="destructive"
+                    className="text-[10px] h-5 min-w-5 flex items-center justify-center px-1"
+                  >
+                    {notificationCount > 99 ? "99+" : notificationCount}
+                  </Badge>
+                )}
               </Link>
             ))}
 

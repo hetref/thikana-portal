@@ -5,6 +5,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -118,7 +119,7 @@ export default function AddPhotoModal({ isOpen, onClose, userId }) {
         setPreviewUrls([]);
         setIsLoading(false);
         setUploadProgress(0);
-      }, 2000);
+      }, 1000);
     } catch (error) {
       console.error("Error adding photos:", error);
       setIsLoading(false);
@@ -213,9 +214,23 @@ export default function AddPhotoModal({ isOpen, onClose, userId }) {
           )}
           
           {isLoading && (
-            <div className="text-center">
-              <p>Uploading... {uploadProgress.toFixed(0)}%</p>
-              {uploadProgress === 100 && <p>Upload complete!</p>}
+            <div className="bg-muted p-3 rounded-md">
+              <div className="flex items-center mb-2">
+                <div className="w-full bg-muted-foreground/20 rounded-full h-2.5 mr-2">
+                  <div
+                    className="bg-primary h-2.5 rounded-full transition-all duration-300"
+                    style={{ width: `${uploadProgress}%` }}
+                  ></div>
+                </div>
+                <span className="text-xs font-medium">
+                  {uploadProgress.toFixed(0)}%
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {uploadProgress < 100
+                  ? "Uploading your photo..."
+                  : "Upload complete!"}
+              </p>
             </div>
           )}
           
