@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Wand2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,8 @@ import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { v4 as uuidv4 } from "uuid";
 import { useRouter } from "next/navigation";
+import ReactCrop, { centerCrop, makeAspectCrop } from "react-image-crop";
+import "react-image-crop/dist/ReactCrop.css";
 
 const CreatePost = () => {
   const [formData, setFormData] = useState({
@@ -25,6 +27,12 @@ const CreatePost = () => {
   });
   const [businessType, setBusinessType] = useState("");
   const router = useRouter();
+
+  // Image crop states
+  const [crop, setCrop] = useState(null);
+  const [imgSrc, setImgSrc] = useState("");
+  const [showCropper, setShowCropper] = useState(false);
+  const imgRef = useRef(null);
 
   useEffect(() => {
     const fetchBusinessType = async () => {
@@ -47,11 +55,12 @@ const CreatePost = () => {
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file && file.type.startsWith("image/")) {
-      setFormData((prev) => ({
-        ...prev,
-        image: file,
-        preview: URL.createObjectURL(file),
-      }));
+      const reader = new FileReader();
+      reader.addEventListener("load", () => {
+        setImgSrc(reader.result?.toString() || "");
+        setShowCropper(true);
+      });
+      reader.readAsDataURL(file);
     } else {
       alert("Please upload a valid image file (jpg, png, etc.)");
       setFormData((prev) => ({
@@ -59,6 +68,64 @@ const CreatePost = () => {
         image: null,
         preview: null,
       }));
+    }
+  };
+
+  const onImageLoad = (e) => {
+    const { width, height } = e.currentTarget;
+    const crop = makeAspectCrop(
+      centerCrop(
+        {
+          unit: "%",
+          width: 90,
+          height: 90,
+        },
+        width,
+        height
+      ),
+      16 / 9,
+      width,
+      height
+    );
+    setCrop(crop);
+  };
+
+  const getCroppedImg = (image, crop) => {
+    const canvas = document.createElement("canvas");
+    const scaleX = image.naturalWidth / image.width;
+    const scaleY = image.naturalHeight / image.height;
+    canvas.width = crop.width;
+    canvas.height = crop.height;
+    const ctx = canvas.getContext("2d");
+
+    ctx.drawImage(
+      image,
+      crop.x * scaleX,
+      crop.y * scaleY,
+      crop.width * scaleX,
+      crop.height * scaleY,
+      0,
+      0,
+      crop.width,
+      crop.height
+    );
+
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        resolve(blob);
+      }, "image/jpeg");
+    });
+  };
+
+  const handleCropComplete = async () => {
+    if (imgRef.current && crop) {
+      const croppedImageBlob = await getCroppedImg(imgRef.current, crop);
+      setFormData((prev) => ({
+        ...prev,
+        image: croppedImageBlob,
+        preview: URL.createObjectURL(croppedImageBlob),
+      }));
+      setShowCropper(false);
     }
   };
 
@@ -158,7 +225,34 @@ const CreatePost = () => {
               onChange={handleImageChange}
               required
             />
-            {formData.preview && (
+            {showCropper && imgSrc && (
+              <div className="mt-4">
+                <ReactCrop
+                  crop={crop}
+                  onChange={(c) => setCrop(c)}
+                  aspect={16 / 9}
+                  className="max-w-full"
+                >
+                  <img
+                    ref={imgRef}
+                    src={imgSrc}
+                    onLoad={onImageLoad}
+                    alt="Crop me"
+                    className="max-w-full"
+                  />
+                </ReactCrop>
+                <div className="mt-4 flex justify-end">
+                  <Button
+                    type="button"
+                    onClick={handleCropComplete}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    Apply Crop
+                  </Button>
+                </div>
+              </div>
+            )}
+            {formData.preview && !showCropper && (
               <div className="mt-4">
                 <img
                   src={formData.preview}

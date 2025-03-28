@@ -35,7 +35,9 @@ const FeedPage = () => {
   const [hasMore, setHasMore] = useState(true);
   const [userLocation, setUserLocation] = useState(null);
   const [locationPermission, setLocationPermission] = useState(null);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
   const refreshTimeout = useRef(null);
+  const autoRefreshInterval = useRef(null);
   const currentUserId = auth.currentUser?.uid;
 
   // Check for email verification
@@ -169,18 +171,26 @@ const FeedPage = () => {
       setLoading(pageNum === 1);
       setError(null);
 
-      const cacheBuster = Math.floor(Date.now() / (15 * 60 * 1000));
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/feed/${currentUserId}?limit=10&_t=${cacheBuster}`,
-        {
-          method: "GET",
-          credentials: "include",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      // Use a smaller cache window (1 minute) for more frequent refreshes
+      const cacheBuster = Math.floor(Date.now() / (60 * 1000));
+
+      // Build the URL with location parameters if available
+      let url = `${process.env.NEXT_PUBLIC_API_URL}/feed/${currentUserId}?limit=10&_t=${cacheBuster}`;
+
+      // Add location parameters if available
+      if (userLocation && userLocation.latitude && userLocation.longitude) {
+        url += `&latitude=${userLocation.latitude}&longitude=${userLocation.longitude}`;
+      }
+
+      const response = await fetch(url, {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache", // Force fresh content on client side
+        },
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -191,60 +201,42 @@ const FeedPage = () => {
         throw new Error("Invalid recommendations format received");
       }
 
-      // Batch fetch likes and post data
-      const postIds = data.recommendations.map((post) => post.id);
-      const [likesSnapshot, postsSnapshot] = await Promise.all([
-        getDocs(collection(db, "users", currentUserId, "likes")),
-        getDocs(
-          query(collection(db, "posts"), where("__name__", "in", postIds))
-        ),
-      ]);
-
+      // Only fetch likes data - we'll use API data for posts
+      const likesSnapshot = await getDocs(
+        collection(db, "users", currentUserId, "likes")
+      );
       const likedPosts = new Set(likesSnapshot.docs.map((doc) => doc.id));
-      const postsMap = new Map(
-        postsSnapshot.docs.map((doc) => [doc.id, doc.data()])
-      );
-      const authorsMap = new Map();
 
-      const processedPosts = await Promise.all(
-        data.recommendations.map(async (post) => {
-          if (!post.id) return null;
+      // Process the recommendations with minimal additional Firestore reads
+      const processedPosts = data.recommendations.map((post) => {
+        if (!post.id) return null;
 
-          const postData = postsMap.get(post.id);
-          if (!postData) return null;
+        const authorData = post.author || {};
 
-          let authorData = authorsMap.get(postData.uid);
-          if (!authorData) {
-            const authorDoc = await getDoc(doc(db, "users", postData.uid));
-            authorData = authorDoc.data();
-            authorsMap.set(postData.uid, authorData);
-          }
+        const isLocationBased = post.recommendation_type === "location";
+        const distanceText = post.distance_km
+          ? `${post.distance_km} km away${
+              post.business_plan
+                ? ` (${
+                    post.business_plan.charAt(0).toUpperCase() +
+                    post.business_plan.slice(1)
+                  } Plan)`
+                : ""
+            }`
+          : null;
 
-          const isLocationBased = post.recommendation_type === "location";
-          const distanceText = post.distance_km
-            ? `${post.distance_km} km away${
-                post.business_plan
-                  ? ` (${
-                      post.business_plan.charAt(0).toUpperCase() +
-                      post.business_plan.slice(1)
-                    } Plan)`
-                  : ""
-              }`
-            : null;
-
-          return {
-            ...post,
-            postId: post.id,
-            likes: postData.likes || 0,
-            isLiked: likedPosts.has(post.id),
-            authorName: authorData.name,
-            authorUsername: authorData.username,
-            authorProfileImage: authorData.profilePic,
-            isLocationBased,
-            distanceText,
-          };
-        })
-      );
+        return {
+          ...post,
+          postId: post.id,
+          likes: post.likes || 0,
+          isLiked: likedPosts.has(post.id),
+          authorName: authorData.businessName || post.businessName || "",
+          authorUsername: authorData.username || post.username || "",
+          authorProfileImage: authorData.profilePic || post.profilePic || "",
+          isLocationBased,
+          distanceText,
+        };
+      });
 
       const validPosts = processedPosts.filter((post) => post !== null);
       setPosts((prev) =>
@@ -264,6 +256,7 @@ const FeedPage = () => {
     if (!currentUserId || !post?.postId) return;
 
     try {
+      // Optimistic update in the UI
       setPosts((prevPosts) =>
         prevPosts.map((p) =>
           p.postId === post.postId
@@ -276,47 +269,60 @@ const FeedPage = () => {
         )
       );
 
+      // Use a batch write to reduce operations
       const batch = writeBatch(db);
       const likeRef = doc(db, "users", currentUserId, "likes", post.postId);
       const postRef = doc(db, "posts", post.postId);
-      const userRef = doc(db, "users", currentUserId);
 
-      if (post.isLiked) {
-        batch.delete(likeRef);
-        batch.update(postRef, { likes: increment(-1) });
-      } else {
+      // Avoid unnecessary user updates by only adding business preferences for new likes
+      if (!post.isLiked) {
         batch.set(likeRef, {
           timestamp: new Date(),
           businessType: post.businessType,
         });
         batch.update(postRef, { likes: increment(1) });
-        batch.update(userRef, {
-          businessPreferences: arrayUnion(post.businessType),
-        });
+
+        // Only update preferences if it's a new like and business type exists
+        if (post.businessType) {
+          const userRef = doc(db, "users", currentUserId);
+          batch.update(userRef, {
+            businessPreferences: arrayUnion(post.businessType),
+          });
+        }
+      } else {
+        batch.delete(likeRef);
+        batch.update(postRef, { likes: increment(-1) });
       }
 
       await batch.commit();
-      await updateRecentInteractions(post.postId, "Like");
 
+      // Only update recent interactions for new likes
+      if (!post.isLiked) {
+        await updateRecentInteractions(post.postId, "Like");
+      }
+
+      // Delay refresh to avoid redundant fetches
       if (refreshTimeout.current) {
         clearTimeout(refreshTimeout.current);
       }
       refreshTimeout.current = setTimeout(() => {
         fetchRecommendations(1);
-      }, 2000);
+      }, 5000); // Longer delay to reduce API calls
     } catch (error) {
       console.error("Error handling like:", error);
+      // Revert the optimistic update on error
       setPosts((prevPosts) =>
         prevPosts.map((p) =>
           p.postId === post.postId
             ? {
                 ...p,
-                isLiked: p.isLiked,
-                likes: p.likes,
+                isLiked: post.isLiked,
+                likes: post.likes,
               }
             : p
         )
       );
+      toast.error("Failed to update like status");
     }
   };
 
@@ -369,6 +375,25 @@ const FeedPage = () => {
       fetchRecommendations(nextPage);
     }
   };
+
+  // Auto-refresh feed periodically
+  useEffect(() => {
+    if (autoRefreshEnabled && currentUserId) {
+      const refreshFeed = () => {
+        console.log("Auto-refreshing feed...");
+        fetchRecommendations(1);
+      };
+
+      // Refresh feed every 1 minute
+      autoRefreshInterval.current = setInterval(refreshFeed, 60 * 1000);
+
+      return () => {
+        if (autoRefreshInterval.current) {
+          clearInterval(autoRefreshInterval.current);
+        }
+      };
+    }
+  }, [autoRefreshEnabled, currentUserId]);
 
   // Initial load and location setup
   useEffect(() => {

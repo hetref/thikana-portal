@@ -25,6 +25,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { userEmailStatus } from "@/utils/userStatus";
 import { sendEmailVerification } from "firebase/auth";
+import { toast } from "react-hot-toast";
 
 export default function WhoToFollow() {
   const [businesses, setBusinesses] = useState([]);
@@ -40,8 +41,34 @@ export default function WhoToFollow() {
 
     try {
       setLoading(true);
+
+      // Get current location for location-based recommendations
+      let locationParams = "";
+      if (recommendationType === "location") {
+        // Try to get user's current location if not using saved location
+        try {
+          if (navigator.geolocation) {
+            const position = await new Promise((resolve, reject) => {
+              navigator.geolocation.getCurrentPosition(resolve, reject, {
+                enableHighAccuracy: true,
+                timeout: 5000,
+                maximumAge: 5 * 60 * 1000, // 5 minutes
+              });
+            });
+
+            if (position) {
+              locationParams = `&latitude=${position.coords.latitude}&longitude=${position.coords.longitude}`;
+            }
+          }
+        } catch (err) {
+          console.log(
+            "Could not get current location, using saved location instead"
+          );
+        }
+      }
+
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/business-recommendations/${auth.currentUser.uid}?limit=${LIMIT}&offset=${currentOffset}&recommendation_type=${recommendationType}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/business-recommendations/${auth.currentUser.uid}?limit=${LIMIT}&offset=${currentOffset}&recommendation_type=${recommendationType}${locationParams}`,
         {
           method: "GET",
           headers: {
@@ -86,6 +113,11 @@ export default function WhoToFollow() {
   useEffect(() => {
     if (!auth.currentUser) return;
 
+    // Reset state when recommendation type changes
+    setOffset(0);
+    setBusinesses([]);
+    setHasMore(true);
+
     // Listen for following changes
     const unsubscribeFollowing = onSnapshot(
       collection(db, "users", auth.currentUser.uid, "following"),
@@ -110,7 +142,7 @@ export default function WhoToFollow() {
   }, [auth.currentUser, recommendationType]);
 
   const handleFollow = async (businessId) => {
-    if (!auth.currentUser) return;
+    if (!auth.currentUser || businessId === auth.currentUser.uid) return;
 
     try {
       await Promise.all([
@@ -135,6 +167,11 @@ export default function WhoToFollow() {
         prevBusinesses.filter((business) => business.id !== businessId)
       );
 
+      // Show success toast message
+      const businessName =
+        businesses.find((b) => b.id === businessId)?.businessName || "Business";
+      toast.success(`You are now following ${businessName}`);
+
       // Only fetch new recommendations if we're running low
       if (businesses.length <= LIMIT) {
         setOffset(0);
@@ -157,8 +194,12 @@ export default function WhoToFollow() {
           doc(db, "users", auth.currentUser.uid, "following", businessId)
         ),
       ]);
+
+      // Show unfollow toast message
+      toast.success(`Business unfollowed successfully`);
     } catch (error) {
       console.error("Error unfollowing business:", error);
+      toast.error("Failed to unfollow business");
     }
   };
 
@@ -172,7 +213,19 @@ export default function WhoToFollow() {
     setRecommendationType(value);
     setOffset(0);
     setBusinesses([]);
-    fetchRecommendedBusinesses(0);
+    setHasMore(true);
+  };
+
+  // Get the recommendation type label
+  const getRecommendationTypeLabel = (type) => {
+    switch (type) {
+      case "location":
+        return "Location Based";
+      case "activity":
+        return "Activity Based";
+      default:
+        return type.charAt(0).toUpperCase() + type.slice(1);
+    }
   };
 
   return (
@@ -205,55 +258,104 @@ export default function WhoToFollow() {
           {userEmailStatus() === true && (
             <>
               <div className="flex flex-col items-center gap-2">
-                {businesses.map((business) => (
-                  <div
-                    className="flex items-center justify-between gap-4 border p-3 rounded-md w-full"
-                    key={`${business.id}-${offset}`}
-                  >
-                    <div className="flex flex-col justify-center w-full gap-2">
-                      <div className="flex items-center gap-2">
-                        <Link
-                          href={`/${business.username}?user=${business.id}`}
-                          className="grid gap-0.5 text-sm"
-                        >
-                          <span className="font-medium">
-                            {business.businessName}
-                          </span>
-                          <span className="text-muted-foreground">
-                            @{business.username}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {business.businessType}
-                            {business.distance_km &&
-                              ` • ${business.distance_km}km away`}
-                            {` • ${business.business_plan} plan`}
-                          </span>
-                          {business.recommendation_type && (
-                            <span className="text-xs text-muted-foreground capitalize">
-                              {business.recommendation_type} recommendation
-                            </span>
-                          )}
-                        </Link>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className={`${
-                          following.has(business.id)
-                            ? "bg-red-500 text-primary-foreground hover:bg-red-400 hover:text-white"
-                            : ""
-                        }`}
-                        onClick={() =>
-                          following.has(business.id)
-                            ? handleUnfollow(business.id)
-                            : handleFollow(business.id)
-                        }
-                      >
-                        {following.has(business.id) ? "Unfollow" : "Follow"}
-                      </Button>
-                    </div>
+                {businesses.length === 0 && !loading ? (
+                  <div className="text-center p-4">
+                    {recommendationType === "location" ? (
+                      <p className="text-muted-foreground text-sm">
+                        No nearby businesses found. Try enabling location access
+                        or switch to Activity Based recommendations.
+                      </p>
+                    ) : (
+                      <p className="text-muted-foreground text-sm">
+                        No businesses with recent activity found. Try switching
+                        to Location Based recommendations.
+                      </p>
+                    )}
                   </div>
-                ))}
+                ) : (
+                  businesses.map((business) => (
+                    <div
+                      className="flex items-center justify-between gap-4 border p-3 rounded-md w-full"
+                      key={`${business.id}-${offset}`}
+                    >
+                      <div className="flex flex-col justify-center w-full gap-2">
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/${business.username}?user=${business.id}`}
+                            className="grid gap-0.5 text-sm"
+                          >
+                            <span className="font-medium">
+                              {business.businessName}
+                            </span>
+                            <span className="text-muted-foreground">
+                              @{business.username}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {business.businessType}
+                              {business.distance_km && (
+                                <span
+                                  className={`${
+                                    business.distance_km > 4
+                                      ? "text-amber-600"
+                                      : "text-emerald-600"
+                                  }`}
+                                >
+                                  {` • ${business.distance_km}km away`}
+                                </span>
+                              )}
+                              {business.business_plan && (
+                                <span
+                                  className={`${
+                                    business.business_plan === "premium"
+                                      ? "text-amber-600"
+                                      : business.business_plan === "standard"
+                                      ? "text-blue-600"
+                                      : ""
+                                  }`}
+                                >
+                                  {` • ${
+                                    business.business_plan
+                                      .charAt(0)
+                                      .toUpperCase() +
+                                    business.business_plan.slice(1)
+                                  } plan`}
+                                </span>
+                              )}
+                            </span>
+                            {business.recommendation_type && (
+                              <span className="text-xs text-muted-foreground capitalize">
+                                {getRecommendationTypeLabel(
+                                  business.recommendation_type
+                                )}
+                                {recommendationType === "location"
+                                  ? " • Within range"
+                                  : business.has_activity
+                                  ? " • Active business"
+                                  : ""}
+                              </span>
+                            )}
+                          </Link>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className={`${
+                            following.has(business.id)
+                              ? "bg-red-500 text-primary-foreground hover:bg-red-400 hover:text-white"
+                              : ""
+                          }`}
+                          onClick={() =>
+                            following.has(business.id)
+                              ? handleUnfollow(business.id)
+                              : handleFollow(business.id)
+                          }
+                        >
+                          {following.has(business.id) ? "Unfollow" : "Follow"}
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
               {hasMore && (
                 <Button

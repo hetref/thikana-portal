@@ -21,6 +21,8 @@ import toast from "react-hot-toast";
 import ImageUpload from "./ImageUpload";
 import { storage } from "@/lib/firebase";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
+import { Plus, X, Edit2, Check } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 const basicInfoSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -32,6 +34,7 @@ const basicInfoSchema = z.object({
   location: z.string().min(2, "Location must be at least 2 characters"),
   bio: z.string().max(500, "Bio must not exceed 500 characters"),
   website: z.string().url("Invalid URL").optional().or(z.literal("")),
+  about: z.string().min(10, "About must be at least 10 characters"),
 });
 
 export default function BasicInfoForm() {
@@ -44,6 +47,13 @@ export default function BasicInfoForm() {
     coverImg: 0,
   });
   const [uploadingType, setUploadingType] = useState(null);
+  const [businessTags, setBusinessTags] = useState([]);
+  const [isGeneratingTags, setIsGeneratingTags] = useState(false);
+  const [editingTagIndex, setEditingTagIndex] = useState(-1);
+  const [editingTagValue, setEditingTagValue] = useState("");
+  const [isAddingCustomTag, setIsAddingCustomTag] = useState(false);
+  const [customTagValue, setCustomTagValue] = useState("");
+
   const user = auth.currentUser;
   const form = useForm({
     resolver: zodResolver(basicInfoSchema),
@@ -55,6 +65,7 @@ export default function BasicInfoForm() {
       location: "",
       bio: "",
       website: "",
+      about: "",
     },
   });
 
@@ -70,6 +81,7 @@ export default function BasicInfoForm() {
         if (userDocSnap.exists()) {
           const userData = userDocSnap.data();
           form.reset(userData);
+          setBusinessTags(userData.businessTags || []);
         }
       } catch (error) {
         console.error("Error fetching user data:", error);
@@ -81,9 +93,78 @@ export default function BasicInfoForm() {
     fetchUserData();
   }, [user, form]);
 
+  const formatTag = (tag) => {
+    return tag
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "");
+  };
+
+  const handleGenerateTags = async () => {
+    const about = form.getValues("about");
+    if (!about) {
+      toast.error("Please fill in the about section first");
+      return;
+    }
+
+    setIsGeneratingTags(true);
+    try {
+      const response = await fetch("/api/generate-ai-tags", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ description: about }),
+      });
+
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      setBusinessTags(data.tags);
+      toast.success("Tags generated successfully!");
+    } catch (error) {
+      console.error("Error generating tags:", error);
+      toast.error("Failed to generate tags");
+    } finally {
+      setIsGeneratingTags(false);
+    }
+  };
+
+  const handleDeleteTag = (index) => {
+    setBusinessTags((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleEditTag = (index) => {
+    setEditingTagIndex(index);
+    setEditingTagValue(businessTags[index]);
+  };
+
+  const handleSaveEdit = (index) => {
+    const formattedTag = formatTag(editingTagValue);
+    if (formattedTag) {
+      setBusinessTags((prev) =>
+        prev.map((tag, i) => (i === index ? formattedTag : tag))
+      );
+    }
+    setEditingTagIndex(-1);
+    setEditingTagValue("");
+  };
+
+  const handleAddCustomTag = () => {
+    const formattedTag = formatTag(customTagValue);
+    if (formattedTag) {
+      setBusinessTags((prev) => [...prev, formattedTag]);
+      setCustomTagValue("");
+      setIsAddingCustomTag(false);
+    }
+  };
+
   async function updateProfile(userData) {
     const userRef = doc(db, "users", user.uid);
-    await setDoc(userRef, userData, { merge: true });
+    await setDoc(userRef, { ...userData, businessTags }, { merge: true });
   }
 
   async function uploadImage(file, type) {
@@ -309,6 +390,133 @@ export default function BasicInfoForm() {
             </FormItem>
           )}
         />
+        <FormField
+          control={form.control}
+          name="about"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>About Your Business</FormLabel>
+              <FormControl>
+                <div className="space-y-2">
+                  <Textarea
+                    placeholder="Tell us about your business in detail..."
+                    {...field}
+                    disabled={isSubmitting}
+                    className="min-h-[100px]"
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleGenerateTags}
+                    disabled={isGeneratingTags || !field.value}
+                    variant="secondary"
+                  >
+                    {isGeneratingTags ? "Generating..." : "Generate Tags"}
+                  </Button>
+                </div>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Tags Section */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <FormLabel>Business Tags</FormLabel>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsAddingCustomTag(true)}
+              className="h-8"
+            >
+              <Plus className="h-4 w-4" />
+              Add Custom Tag
+            </Button>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {businessTags.map((tag, index) => (
+              <Badge
+                key={index}
+                variant="secondary"
+                className="flex items-center gap-1 px-2 py-1"
+              >
+                {editingTagIndex === index ? (
+                  <div className="flex items-center gap-1">
+                    <Input
+                      value={editingTagValue}
+                      onChange={(e) => setEditingTagValue(e.target.value)}
+                      className="h-6 w-24 text-xs"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleSaveEdit(index)}
+                      className="h-6 w-6 p-0"
+                    >
+                      <Check className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <span>{tag}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEditTag(index)}
+                      className="h-4 w-4 p-0"
+                    >
+                      <Edit2 className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteTag(index)}
+                      className="h-4 w-4 p-0"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </>
+                )}
+              </Badge>
+            ))}
+
+            {isAddingCustomTag && (
+              <div className="flex items-center gap-2">
+                <Input
+                  value={customTagValue}
+                  onChange={(e) => setCustomTagValue(e.target.value)}
+                  placeholder="Enter custom tag"
+                  className="h-8"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleAddCustomTag}
+                  disabled={!customTagValue.trim()}
+                >
+                  Add
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setIsAddingCustomTag(false);
+                    setCustomTagValue("");
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? "Saving..." : "Save Changes"}
         </Button>

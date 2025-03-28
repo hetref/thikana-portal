@@ -26,6 +26,7 @@ import {
   Globe,
   Heart,
   MessageCircle,
+  Bookmark,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import WhoToFollow from "@/components/WhoToFollow";
@@ -55,6 +56,8 @@ export default function Profile() {
   const { posts, loading, fetchMorePosts, hasMore, error } =
     useGetUserPosts(userId);
   const [showLocationIFrame, setShowLocationIFrame] = useState(false);
+  const [savedPosts, setSavedPosts] = useState([]);
+  const [loadingSavedPosts, setLoadingSavedPosts] = useState(false);
   console.log("USERDATA", userData);
 
   useEffect(() => {
@@ -189,6 +192,69 @@ export default function Profile() {
         });
     }
   };
+
+  // Add new useEffect for fetching saved posts
+  useEffect(() => {
+    const fetchSavedPosts = async () => {
+      if (!user?.uid) {
+        console.log("No user ID available");
+        return;
+      }
+
+      setLoadingSavedPosts(true);
+      try {
+        console.log("Fetching saved posts for user:", user.uid);
+        const savedPostsRef = collection(db, "users", user.uid, "savedPosts");
+        const unsubscribe = onSnapshot(
+          savedPostsRef,
+          async (snapshot) => {
+            console.log("Saved posts snapshot size:", snapshot.size);
+            const savedPostsData = await Promise.all(
+              snapshot.docs.map(async (savedPostDoc) => {
+                const postData = savedPostDoc.data();
+                console.log("Saved post data:", postData);
+                console.log("Post Author Name :", postData.authorName);
+                const postRef = doc(db, "posts", postData.postId);
+                const postDoc = await getDoc(postRef);
+                if (postDoc.exists()) {
+                  return {
+                    ...postDoc.data(),
+                    id: postDoc.id,
+                    savedAt: postData.timestamp,
+                    authorName: postData.authorName,
+                    authorProfileImage: postData.authorProfileImage,
+                    authorUsername: postData.authorUsername,
+                  };
+                }
+                console.log("Post not found:", postData.postId);
+                return null;
+              })
+            );
+
+            // Filter out any null values and sort by savedAt timestamp
+            const validPosts = savedPostsData
+              .filter((post) => post !== null)
+              .sort((a, b) => b.savedAt?.toMillis() - a.savedAt?.toMillis());
+
+            console.log("Valid saved posts:", validPosts);
+            setSavedPosts(validPosts);
+          },
+          (error) => {
+            console.error("Error in saved posts snapshot:", error);
+          }
+        );
+
+        return () => unsubscribe();
+      } catch (error) {
+        console.error("Error fetching saved posts:", error);
+        toast.error("Failed to load saved posts");
+      } finally {
+        setLoadingSavedPosts(false);
+      }
+    };
+
+    fetchSavedPosts();
+  }, [user?.uid]);
 
   return (
     <div className="flex items-center justify-center w-full">
@@ -450,127 +516,232 @@ export default function Profile() {
                 </Button>
               </div>
             )}
-            {userEmailStatus() === true && userData?.role === "business" && (
+            {userEmailStatus() === true && (
               <Tabs defaultValue="posts" className="w-full">
                 <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent overflow-x-auto whitespace-nowrap sm:text-sm">
+                  {userData?.role === "business" && (
+                    <>
+                      <TabsTrigger
+                        value="posts"
+                        className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 font-semibold text-sm sm:text-sm"
+                      >
+                        <FileTextIcon className="w-5 h-5" />
+                        Posts
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="likes"
+                        className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 font-semibold text-sm sm:text-sm"
+                      >
+                        <HeartIcon className="w-5 h-5" />
+                        Likes
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="photos"
+                        className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 font-semibold text-sm sm:text-sm"
+                      >
+                        <Images className="w-5 h-5" />
+                        Photos
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="products"
+                        className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 font-semibold text-sm sm:text-sm"
+                      >
+                        <SquareChartGantt className="w-5 h-5" />
+                        Products
+                      </TabsTrigger>
+                    </>
+                  )}
                   <TabsTrigger
-                    value="posts"
+                    value="saved"
                     className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 font-semibold text-sm sm:text-sm"
                   >
-                    <FileTextIcon className="w-5 h-5" />
-                    Posts
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="likes"
-                    className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 font-semibold text-sm sm:text-sm"
-                  >
-                    <HeartIcon className="w-5 h-5" />
-                    Likes
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="photos"
-                    className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 font-semibold text-sm sm:text-sm"
-                  >
-                    <Images className="w-5 h-5" />
-                    Photos
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="products"
-                    className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 font-semibold text-sm sm:text-sm"
-                  >
-                    <SquareChartGantt className="w-5 h-5" />
-                    Products
+                    <Bookmark className="w-5 h-5" />
+                    Saved
                   </TabsTrigger>
                 </TabsList>
-                <TabsContent value="posts" className="p-6">
-                  {renderPosts()}
-                </TabsContent>
-                <TabsContent value="likes" className="p-6">
-                  <div className="space-y-4">
-                    {likedPosts.length === 0 && (
-                      <div className="text-center">
-                        <p className="text-muted-foreground">
-                          No liked posts yet
-                        </p>
+
+                {userData?.role === "business" && (
+                  <>
+                    <TabsContent value="posts" className="p-6">
+                      {renderPosts()}
+                    </TabsContent>
+                    <TabsContent value="likes" className="p-6">
+                      <div className="space-y-4">
+                        {likedPosts.length === 0 && (
+                          <div className="text-center">
+                            <p className="text-muted-foreground">
+                              No liked posts yet
+                            </p>
+                          </div>
+                        )}
+                        {likedPosts.map((post, index) => (
+                          <Card key={index} className="p-4">
+                            <ProfilePosts post={post} userData={userData} />
+                          </Card>
+                        ))}
                       </div>
-                    )}
-                    {likedPosts.map((post, index) => (
-                      <Card key={index} className="p-4">
-                        <ProfilePosts post={post} userData={userData} />
-                      </Card>
-                    ))}
-                  </div>
-                </TabsContent>
-                <TabsContent value="photos" className="p-6">
-                  {userData?.photos && userData.photos.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-4">
-                      {userData.photos.map((photo, index) => (
-                        <Dialog key={index}>
-                          {/* Trigger for the Dialog */}
-                          <DialogTrigger asChild>
-                            <div>
-                              <Image
-                                width={1000}
-                                height={1000}
-                                src={photo.photoUrl}
-                                alt={photo.title}
-                                className="w-full h-auto rounded-lg rounded-b-none"
-                              />
-                              <div className="bg-black bg-opacity-90 border-t-2 border-white text-white p-2 rounded-b-lg">
-                                <p>{photo.title}</p>
-                                <p>
+                    </TabsContent>
+                    <TabsContent value="photos" className="p-6">
+                      {userData?.photos && userData.photos.length > 0 ? (
+                        <div className="grid grid-cols-2 gap-4">
+                          {userData.photos.map((photo, index) => (
+                            <Dialog key={index}>
+                              <DialogTrigger asChild>
+                                <div>
+                                  <Image
+                                    width={1000}
+                                    height={1000}
+                                    src={photo.photoUrl}
+                                    alt={photo.title}
+                                    className="w-full h-auto rounded-lg rounded-b-none"
+                                  />
+                                  <div className="bg-black bg-opacity-90 border-t-2 border-white text-white p-2 rounded-b-lg">
+                                    <p>{photo.title}</p>
+                                    <p>
+                                      {new Date(
+                                        photo.addedOn
+                                      ).toLocaleDateString()}
+                                    </p>
+                                  </div>
+                                </div>
+                              </DialogTrigger>
+                              <DialogContent className="w-full max-w-3xl p-4 flex flex-col gap-2 justify-center items-center">
+                                <DialogTitle>{photo.title}</DialogTitle>
+                                <DialogDescription>
                                   {new Date(photo.addedOn).toLocaleDateString()}
-                                </p>
-                              </div>
-                            </div>
-                          </DialogTrigger>
-                          {/* Dialog Content */}
-                          <DialogContent className="w-full max-w-3xl p-4 flex flex-col gap-2 justify-center items-center">
-                            <DialogTitle>{photo.title}</DialogTitle>
-                            <DialogDescription>
-                              {new Date(photo.addedOn).toLocaleDateString()}
-                            </DialogDescription>
-                            <Image
-                              width={1000}
-                              height={1000}
-                              src={photo.photoUrl}
-                              alt="Full View"
-                              className="max-w-full rounded-lg max-h-[80svh] max-w-[80vw]]"
-                            />
-                          </DialogContent>
-                        </Dialog>
-                      ))}
+                                </DialogDescription>
+                                <Image
+                                  width={1000}
+                                  height={1000}
+                                  src={photo.photoUrl}
+                                  alt="Full View"
+                                  className="max-w-full rounded-lg max-h-[80svh] max-w-[80vw]]"
+                                />
+                              </DialogContent>
+                            </Dialog>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center">
+                          <p className="text-muted-foreground">
+                            No Photos Added Yet
+                          </p>
+                          <Button
+                            className="mt-2"
+                            onClick={() => {
+                              /* Add photo logic */
+                            }}
+                          >
+                            Add Photo
+                          </Button>
+                        </div>
+                      )}
+                    </TabsContent>
+                    <TabsContent value="products" className="p-6">
+                      {userData && user && (
+                        <ShowProductsTabContent
+                          userId={userId}
+                          userData={userData}
+                        />
+                      )}
+                    </TabsContent>
+                  </>
+                )}
+
+                <TabsContent value="saved" className="p-6">
+                  {loadingSavedPosts ? (
+                    <div className="flex justify-center py-8">
+                      <Loader2Icon className="w-6 h-6 animate-spin" />
+                    </div>
+                  ) : savedPosts.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No saved posts yet
                     </div>
                   ) : (
-                    <div className="text-center">
-                      <p className="text-muted-foreground">
-                        No Photos Added Yet
-                      </p>
-                      <Button
-                        className="mt-2"
-                        onClick={() => {
-                          /* Add photo logic */
-                        }}
-                      >
-                        Add Photo
-                      </Button>
+                    <div className="space-y-4">
+                      {savedPosts.map((post) => (
+                        <Card
+                          key={post.id}
+                          className="cursor-pointer hover:shadow-md transition-shadow"
+                        >
+                          <CardContent className="pt-6">
+                            <div className="flex flex-col gap-4">
+                              {/* Post Header */}
+                              <div className="flex justify-between items-start">
+                                <div className="flex gap-3">
+                                  <Avatar className="h-10 w-10">
+                                    <AvatarImage
+                                      src={
+                                        post.authorProfileImage || "/avatar.png"
+                                      }
+                                      alt={post.authorName || "User"}
+                                    />
+                                  </Avatar>
+                                  <div>
+                                    <p className="font-semibold">
+                                      {post.authorName || "Anonymous"}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                      @{post.authorUsername || "user"}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Post Content */}
+                              <div className="space-y-4">
+                                <p>
+                                  {post.caption ||
+                                    post.content ||
+                                    post.description}
+                                </p>
+                                {post.mediaUrl && (
+                                  <div className="relative rounded-lg overflow-hidden bg-muted">
+                                    <div className="relative aspect-[16/9]">
+                                      <img
+                                        src={post.mediaUrl}
+                                        alt="Post content"
+                                        className="object-cover w-full h-full"
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Post Actions */}
+                              <div className="flex items-center justify-between mt-4">
+                                <div className="flex gap-4">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="flex gap-2"
+                                  >
+                                    <Heart className="h-5 w-5" />
+                                    <span>{post.likes || 0}</span>
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="flex gap-2"
+                                    onClick={() =>
+                                      router.push(`/feed/${post.id}`)
+                                    }
+                                  >
+                                    <MessageCircle className="h-5 w-5" />
+                                    <span>{post.commentsCount || 0}</span>
+                                  </Button>
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                  {new Date(
+                                    post.savedAt?.toDate()
+                                  ).toLocaleDateString()}
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
                     </div>
-                  )}
-                </TabsContent>
-                <TabsContent value="products" className="p-6">
-                  {/* <div className="space-y-4">
-                  {likedPosts.map((post, index) => (
-                    <Card key={index} className="p-4">
-                      <ProfilePosts post={post} userData={userData} />
-                    </Card>
-                  ))}
-                </div> */}
-                  {/* TODO: Add the cart functionality */}
-                  {userData && user && (
-                    <ShowProductsTabContent
-                      userId={userId}
-                      userData={userData}
-                    />
                   )}
                 </TabsContent>
               </Tabs>
