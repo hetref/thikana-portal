@@ -1,3 +1,3 @@
 export default function NotificationsLayout({ children }) {
-  return children
-} 
+  return children;
+}

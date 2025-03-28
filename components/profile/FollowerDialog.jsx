@@ -167,6 +167,7 @@ const FollowerDialog = ({ followerCount, userId, className }) => {
   const [error, setError] = useState(null);
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const currentUser = auth.currentUser;
 
   useEffect(() => {
     const fetchFollowers = async () => {
@@ -315,7 +316,11 @@ const FollowerDialog = ({ followerCount, userId, className }) => {
                   className="flex items-center justify-between p-3 rounded-lg border border-border/60 bg-background hover:bg-accent/5 transition-colors"
                 >
                   <Link
-                    href={`/${follower?.username}?user=${follower?.uid}`}
+                    href={
+                      currentUser && follower?.uid === currentUser.uid
+                        ? "/profile"
+                        : `/${follower?.username}?user=${follower?.uid}`
+                    }
                     className="flex items-center gap-3 flex-1"
                   >
                     <Avatar className="h-10 w-10 border border-border/50">

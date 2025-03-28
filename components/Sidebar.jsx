@@ -21,6 +21,8 @@ import { useIsBusinessUser } from "@/lib/business-user";
 import toast from "react-hot-toast";
 import { userEmailStatus } from "@/utils/userStatus";
 import { getUnreadNotificationCount } from "@/lib/notifications";
+import FollowingDialog from "@/components/profile/FollowingDialog";
+import FollowerDialog from "@/components/profile/FollowerDialog";
 
 // Guest sidebar component when user is not logged in
 function DefaultSidebar() {
@@ -174,7 +176,7 @@ export default function Sidebar() {
         <CardContent className="p-6">
           <div className="flex flex-col items-center text-center">
             <Link href="/profile" className="group">
-              <div className="relative">
+              <div className="relative flex items-center justify-center">
                 <Avatar className="w-20 h-20 border-2 border-primary/20 transition-transform group-hover:scale-105">
                   <AvatarImage
                     src={user.profilePic || ""}
@@ -210,24 +212,18 @@ export default function Sidebar() {
             <div className="w-full mt-4">
               <Separator className="my-3" />
               <div className="grid grid-cols-2 gap-6 py-2">
-                <div className="flex flex-col items-center">
-                  <span className="font-semibold text-lg">
-                    {followingCount || "0"}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    Following
-                  </span>
-                </div>
+                <FollowingDialog
+                  followingCount={followingCount}
+                  userId={userId}
+                  className="flex flex-col items-center hover:text-primary transition-colors cursor-pointer"
+                />
 
                 {isBusinessUser && (
-                  <div className="flex flex-col items-center">
-                    <span className="font-semibold text-lg">
-                      {followersCount || "0"}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      Followers
-                    </span>
-                  </div>
+                  <FollowerDialog
+                    followerCount={followersCount}
+                    userId={userId}
+                    className="flex flex-col items-center hover:text-primary transition-colors cursor-pointer"
+                  />
                 )}
               </div>
               <Separator className="my-3" />
@@ -292,7 +288,7 @@ export default function Sidebar() {
             )}
 
             <div className="w-full mt-4">
-              <Link href="/profile/edit">
+              <Link href="/profile/settings">
                 <Button variant="outline" size="sm" className="w-full">
                   Edit Profile
                 </Button>
