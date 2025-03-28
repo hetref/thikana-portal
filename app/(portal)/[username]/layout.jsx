@@ -20,17 +20,6 @@ const UsernameLayout = ({ children }) => {
     const fetchUserByUsername = async () => {
       try {
         setLoading(true);
-        // Query to find a user by username
-        // const usersRef = doc(db, "usernames", username);
-        // const usernameDoc = await getDoc(usersRef);
-
-        // if (!usernameDoc.exists()) {
-        //   setNotFound(true);
-        //   setLoading(false);
-        //   return;
-        // }
-
-        // const userId = usernameDoc.data().uid;
 
         // Get the actual user document
         const userDoc = await getDoc(doc(db, "users", userId));
@@ -77,7 +66,7 @@ const UsernameLayout = ({ children }) => {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col lg:flex-row gap-6">
+          <div className="flex flex-col lg:flex-row gap-6 px-2 md:px-4">
             <aside className="hidden lg:block lg:w-80">
               <div className="sticky top-20">
                 <Sidebar />
@@ -110,7 +99,7 @@ const UsernameLayout = ({ children }) => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col lg:flex-row gap-6">
+        <div className="flex flex-col lg:flex-row gap-6 px-2 md:px-4">
           <aside className="hidden lg:block lg:w-80">
             <div className="sticky top-20">
               <Sidebar />

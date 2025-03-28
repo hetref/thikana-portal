@@ -51,6 +51,18 @@ import FollowingDialog from "@/components/profile/FollowingDialog";
 import FollowerDialog from "@/components/profile/FollowerDialog";
 import ShareBusinessDialog from "@/components/profile/ShareBusinessDialog";
 import toast from "react-hot-toast";
+import { cn } from "@/lib/utils";
+
+// Add a style element to hide scrollbars
+const scrollbarHideStyles = `
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+`;
 
 export default function UserProfile() {
   const router = useRouter();
@@ -160,6 +172,7 @@ export default function UserProfile() {
           id: doc.id,
           ...doc.data(),
         }));
+        console.log("PHOTOS", photos);
         setUserPhotos(photos);
         setLoadingPhotos(false);
       },
@@ -278,17 +291,23 @@ export default function UserProfile() {
 
   return (
     <div className="space-y-6 py-6">
+      {/* Add style element for custom CSS */}
+      <style jsx global>
+        {scrollbarHideStyles}
+      </style>
+
       {/* Profile Card */}
       <Card className="overflow-hidden bg-white border-0 shadow-sm">
         {/* Cover Image */}
-        <div className="relative h-48 sm:h-64 md:h-72 bg-gradient-to-r from-blue-50 to-indigo-50">
+        <div className="relative h-full w-full">
           <Dialog>
-            <DialogTrigger className="w-full h-full">
+            <DialogTrigger className="z-30 w-full h-full">
               <Image
                 src={userData?.coverPic || "/coverimg.png"}
-                fill
+                width={1000}
+                height={1000}
                 alt="Cover Image"
-                className="object-cover transition-opacity hover:opacity-95"
+                className=" z-30 object-cover transition-opacity hover:opacity-95 border border-black/40 rounded-t-xl"
                 priority
               />
             </DialogTrigger>
@@ -311,7 +330,7 @@ export default function UserProfile() {
           {/* Profile picture positioned over cover image */}
           <Dialog>
             <DialogTrigger className="absolute bottom-0 left-8 transform translate-y-1/2">
-              <Avatar className="w-24 h-24 border-4 border-white shadow-md hover:shadow-lg transition-all cursor-pointer">
+              <Avatar className="z-50 w-24 h-24 border-4 border-white shadow-md hover:shadow-lg transition-all cursor-pointer">
                 <AvatarImage
                   src={userData?.profilePic || "/avatar.png"}
                   alt={userData?.name}
@@ -486,24 +505,36 @@ export default function UserProfile() {
       <Card className="border-0 shadow-sm overflow-hidden bg-white">
         <Tabs defaultValue="posts" className="w-full">
           <div className="border-b">
-            <TabsList className="justify-start h-auto p-0 bg-transparent overflow-x-auto whitespace-nowrap">
+            <TabsList className="justify-start h-auto p-0 bg-transparent overflow-x-auto scrollbar-hide whitespace-nowrap">
               <TabsTrigger
                 value="posts"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 py-3 font-medium text-sm"
+                className={cn(
+                  "rounded-none border-b-2 border-transparent",
+                  "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
+                  "px-6 py-3 font-medium text-sm transition-all duration-200"
+                )}
               >
                 <FileTextIcon className="w-4 h-4 mr-2" />
                 Posts
               </TabsTrigger>
               <TabsTrigger
                 value="photos"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 py-3 font-medium text-sm"
+                className={cn(
+                  "rounded-none border-b-2 border-transparent",
+                  "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
+                  "px-6 py-3 font-medium text-sm transition-all duration-200"
+                )}
               >
                 <Images className="w-4 h-4 mr-2" />
                 Photos
               </TabsTrigger>
               <TabsTrigger
                 value="products"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 py-3 font-medium text-sm"
+                className={cn(
+                  "rounded-none border-b-2 border-transparent",
+                  "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
+                  "px-6 py-3 font-medium text-sm transition-all duration-200"
+                )}
               >
                 <SquareChartGantt className="w-4 h-4 mr-2" />
                 Products
@@ -511,27 +542,34 @@ export default function UserProfile() {
             </TabsList>
           </div>
 
-          <TabsContent value="posts" className="p-6 focus:outline-none">
+          <TabsContent
+            value="posts"
+            className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+          >
             {renderPosts()}
           </TabsContent>
 
-          <TabsContent value="photos" className="p-6 focus:outline-none">
+          <TabsContent
+            value="photos"
+            className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+          >
             {loadingPhotos ? (
               <div className="flex justify-center py-10">
                 <Loader2Icon className="w-8 h-8 animate-spin text-gray-400" />
               </div>
             ) : userPhotos.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                {userPhotos.map((photo) => (
+              <div className="grid grid-cols-2 gap-4">
+                {userPhotos?.map((photo) => (
                   <Dialog key={photo.id}>
                     <DialogTrigger asChild>
-                      <div className="rounded-lg overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer group">
-                        <div className="aspect-square relative">
+                      <div className="rounded-lg overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer group">
+                        <div className="relative">
                           <Image
                             src={photo.photoUrl}
                             alt={photo.caption || "Business photo"}
-                            fill
-                            className="object-cover group-hover:scale-105 transition-transform duration-300"
+                            width={500}
+                            height={350}
+                            className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-300"
                           />
                         </div>
                         {photo.caption && (
@@ -541,9 +579,7 @@ export default function UserProfile() {
                             </p>
                             <p className="text-xs text-gray-500">
                               {photo.timestamp
-                                ? new Date(
-                                    photo.timestamp.toDate()
-                                  ).toLocaleDateString()
+                                ? new Date(photo.timestamp).toLocaleDateString()
                                 : ""}
                             </p>
                           </div>
@@ -557,9 +593,7 @@ export default function UserProfile() {
                         </DialogTitle>
                         <DialogDescription>
                           {photo.timestamp
-                            ? new Date(
-                                photo.timestamp.toDate()
-                              ).toLocaleDateString()
+                            ? new Date(photo.timestamp).toLocaleDateString()
                             : ""}
                         </DialogDescription>
                       </DialogHeader>
@@ -584,12 +618,16 @@ export default function UserProfile() {
             )}
           </TabsContent>
 
-          <TabsContent value="products" className="p-6 focus:outline-none">
+          <TabsContent
+            value="products"
+            className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+          >
             {userData && (
               <ShowProductsTabContent
                 userId={userId}
                 userData={userData}
                 isViewOnly={true}
+                currentUserView={false}
               />
             )}
           </TabsContent>

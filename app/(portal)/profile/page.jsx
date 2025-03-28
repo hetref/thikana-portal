@@ -61,6 +61,18 @@ import FollowerDialog from "@/components/profile/FollowerDialog";
 import PhotosGrid from "@/components/PhotosGrid";
 import AddPhotoModal from "@/components/AddPhotoModal";
 import ShareBusinessDialog from "@/components/profile/ShareBusinessDialog";
+import { cn } from "@/lib/utils";
+
+// Add a style element to hide scrollbars
+const scrollbarHideStyles = `
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+`;
 
 export default function Profile() {
   const router = useRouter();
@@ -265,6 +277,11 @@ export default function Profile() {
 
   return (
     <div className="min-h-screen">
+      {/* Add style element for custom CSS */}
+      <style jsx global>
+        {scrollbarHideStyles}
+      </style>
+
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Main content */}
@@ -474,31 +491,47 @@ export default function Profile() {
               <Card className="border-0 shadow-sm overflow-hidden bg-white">
                 <Tabs defaultValue="posts" className="w-full">
                   <div className="border-b">
-                    <TabsList className="justify-start h-auto p-0 bg-transparent overflow-x-auto whitespace-nowrap">
+                    <TabsList className="justify-start h-auto p-0 bg-transparent overflow-x-auto scrollbar-hide whitespace-nowrap">
                       <TabsTrigger
                         value="posts"
-                        className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 py-3 font-medium text-sm"
+                        className={cn(
+                          "rounded-none border-b-2 border-transparent",
+                          "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
+                          "px-6 py-3 font-medium text-sm transition-all duration-200"
+                        )}
                       >
                         <FileTextIcon className="w-4 h-4 mr-2" />
                         Posts
                       </TabsTrigger>
                       <TabsTrigger
                         value="likes"
-                        className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 py-3 font-medium text-sm"
+                        className={cn(
+                          "rounded-none border-b-2 border-transparent",
+                          "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
+                          "px-6 py-3 font-medium text-sm transition-all duration-200"
+                        )}
                       >
                         <HeartIcon className="w-4 h-4 mr-2" />
                         Likes
                       </TabsTrigger>
                       <TabsTrigger
                         value="photos"
-                        className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 py-3 font-medium text-sm"
+                        className={cn(
+                          "rounded-none border-b-2 border-transparent",
+                          "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
+                          "px-6 py-3 font-medium text-sm transition-all duration-200"
+                        )}
                       >
                         <Images className="w-4 h-4 mr-2" />
                         Photos
                       </TabsTrigger>
                       <TabsTrigger
                         value="products"
-                        className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 py-3 font-medium text-sm"
+                        className={cn(
+                          "rounded-none border-b-2 border-transparent",
+                          "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
+                          "px-6 py-3 font-medium text-sm transition-all duration-200"
+                        )}
                       >
                         <SquareChartGantt className="w-4 h-4 mr-2" />
                         Products
@@ -506,15 +539,21 @@ export default function Profile() {
                     </TabsList>
                   </div>
 
-                  <TabsContent value="posts" className="p-6 focus:outline-none">
+                  <TabsContent
+                    value="posts"
+                    className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                  >
                     {renderPosts()}
                   </TabsContent>
 
-                  <TabsContent value="likes" className="p-6 focus:outline-none">
+                  <TabsContent
+                    value="likes"
+                    className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                  >
                     <div className="space-y-4">
                       {likedPosts.length === 0 ? (
-                        <div className="text-center py-10">
-                          <Heart className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+                        <div className="text-center py-12">
+                          <Heart className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
                           <p className="text-muted-foreground">
                             No liked posts yet
                           </p>
@@ -523,9 +562,11 @@ export default function Profile() {
                         likedPosts.map((post, index) => (
                           <Card
                             key={index}
-                            className="p-4 hover:shadow-md transition-shadow border border-gray-100"
+                            className="cursor-pointer hover:shadow-md transition-shadow border border-gray-100"
                           >
-                            <ProfilePosts post={post} userData={userData} />
+                            <CardContent className="pt-6">
+                              <ProfilePosts post={post} userData={userData} />
+                            </CardContent>
                           </Card>
                         ))
                       )}
@@ -534,7 +575,7 @@ export default function Profile() {
 
                   <TabsContent
                     value="photos"
-                    className="p-6 focus:outline-none"
+                    className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
                   >
                     {userData && (
                       <>
@@ -567,12 +608,13 @@ export default function Profile() {
 
                   <TabsContent
                     value="products"
-                    className="p-6 focus:outline-none"
+                    className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
                   >
                     {userData && user && (
                       <ShowProductsTabContent
                         userId={userId}
                         userData={userData}
+                        currentUserView={true}
                       />
                     )}
                   </TabsContent>
