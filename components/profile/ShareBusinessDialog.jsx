@@ -28,7 +28,7 @@ const ShareBusinessDialog = ({ userData }) => {
   const qrRef = useRef(null);
   const profileUrl =
     typeof window !== "undefined"
-      ? `${window.location.origin}/business/${userData?.username || userData?.uid}`
+      ? `${window.location.origin}/${userData?.username}?user=${userData?.uid}`
       : "";
 
   const handleCopyLink = () => {
