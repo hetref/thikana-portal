@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "./ui/card";
 import { Avatar, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
-import { Heart, MessageCircle, MapPin, Send } from "lucide-react";
+import { Heart, MessageCircle, MapPin, Send, Bookmark } from "lucide-react";
 import { Input } from "./ui/input";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
@@ -15,6 +15,7 @@ import {
   serverTimestamp,
   arrayUnion,
   onSnapshot,
+  deleteDoc,
 } from "firebase/firestore";
 import toast from "react-hot-toast";
 
@@ -24,6 +25,8 @@ function PostCard({ post, onLike, onView, showDistance, distanceText }) {
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [commentsCount, setCommentsCount] = useState(post?.commentsCount || 0);
+  const [isSaved, setIsSaved] = useState(false);
+  const [isSaveProcessing, setIsSaveProcessing] = useState(false);
   const router = useRouter();
 
   const isLikedRef = useRef(post?.isLiked);
@@ -33,6 +36,29 @@ function PostCard({ post, onLike, onView, showDistance, distanceText }) {
     isLikedRef.current = post?.isLiked;
     likesCountRef.current = post?.likes;
   }, [post?.isLiked, post?.likes]);
+
+  // Check if post is saved when component mounts
+  useEffect(() => {
+    const checkIfSaved = async () => {
+      if (!auth.currentUser?.uid || !post?.postId) return;
+
+      try {
+        const savedPostRef = doc(
+          db,
+          "users",
+          auth.currentUser.uid,
+          "savedPosts",
+          post.postId
+        );
+        const savedPostDoc = await getDoc(savedPostRef);
+        setIsSaved(savedPostDoc.exists());
+      } catch (error) {
+        console.error("Error checking saved status:", error);
+      }
+    };
+
+    checkIfSaved();
+  }, [post?.postId]);
 
   // Set up realtime listener for comment count
   useEffect(() => {
@@ -61,6 +87,60 @@ function PostCard({ post, onLike, onView, showDistance, distanceText }) {
     } catch (error) {
       console.error("Error handling like:", error);
       setIsLikeProcessing(false);
+    }
+  };
+
+  const handleSave = async (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    if (isSaveProcessing || !auth.currentUser?.uid || !post?.postId) {
+      console.log("Save conditions not met:", {
+        isSaveProcessing,
+        userId: auth.currentUser?.uid,
+        postId: post?.postId,
+      });
+      return;
+    }
+
+    try {
+      setIsSaveProcessing(true);
+      const savedPostRef = doc(
+        db,
+        "users",
+        auth.currentUser.uid,
+        "savedPosts",
+        post.postId
+      );
+
+      if (isSaved) {
+        // Remove from saved posts
+        console.log("Removing post from saved:", post.postId);
+        await deleteDoc(savedPostRef);
+        setIsSaved(false);
+        toast.success("Post removed from saved items");
+      } else {
+        // Add to saved posts
+        console.log("Adding post to saved:", post.postId);
+        const savedPostData = {
+          timestamp: serverTimestamp(),
+          postId: post.postId,
+          authorName: post.authorName,
+          authorUsername: post.authorUsername,
+          authorProfileImage: post.authorProfileImage,
+          mediaUrl: post.mediaUrl,
+          caption: post.caption || post.content || post.description,
+        };
+        console.log("Saving post data:", savedPostData);
+        await setDoc(savedPostRef, savedPostData);
+        setIsSaved(true);
+        toast.success("Post saved successfully");
+      }
+    } catch (error) {
+      console.error("Error handling save:", error);
+      toast.error("Failed to update save status");
+    } finally {
+      setIsSaveProcessing(false);
     }
   };
 
@@ -226,6 +306,17 @@ function PostCard({ post, onLike, onView, showDistance, distanceText }) {
               </Button>
             </div>
           </div>
+
+          {/* Save Button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleSave}
+            disabled={isSaveProcessing}
+            className={`p-2 ${isSaved ? "text-blue-500" : ""}`}
+          >
+            <Bookmark className={`h-5 w-5 ${isSaved ? "fill-current" : ""}`} />
+          </Button>
         </div>
 
         {/* Comment Box */}

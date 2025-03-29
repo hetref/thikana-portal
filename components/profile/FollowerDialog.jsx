@@ -12,7 +12,17 @@ import { Button } from "@/components/ui/button";
 import { doc, setDoc, deleteDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import Link from "next/link";
-import { Minus, Plus } from "lucide-react";
+import {
+  Loader2,
+  Plus,
+  Search,
+  UserPlus,
+  UserX,
+  UserCheck,
+} from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import toast from "react-hot-toast";
 
 const FollowingDialog = ({ followingCount }) => {
@@ -151,29 +161,32 @@ const FollowingDialog = ({ followingCount }) => {
   );
 };
 
-const FollowerDialog = ({ followerCount, userId }) => {
+const FollowerDialog = ({ followerCount, userId, className }) => {
   const [followers, setFollowers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [open, setOpen] = useState(false);
-  // const userId = auth.currentUser?.uid;
+  const [searchQuery, setSearchQuery] = useState("");
+  const currentUser = auth.currentUser;
 
   useEffect(() => {
     const fetchFollowers = async () => {
       if (!userId) return;
       try {
-        console.log("FETCHING FOLLOWERS");
+        setLoading(true);
         const followersData = await getFollowers(userId);
         setFollowers(followersData);
-        console.log("Followers Data:", followersData);
       } catch (err) {
         setError(err);
+        toast.error("Could not load followers list");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchFollowers();
+    if (open) {
+      fetchFollowers();
+    }
   }, [userId, open]);
 
   const handleFollowToggle = async (followerId, isFollowing) => {
@@ -188,7 +201,7 @@ const FollowerDialog = ({ followerCount, userId }) => {
         await deleteDoc(
           doc(db, "users", auth.currentUser.uid, "following", followerId)
         );
-        toast.success("Unfollowed Successfully");
+        toast.success("Unfollowed successfully");
       } else {
         // Follow logic
         await setDoc(
@@ -205,7 +218,7 @@ const FollowerDialog = ({ followerCount, userId }) => {
             timestamp: new Date(),
           }
         );
-        toast.success("Followed Successfully");
+        toast.success("Followed successfully");
       }
 
       // Update the local state
@@ -218,64 +231,133 @@ const FollowerDialog = ({ followerCount, userId }) => {
       );
     } catch (error) {
       console.error("Error toggling follow status:", error);
+      toast.error("Failed to update follow status");
     }
   };
 
-  if (loading) return <div>...</div>;
-  if (error) {
-    console.log("ERROR WHILE FETCHING FOLLOWERS", error);
-    return <div>Error: {error.message}</div>;
-  }
+  const filteredFollowers = useMemo(() => {
+    if (!searchQuery.trim()) return followers;
+
+    return followers.filter(
+      (follower) =>
+        follower?.businessName
+          ?.toLowerCase()
+          .includes(searchQuery.toLowerCase()) ||
+        follower?.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        follower?.business_type
+          ?.toLowerCase()
+          .includes(searchQuery.toLowerCase())
+    );
+  }, [followers, searchQuery]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger>
-        <div>
-          <div className="font-semibold">{followerCount}</div>
+      <DialogTrigger className={className}>
+        <div className="flex flex-col items-center hover:text-primary transition-colors">
+          <div className="font-semibold text-lg">{followerCount}</div>
           <div className="text-sm text-muted-foreground">Followers</div>
         </div>
       </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Your Followers</DialogTitle>
-          <DialogDescription className="pt-4">
-            {Array.isArray(followers) && followers.length === 0 && (
-              <div className="text-center text-muted-foreground">
-                You have no followers yet.
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader className="space-y-1">
+          <DialogTitle className="text-xl font-bold">Followers</DialogTitle>
+          <DialogDescription className="text-sm">
+            People and businesses following you
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="relative mt-2">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search followers..."
+            className="pl-8"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+
+        <div className="mt-2 max-h-[60vh] overflow-y-auto pr-1">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-8 space-y-2">
+              <Loader2 className="h-8 w-8 animate-spin text-primary/70" />
+              <p className="text-sm text-muted-foreground">
+                Loading followers...
+              </p>
+            </div>
+          ) : error ? (
+            <div className="text-center py-6 text-rose-500">
+              <p>Could not load followers list</p>
+            </div>
+          ) : Array.isArray(filteredFollowers) &&
+            filteredFollowers.length === 0 ? (
+            searchQuery ? (
+              <div className="text-center py-8 space-y-2">
+                <UserX className="h-12 w-12 mx-auto text-muted-foreground/50" />
+                <p className="text-muted-foreground">
+                  No matches found for "{searchQuery}"
+                </p>
               </div>
-            )}
-            <div className="flex flex-col gap-4">
-              {Array.isArray(followers) &&
-                followers.length > 0 &&
-                followers.map((follower) => (
-                  <div
-                    className="flex items-center justify-between gap-4 border px-6 py-3 rounded-full w-full"
-                    key={follower?.uid}
+            ) : (
+              <div className="text-center py-8 space-y-2">
+                <UserX className="h-12 w-12 mx-auto text-muted-foreground/50" />
+                <p className="text-muted-foreground">
+                  You don't have any followers yet
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  When people follow you, they'll show up here
+                </p>
+              </div>
+            )
+          ) : (
+            <div className="space-y-3 mt-3">
+              {filteredFollowers.map((follower) => (
+                <div
+                  key={follower?.uid}
+                  className="flex items-center justify-between p-3 rounded-lg border border-border/60 bg-background hover:bg-accent/5 transition-colors"
+                >
+                  <Link
+                    href={
+                      currentUser && follower?.uid === currentUser.uid
+                        ? "/profile"
+                        : `/${follower?.username}?user=${follower?.uid}`
+                    }
+                    className="flex items-center gap-3 flex-1"
                   >
-                    <div className="flex items-center justify-between w-full gap-2">
-                      <div className="flex items-center gap-2">
-                        <Link
-                          href={`/${follower?.username}?user=${follower?.uid}`}
-                          className="grid gap-0.5 text-sm"
-                        >
-                          <span className="font-medium">
-                            {follower?.businessName}
-                          </span>
-                          <span className="text-muted-foreground">
-                            @{follower?.username}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {follower?.business_type}
-                          </span>
-                        </Link>
+                    <Avatar className="h-10 w-10 border border-border/50">
+                      <AvatarImage
+                        src={follower?.profilePic || "/avatar.png"}
+                        alt={follower?.businessName}
+                      />
+                      <AvatarFallback>
+                        {follower?.businessName?.charAt(0) || "B"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex flex-col min-w-0">
+                      <div className="font-medium truncate">
+                        {follower?.businessName || "Business"}
                       </div>
+                      <div className="text-xs text-muted-foreground flex items-center gap-2">
+                        <span>@{follower?.username || "username"}</span>
+                        {follower?.business_type && (
+                          <Badge
+                            variant="outline"
+                            className="text-xs font-normal py-0 h-5"
+                          >
+                            {follower.business_type}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                  {auth.currentUser &&
+                    auth.currentUser.uid !== follower?.uid && (
                       <Button
                         size="sm"
-                        variant="outline"
-                        className={`${
+                        variant={follower.isFollowing ? "outline" : "default"}
+                        className={`h-9 px-2.5 ml-2 ${
                           follower.isFollowing
-                            ? "bg-red-500 text-primary-foreground hover:bg-red-400 hover:text-white"
-                            : "bg-green-500 text-primary-foreground hover:bg-green-400 hover:text-white"
+                            ? "border-gray-200 text-gray-700 hover:bg-gray-100"
+                            : "bg-primary text-primary-foreground"
                         }`}
                         onClick={() =>
                           handleFollowToggle(
@@ -284,14 +366,24 @@ const FollowerDialog = ({ followerCount, userId }) => {
                           )
                         }
                       >
-                        {follower.isFollowing ? <Minus /> : <Plus />}
+                        {follower.isFollowing ? (
+                          <>
+                            <UserCheck className="h-4 w-4 mr-1.5" />
+                            <span>Following</span>
+                          </>
+                        ) : (
+                          <>
+                            <UserPlus className="h-4 w-4 mr-1.5" />
+                            <span>Follow</span>
+                          </>
+                        )}
                       </Button>
-                    </div>
-                  </div>
-                ))}
+                    )}
+                </div>
+              ))}
             </div>
-          </DialogDescription>
-        </DialogHeader>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -26,12 +26,12 @@ export default function SettingsPage() {
       >
         <div className="w-full md:w-3/4">
           <TabsContent value="basic-info">
-            <div className="mb-4">
+            {/* <div className="mb-4">
               <h2 className="font-semibold text-2xl">Basic Information</h2>
               <p className="text-lg mt-2">
                 Manage your basic business profile information.
               </p>
-            </div>
+            </div> */}
             <BasicInfoForm />
           </TabsContent>
           <TabsContent value="payment">

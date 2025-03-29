@@ -21,9 +21,8 @@ export default function StoreLocationPicker() {
   const inputRef = useRef(null);
 
   // Your Gomaps API key
-  const GOMAPS_API_KEY = "AlzaSy0ZX6J8gbg9HzXotw8vmTMxDG66makE6jo";
+  const GOMAPS_API_KEY = "AlzaSyqHocSfv0LGEv5PD40kuKYGUTUjOcYNJnF";
 
-  // Initialize map after script is loaded
   useEffect(() => {
     if (!isMapLoaded || !mapContainerRef.current || !inputRef.current) return;
 
