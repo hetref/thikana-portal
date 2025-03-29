@@ -27,8 +27,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { userEmailStatus } from "@/utils/userStatus";
 import { sendEmailVerification } from "firebase/auth";
-import { MapPin, UserPlus, UserMinus, Loader2, RefreshCw } from "lucide-react";
-import toast from "react-hot-toast";
+import { toast } from "react-hot-toast";
+import { Loader2, RefreshCw } from "lucide-react";
 
 export default function WhoToFollow() {
   const [businesses, setBusinesses] = useState([]);
@@ -204,7 +204,6 @@ export default function WhoToFollow() {
 
       // Show unfollow toast message
       toast.success(`Business unfollowed successfully`);
-      toast.success("Unfollowed successfully");
     } catch (error) {
       console.error("Error unfollowing business:", error);
       toast.error("Failed to unfollow business");
