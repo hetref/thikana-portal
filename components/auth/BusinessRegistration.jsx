@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Eye, EyeOff, Upload } from "lucide-react";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const BusinessRegistration = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -22,12 +23,23 @@ const BusinessRegistration = () => {
   const [password, setPassword] = useState("");
   const [passwordShow, setPasswordShow] = useState(false);
   const [businessType, setBusinessType] = useState("");
+  const [businessCategories, setBusinessCategories] = useState([]);
   const [gumastaLicense, setGumastaLicense] = useState(null);
   const [gumastaLicenseError, setGumastaLicenseError] = useState("");
 
   const fileInputRef = useRef(null);
 
   const router = useRouter();
+
+  const handleBusinessCategoryChange = (category) => {
+    if (businessCategories.includes(category)) {
+      setBusinessCategories(
+        businessCategories.filter((item) => item !== category)
+      );
+    } else {
+      setBusinessCategories([...businessCategories, category]);
+    }
+  };
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -81,6 +93,7 @@ const BusinessRegistration = () => {
       const businessData = {
         businessName,
         business_type: businessType,
+        business_categories: businessCategories,
         name: firstName + " " + lastName,
         email,
         phone,
@@ -100,6 +113,7 @@ const BusinessRegistration = () => {
       const business = {
         businessName,
         business_type: businessType,
+        business_categories: businessCategories,
         adminName: firstName + " " + lastName,
         email,
         phone,
@@ -157,6 +171,42 @@ const BusinessRegistration = () => {
                 value={businessType}
                 onChange={(e) => setBusinessType(e.target.value)}
               />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Business Category</Label>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="serviceBasedBusiness"
+                    checked={businessCategories.includes("service")}
+                    onCheckedChange={() =>
+                      handleBusinessCategoryChange("service")
+                    }
+                  />
+                  <Label
+                    htmlFor="serviceBasedBusiness"
+                    className="cursor-pointer"
+                  >
+                    Service-Based Business
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="productBasedBusiness"
+                    checked={businessCategories.includes("product")}
+                    onCheckedChange={() =>
+                      handleBusinessCategoryChange("product")
+                    }
+                  />
+                  <Label
+                    htmlFor="productBasedBusiness"
+                    className="cursor-pointer"
+                  >
+                    Product-Based Business
+                  </Label>
+                </div>
+              </div>
             </div>
 
             <div className="grid gap-2">
