@@ -283,9 +283,20 @@ export default function Profile() {
                           variant="default"
                           className="bg-blue-600 hover:bg-blue-700 flex gap-2 items-center"
                         >
-                          <Link href="/website-builder">
+                          <Link href="/wb">
                             <Globe className="h-4 w-4" />
                             Create Website
+                          </Link>
+                        </Button>
+
+                        <Button
+                          asChild
+                          variant="default"
+                          className="bg-blue-600 hover:bg-blue-700 flex gap-2 items-center"
+                        >
+                          <Link href={userData?.website || "#"} target="_blank">
+                            <Globe className="h-4 w-4" />
+                            Visit Website
                           </Link>
                         </Button>
                       </div>
