@@ -28,6 +28,7 @@ import Link from "next/link";
 import { userEmailStatus } from "@/utils/userStatus";
 import { sendEmailVerification } from "firebase/auth";
 import { toast } from "react-hot-toast";
+import { Loader2, RefreshCw } from "lucide-react";
 
 export default function WhoToFollow() {
   const [businesses, setBusinesses] = useState([]);
@@ -362,8 +363,8 @@ export default function WhoToFollow() {
                                     business.business_plan === "premium"
                                       ? "text-amber-600"
                                       : business.business_plan === "standard"
-                                      ? "text-blue-600"
-                                      : ""
+                                        ? "text-blue-600"
+                                        : ""
                                   }`}
                                 >
                                   {` • ${
@@ -383,8 +384,8 @@ export default function WhoToFollow() {
                                 {recommendationType === "location"
                                   ? " • Within range"
                                   : business.has_activity
-                                  ? " • Active business"
-                                  : ""}
+                                    ? " • Active business"
+                                    : ""}
                               </span>
                             )}
                           </Link>
