@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -104,8 +104,8 @@ export default function Profile() {
   const [loadingSavedPosts, setLoadingSavedPosts] = useState(false);
   const [postToUnsave, setPostToUnsave] = useState(null);
   const [isUnsaveDialogOpen, setIsUnsaveDialogOpen] = useState(false);
-  console.log("USERDATA", userData);
 
+  // Authentication listener
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((authUser) => {
       if (authUser) {
@@ -117,39 +117,37 @@ export default function Profile() {
     return () => unsubscribe();
   }, [router]);
 
+  // Followers and following count listeners
   useEffect(() => {
     if (!userId) return;
+
     const followersRef = collection(db, "users", userId, "followers");
     const followingRef = collection(db, "users", userId, "following");
 
-    // Set up real-time listener for followers count
     const unsubscribeFollowers = onSnapshot(followersRef, (snapshot) => {
-      setFollowersCount(snapshot.size); // Update followers count in real-time
+      setFollowersCount(snapshot.size);
     });
 
-    // Set up real-time listener for following count
     const unsubscribeFollowing = onSnapshot(followingRef, (snapshot) => {
-      setFollowingCount(snapshot.size); // Update following count in real-time
+      setFollowingCount(snapshot.size);
     });
 
     return () => {
-      unsubscribeFollowers(); // Cleanup on unmount
-      unsubscribeFollowing(); // Cleanup on unmount
+      unsubscribeFollowers();
+      unsubscribeFollowing();
     };
   }, [userId]);
 
-  // Fetch user data with photos
+  // User data listener
   useEffect(() => {
     if (!userId) return;
 
-    // Set up listener for real-time updates
     const userRef = doc(db, "users", userId);
     const unsubscribe = onSnapshot(userRef, (docSnap) => {
       if (docSnap.exists()) {
-        const userData = docSnap.data();
         setUserData({
           uid: userId,
-          ...userData,
+          ...docSnap.data(),
         });
       } else {
         setUserData(null);
@@ -159,7 +157,7 @@ export default function Profile() {
     return () => unsubscribe();
   }, [userId]);
 
-  // Fetch user photos from subcollection
+  // User photos listener
   useEffect(() => {
     if (!userId) return;
 
@@ -186,20 +184,166 @@ export default function Profile() {
     return () => unsubscribe();
   }, [userId]);
 
-  const handleLoadMore = () => {
+  // Liked posts listener
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const unsubscribe = onSnapshot(
+      collection(db, "users", user.uid, "postlikes"),
+      async (querySnapshot) => {
+        const postIds = querySnapshot.docs.map((doc) => doc.id);
+        const postDocs = await Promise.all(
+          postIds.map((id) => getDoc(doc(db, "posts", id)))
+        );
+        const tempLikedPosts = postDocs
+          .filter((doc) => doc.exists())
+          .map((doc) => ({ ...doc.data(), id: doc.id }));
+        setLikedPosts(tempLikedPosts);
+      },
+      (error) => {
+        console.error("Error fetching liked posts:", error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [user?.uid]);
+
+  // Saved posts listener
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    setLoadingSavedPosts(true);
+
+    try {
+      const savedPostsRef = collection(db, "users", user.uid, "savedPosts");
+      const unsubscribe = onSnapshot(
+        savedPostsRef,
+        async (snapshot) => {
+          const savedPostsData = await Promise.all(
+            snapshot.docs.map(async (savedPostDoc) => {
+              const postData = savedPostDoc.data();
+              const postRef = doc(db, "posts", postData.postId);
+              const postDoc = await getDoc(postRef);
+
+              if (postDoc.exists()) {
+                return {
+                  ...postDoc.data(),
+                  id: postDoc.id,
+                  savedAt: postData.timestamp,
+                  authorName: postData.authorName,
+                  authorProfileImage: postData.authorProfileImage,
+                  authorUsername: postData.authorUsername,
+                };
+              }
+              return null;
+            })
+          );
+
+          // Filter out any null values and sort by savedAt timestamp
+          const validPosts = savedPostsData
+            .filter(Boolean)
+            .sort((a, b) => b.savedAt?.toMillis() - a.savedAt?.toMillis());
+
+          setSavedPosts(validPosts);
+          setLoadingSavedPosts(false);
+        },
+        (error) => {
+          console.error("Error in saved posts snapshot:", error);
+          setLoadingSavedPosts(false);
+        }
+      );
+
+      return () => unsubscribe();
+    } catch (error) {
+      console.error("Error fetching saved posts:", error);
+      toast.error("Failed to load saved posts");
+      setLoadingSavedPosts(false);
+    }
+  }, [user?.uid]);
+
+  // Memoized handlers
+  const handleLoadMore = useCallback(() => {
     if (hasMore && !loading) {
       fetchMorePosts();
     }
-  };
+  }, [hasMore, loading, fetchMorePosts]);
 
-  const formattedDate = new Date(
-    user?.metadata?.creationTime
-  ).toLocaleDateString("en-US", {
-    month: "long",
-    year: "numeric",
-  });
+  const toggleLocationIFrame = useCallback(() => {
+    setShowLocationIFrame((prev) => !prev);
+  }, []);
 
-  const renderPosts = () => {
+  const openAddPhotoModal = useCallback(() => {
+    setIsAddPhotoModalOpen(true);
+  }, []);
+
+  const closeAddPhotoModal = useCallback(() => {
+    setIsAddPhotoModalOpen(false);
+  }, []);
+
+  const handleUnsavePost = useCallback(
+    async (postId) => {
+      if (!user?.uid) return;
+
+      try {
+        const savedPostRef = doc(db, "users", user.uid, "savedPosts", postId);
+        await deleteDoc(savedPostRef);
+        toast.success("Post unsaved successfully");
+      } catch (error) {
+        console.error("Error unsaving post:", error);
+        toast.error("Failed to unsave post");
+      }
+    },
+    [user?.uid]
+  );
+
+  const prepareUnsave = useCallback((postId) => {
+    setPostToUnsave(postId);
+    setIsUnsaveDialogOpen(true);
+  }, []);
+
+  const confirmUnsave = useCallback(() => {
+    if (postToUnsave) {
+      handleUnsavePost(postToUnsave);
+      setPostToUnsave(null);
+    }
+  }, [postToUnsave, handleUnsavePost]);
+
+  const verifyEmailHandler = useCallback(() => {
+    if (user) {
+      sendEmailVerification(user)
+        .then(() => {
+          toast.success("Email Verification Link Sent Successfully!");
+        })
+        .catch((error) => {
+          console.error("Error sending email verification:", error);
+          toast.error("Failed to send verification email");
+        });
+    }
+  }, [user]);
+
+  // Memoized values
+  const formattedDate = useMemo(() => {
+    if (!user?.metadata?.creationTime) return "";
+    return new Date(user.metadata.creationTime).toLocaleDateString("en-US", {
+      month: "long",
+      year: "numeric",
+    });
+  }, [user?.metadata?.creationTime]);
+
+  const isBusinessUser = useMemo(() => {
+    return userData?.role === "business";
+  }, [userData?.role]);
+
+  const isCurrentUser = useMemo(() => {
+    return userId === user?.uid;
+  }, [userId, user?.uid]);
+
+  const isEmailVerified = useMemo(() => {
+    return userEmailStatus() === true;
+  }, []);
+
+  // Memoized UI components
+  const renderPosts = useMemo(() => {
     if (loading && !posts.length) {
       return (
         <div className="flex justify-center py-8">
@@ -207,6 +351,7 @@ export default function Profile() {
         </div>
       );
     }
+
     if (!loading && !posts.length) {
       return (
         <div className="text-center py-12">
@@ -217,6 +362,7 @@ export default function Profile() {
         </div>
       );
     }
+
     return (
       <div className="space-y-4">
         {posts.map((post) => (
@@ -250,123 +396,107 @@ export default function Profile() {
         )}
       </div>
     );
-  };
+  }, [posts, loading, hasMore, handleLoadMore, userData]);
 
-  const getLikedPosts = () => {
-    if (!user) return;
-    const unsubscribe = onSnapshot(
-      collection(db, "users", user.uid, "postlikes"),
-      async (querySnapshot) => {
-        const postIds = querySnapshot.docs.map((doc) => doc.id);
-        const postDocs = await Promise.all(
-          postIds.map((id) => getDoc(doc(db, "posts", id)))
-        );
-        const tempLikedPosts = postDocs
-          .filter((doc) => doc.exists())
-          .map((doc) => ({ ...doc.data(), id: doc.id }));
-        console.log("tempLikedPosts", tempLikedPosts);
-        setLikedPosts(tempLikedPosts);
-      },
-      (error) => {
-        console.error("Error fetching liked posts:", error);
-      }
+  const renderEmptyState = useCallback((icon, message) => {
+    const Icon = icon;
+    return (
+      <div className="text-center py-12">
+        <Icon className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+        <p className="text-muted-foreground">{message}</p>
+      </div>
     );
-    return () => unsubscribe(); // Cleanup subscription on unmount
-  };
+  }, []);
 
-  useEffect(() => {
-    getLikedPosts();
-  }, [user]);
+  const renderLoading = useCallback(
+    () => (
+      <div className="flex justify-center py-10">
+        <Loader2Icon className="w-8 h-8 animate-spin text-gray-400" />
+      </div>
+    ),
+    []
+  );
 
-  // Add useEffect for fetching saved posts
-  useEffect(() => {
-    const fetchSavedPosts = async () => {
-      if (!user?.uid) {
-        console.log("No user ID available");
-        return;
-      }
+  const renderSavedPostCard = useCallback(
+    (post) => (
+      <Card
+        key={post.id}
+        className="cursor-pointer hover:shadow-md transition-shadow border border-gray-100"
+      >
+        <CardContent className="pt-6">
+          <div className="flex flex-col gap-4">
+            {/* Post Header */}
+            <div className="flex justify-between items-start">
+              <div className="flex gap-3">
+                <Avatar className="h-10 w-10">
+                  <AvatarImage
+                    src={post.authorProfileImage || "/avatar.png"}
+                    alt={post.authorName || "User"}
+                  />
+                </Avatar>
+                <div>
+                  <p className="font-semibold">
+                    {post.authorName || "Anonymous"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    @{post.authorUsername || "user"}
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => prepareUnsave(post.id)}
+                className="text-primary hover:text-primary/80"
+              >
+                <Bookmark className="h-5 w-5 fill-current" />
+              </Button>
+            </div>
 
-      setLoadingSavedPosts(true);
-      try {
-        console.log("Fetching saved posts for user:", user.uid);
-        const savedPostsRef = collection(db, "users", user.uid, "savedPosts");
-        const unsubscribe = onSnapshot(
-          savedPostsRef,
-          async (snapshot) => {
-            console.log("Saved posts snapshot size:", snapshot.size);
-            const savedPostsData = await Promise.all(
-              snapshot.docs.map(async (savedPostDoc) => {
-                const postData = savedPostDoc.data();
-                console.log("Saved post data:", postData);
-                const postRef = doc(db, "posts", postData.postId);
-                const postDoc = await getDoc(postRef);
-                if (postDoc.exists()) {
-                  return {
-                    ...postDoc.data(),
-                    id: postDoc.id,
-                    savedAt: postData.timestamp,
-                    authorName: postData.authorName,
-                    authorProfileImage: postData.authorProfileImage,
-                    authorUsername: postData.authorUsername,
-                  };
-                }
-                console.log("Post not found:", postData.postId);
-                return null;
-              })
-            );
+            {/* Post Content */}
+            <div className="space-y-4">
+              <p>{post.caption || post.content || post.description}</p>
+              {post.mediaUrl && (
+                <div className="relative rounded-lg overflow-hidden bg-muted">
+                  <div className="relative aspect-[16/9]">
+                    <img
+                      src={post.mediaUrl}
+                      alt="Post content"
+                      className="object-cover w-full h-full"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
 
-            // Filter out any null values and sort by savedAt timestamp
-            const validPosts = savedPostsData
-              .filter((post) => post !== null)
-              .sort((a, b) => b.savedAt?.toMillis() - a.savedAt?.toMillis());
-
-            console.log("Valid saved posts:", validPosts);
-            setSavedPosts(validPosts);
-          },
-          (error) => {
-            console.error("Error in saved posts snapshot:", error);
-          }
-        );
-
-        return () => unsubscribe();
-      } catch (error) {
-        console.error("Error fetching saved posts:", error);
-        toast.error("Failed to load saved posts");
-      } finally {
-        setLoadingSavedPosts(false);
-      }
-    };
-
-    fetchSavedPosts();
-  }, [user?.uid]);
-
-  const verifyEmailHandler = () => {
-    if (user) {
-      sendEmailVerification(user)
-        .then(() => {
-          toast.success("Email Verification Link Sent Sucessfully!");
-          console.log("Email verification sent");
-        })
-        .catch((error) => {
-          console.error("Error sending email verification:", error);
-        });
-    }
-  };
-
-  const handleUnsavePost = async (postId) => {
-    if (!user?.uid) return;
-
-    try {
-      const savedPostRef = doc(db, "users", user.uid, "savedPosts", postId);
-      await deleteDoc(savedPostRef);
-
-      // The real-time listener will automatically update the UI
-      toast.success("Post unsaved successfully");
-    } catch (error) {
-      console.error("Error unsaving post:", error);
-      toast.error("Failed to unsave post");
-    }
-  };
+            {/* Post Actions */}
+            <div className="flex items-center justify-between mt-4">
+              <div className="flex gap-4">
+                <Button variant="ghost" size="sm" className="flex gap-2">
+                  <Heart className="h-5 w-5" />
+                  <span>{post.likes || 0}</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="flex gap-2"
+                  onClick={() => router.push(`/feed/${post.id}`)}
+                >
+                  <MessageCircle className="h-5 w-5" />
+                  <span>{post.commentsCount || 0}</span>
+                </Button>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {post.savedAt?.toDate &&
+                  new Date(post.savedAt.toDate()).toLocaleDateString()}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    ),
+    [prepareUnsave, router]
+  );
 
   return (
     <div className="min-h-screen">
@@ -390,7 +520,7 @@ export default function Profile() {
                       width={1000}
                       height={1000}
                       alt="Cover Image"
-                      className=" z-30 object-cover transition-opacity hover:opacity-95 border border-black/40 rounded-t-xl"
+                      className="z-30 object-cover transition-opacity hover:opacity-95 border border-black/40 rounded-t-xl"
                       priority
                     />
                   </DialogTrigger>
@@ -451,22 +581,6 @@ export default function Profile() {
                       <User className="w-4 h-4" />
                       <span>{userData?.name || "Owner Name"}</span>
                     </div>
-                    {/* <div className="flex items-center text-gray-600 gap-1">
-                      <Calendar className="w-4 h-4" />
-                      <span className="text-sm">Joined {formattedDate}</span>
-                    </div>
-                    {userData?.role === "business" && userData?.phone && (
-                      <div className="flex items-center text-gray-600 gap-1">
-                        <Phone className="w-4 h-4" />
-                        <span className="text-sm">{userData.phone}</span>
-                      </div>
-                    )} */}
-                    {/* {userData?.role === "business" && userData?.email && (
-                      <div className="flex items-center text-gray-600 gap-1">
-                        <Mail className="w-4 h-4" />
-                        <span className="text-sm">{userData.email}</span>
-                      </div>
-                    )} */}
                     <p className="text-gray-700 mt-2">
                       {userData?.bio || "Amazing Bio..."}
                     </p>
@@ -474,7 +588,7 @@ export default function Profile() {
 
                   {/* Action buttons */}
                   <div className="flex w-full gap-2 mt-3 md:mt-0">
-                    {userId === user?.uid && (
+                    {isCurrentUser && (
                       <Button
                         asChild
                         variant="default"
@@ -487,14 +601,11 @@ export default function Profile() {
                       </Button>
                     )}
 
-                    {userData?.role === "business" && (
+                    {isBusinessUser && (
                       <>
                         <Button
                           variant="outline"
-                          className=""
-                          onClick={() =>
-                            setShowLocationIFrame(!showLocationIFrame)
-                          }
+                          onClick={toggleLocationIFrame}
                         >
                           <MapPinIcon className="w-4 h-4 mr-1" />
                           Location
@@ -514,12 +625,12 @@ export default function Profile() {
                 <div className="mt-6 grid grid-cols-4 gap-4 divide-x divide-gray-200 rounded-lg border p-4 bg-gray-50">
                   <FollowingDialog
                     followingCount={followingCount}
-                    userId={userId && userId}
+                    userId={userId}
                     className="flex flex-col items-center cursor-pointer"
                   />
                   <FollowerDialog
                     followerCount={followersCount}
-                    userId={userId && userId}
+                    userId={userId}
                     className="flex flex-col items-center pl-4 cursor-pointer"
                   />
                   <div className="flex flex-col items-center pl-4">
@@ -537,7 +648,7 @@ export default function Profile() {
                 </div>
 
                 {/* Location map */}
-                {showLocationIFrame && userData?.role === "business" && (
+                {showLocationIFrame && isBusinessUser && (
                   <div className="mt-6 rounded-lg border overflow-hidden bg-white shadow-sm">
                     <div className="p-4 border-b">
                       <h3 className="font-medium flex items-center gap-2 text-gray-900">
@@ -567,7 +678,7 @@ export default function Profile() {
             </Card>
 
             {/* Email verification warning */}
-            {userEmailStatus() === false && (
+            {!isEmailVerified && (
               <div className="rounded-lg bg-amber-50 border border-amber-200 p-4 shadow-sm">
                 <div className="flex flex-col items-center text-center">
                   <p className="text-amber-800 mb-3">
@@ -584,7 +695,7 @@ export default function Profile() {
             )}
 
             {/* Content tabs for business users */}
-            {userEmailStatus() === true && userData?.role === "business" && (
+            {isEmailVerified && isBusinessUser && (
               <Card className="border-0 shadow-sm overflow-hidden bg-white">
                 <Tabs defaultValue="posts" className="w-full">
                   <div className="border-b">
@@ -651,7 +762,7 @@ export default function Profile() {
                     value="posts"
                     className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
                   >
-                    {renderPosts()}
+                    {renderPosts}
                   </TabsContent>
 
                   <TabsContent
@@ -659,25 +770,18 @@ export default function Profile() {
                     className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
                   >
                     <div className="space-y-4">
-                      {likedPosts.length === 0 ? (
-                        <div className="text-center py-12">
-                          <Heart className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-                          <p className="text-muted-foreground">
-                            No liked posts yet
-                          </p>
-                        </div>
-                      ) : (
-                        likedPosts.map((post, index) => (
-                          <Card
-                            key={index}
-                            className="cursor-pointer hover:shadow-md transition-shadow border border-gray-100"
-                          >
-                            <CardContent className="pt-6">
-                              <ProfilePosts post={post} userData={userData} />
-                            </CardContent>
-                          </Card>
-                        ))
-                      )}
+                      {likedPosts.length === 0
+                        ? renderEmptyState(Heart, "No liked posts yet")
+                        : likedPosts.map((post, index) => (
+                            <Card
+                              key={index}
+                              className="cursor-pointer hover:shadow-md transition-shadow border border-gray-100"
+                            >
+                              <CardContent className="pt-6">
+                                <ProfilePosts post={post} userData={userData} />
+                              </CardContent>
+                            </Card>
+                          ))}
                     </div>
                   </TabsContent>
 
@@ -688,23 +792,19 @@ export default function Profile() {
                     {userData && (
                       <>
                         {loadingPhotos ? (
-                          <div className="flex justify-center py-10">
-                            <Loader2Icon className="w-8 h-8 animate-spin text-gray-400" />
-                          </div>
+                          renderLoading()
                         ) : (
                           <>
                             <PhotosGrid
                               photos={userPhotos}
                               userId={userData.uid}
-                              onPhotoDeleted={(photoId) => {
-                                // We don't need to update local state - snapshot will handle it
-                              }}
-                              onAddPhoto={() => setIsAddPhotoModalOpen(true)}
+                              onPhotoDeleted={() => {}}
+                              onAddPhoto={openAddPhotoModal}
                             />
                             {auth.currentUser && (
                               <AddPhotoModal
                                 isOpen={isAddPhotoModalOpen}
-                                onClose={() => setIsAddPhotoModalOpen(false)}
+                                onClose={closeAddPhotoModal}
                                 userId={auth.currentUser.uid}
                               />
                             )}
@@ -732,113 +832,11 @@ export default function Profile() {
                     className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
                   >
                     <div className="space-y-4">
-                      {loadingSavedPosts ? (
-                        <div className="flex justify-center py-10">
-                          <Loader2Icon className="w-8 h-8 animate-spin text-gray-400" />
-                        </div>
-                      ) : savedPosts.length === 0 ? (
-                        <div className="text-center py-12">
-                          <Bookmark className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-                          <p className="text-muted-foreground">
-                            No saved posts yet
-                          </p>
-                        </div>
-                      ) : (
-                        savedPosts.map((post) => (
-                          <Card
-                            key={post.id}
-                            className="cursor-pointer hover:shadow-md transition-shadow border border-gray-100"
-                          >
-                            <CardContent className="pt-6">
-                              <div className="flex flex-col gap-4">
-                                {/* Post Header */}
-                                <div className="flex justify-between items-start">
-                                  <div className="flex gap-3">
-                                    <Avatar className="h-10 w-10">
-                                      <AvatarImage
-                                        src={
-                                          post.authorProfileImage ||
-                                          "/avatar.png"
-                                        }
-                                        alt={post.authorName || "User"}
-                                      />
-                                    </Avatar>
-                                    <div>
-                                      <p className="font-semibold">
-                                        {post.authorName || "Anonymous"}
-                                      </p>
-                                      <p className="text-sm text-muted-foreground">
-                                        @{post.authorUsername || "user"}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => {
-                                      setPostToUnsave(post.id);
-                                      setIsUnsaveDialogOpen(true);
-                                    }}
-                                    className="text-primary hover:text-primary/80"
-                                  >
-                                    <Bookmark className="h-5 w-5 fill-current" />
-                                  </Button>
-                                </div>
-
-                                {/* Post Content */}
-                                <div className="space-y-4">
-                                  <p>
-                                    {post.caption ||
-                                      post.content ||
-                                      post.description}
-                                  </p>
-                                  {post.mediaUrl && (
-                                    <div className="relative rounded-lg overflow-hidden bg-muted">
-                                      <div className="relative aspect-[16/9]">
-                                        <img
-                                          src={post.mediaUrl}
-                                          alt="Post content"
-                                          className="object-cover w-full h-full"
-                                        />
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Post Actions */}
-                                <div className="flex items-center justify-between mt-4">
-                                  <div className="flex gap-4">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="flex gap-2"
-                                    >
-                                      <Heart className="h-5 w-5" />
-                                      <span>{post.likes || 0}</span>
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="flex gap-2"
-                                      onClick={() =>
-                                        router.push(`/feed/${post.id}`)
-                                      }
-                                    >
-                                      <MessageCircle className="h-5 w-5" />
-                                      <span>{post.commentsCount || 0}</span>
-                                    </Button>
-                                  </div>
-                                  <div className="text-sm text-muted-foreground">
-                                    {new Date(
-                                      post.savedAt?.toDate()
-                                    ).toLocaleDateString()}
-                                  </div>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))
-                      )}
+                      {loadingSavedPosts
+                        ? renderLoading()
+                        : savedPosts.length === 0
+                          ? renderEmptyState(Bookmark, "No saved posts yet")
+                          : savedPosts.map(renderSavedPostCard)}
                     </div>
                   </TabsContent>
                 </Tabs>
@@ -846,7 +844,7 @@ export default function Profile() {
             )}
 
             {/* Saved Posts tab for regular users */}
-            {userEmailStatus() === true && userData?.role !== "business" && (
+            {isEmailVerified && !isBusinessUser && (
               <Card className="border-0 shadow-sm overflow-hidden bg-white">
                 <Tabs defaultValue="saved" className="w-full">
                   <div className="border-b">
@@ -870,113 +868,11 @@ export default function Profile() {
                     className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
                   >
                     <div className="space-y-4">
-                      {loadingSavedPosts ? (
-                        <div className="flex justify-center py-10">
-                          <Loader2Icon className="w-8 h-8 animate-spin text-gray-400" />
-                        </div>
-                      ) : savedPosts.length === 0 ? (
-                        <div className="text-center py-12">
-                          <Bookmark className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-                          <p className="text-muted-foreground">
-                            No saved posts yet
-                          </p>
-                        </div>
-                      ) : (
-                        savedPosts.map((post) => (
-                          <Card
-                            key={post.id}
-                            className="cursor-pointer hover:shadow-md transition-shadow border border-gray-100"
-                          >
-                            <CardContent className="pt-6">
-                              <div className="flex flex-col gap-4">
-                                {/* Post Header */}
-                                <div className="flex justify-between items-start">
-                                  <div className="flex gap-3">
-                                    <Avatar className="h-10 w-10">
-                                      <AvatarImage
-                                        src={
-                                          post.authorProfileImage ||
-                                          "/avatar.png"
-                                        }
-                                        alt={post.authorName || "User"}
-                                      />
-                                    </Avatar>
-                                    <div>
-                                      <p className="font-semibold">
-                                        {post.authorName || "Anonymous"}
-                                      </p>
-                                      <p className="text-sm text-muted-foreground">
-                                        @{post.authorUsername || "user"}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => {
-                                      setPostToUnsave(post.id);
-                                      setIsUnsaveDialogOpen(true);
-                                    }}
-                                    className="text-primary hover:text-primary/80"
-                                  >
-                                    <Bookmark className="h-5 w-5 fill-current" />
-                                  </Button>
-                                </div>
-
-                                {/* Post Content */}
-                                <div className="space-y-4">
-                                  <p>
-                                    {post.caption ||
-                                      post.content ||
-                                      post.description}
-                                  </p>
-                                  {post.mediaUrl && (
-                                    <div className="relative rounded-lg overflow-hidden bg-muted">
-                                      <div className="relative aspect-[16/9]">
-                                        <img
-                                          src={post.mediaUrl}
-                                          alt="Post content"
-                                          className="object-cover w-full h-full"
-                                        />
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Post Actions */}
-                                <div className="flex items-center justify-between mt-4">
-                                  <div className="flex gap-4">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="flex gap-2"
-                                    >
-                                      <Heart className="h-5 w-5" />
-                                      <span>{post.likes || 0}</span>
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="flex gap-2"
-                                      onClick={() =>
-                                        router.push(`/feed/${post.id}`)
-                                      }
-                                    >
-                                      <MessageCircle className="h-5 w-5" />
-                                      <span>{post.commentsCount || 0}</span>
-                                    </Button>
-                                  </div>
-                                  <div className="text-sm text-muted-foreground">
-                                    {new Date(
-                                      post.savedAt?.toDate()
-                                    ).toLocaleDateString()}
-                                  </div>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))
-                      )}
+                      {loadingSavedPosts
+                        ? renderLoading()
+                        : savedPosts.length === 0
+                          ? renderEmptyState(Bookmark, "No saved posts yet")
+                          : savedPosts.map(renderSavedPostCard)}
                     </div>
                   </TabsContent>
                 </Tabs>
@@ -1005,14 +901,7 @@ export default function Profile() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (postToUnsave) {
-                  handleUnsavePost(postToUnsave);
-                  setPostToUnsave(null);
-                }
-              }}
-            >
+            <AlertDialogAction onClick={confirmUnsave}>
               Unsave
             </AlertDialogAction>
           </AlertDialogFooter>
