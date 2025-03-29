@@ -1,35 +1,100 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { auth, db, storage } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { setDoc } from "firebase/firestore";
 import { doc } from "firebase/firestore";
 import Link from "next/link";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Eye, EyeOff, Upload } from "lucide-react";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { Eye, EyeOff } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import toast from "react-hot-toast";
 
 const BusinessRegistration = () => {
   const [isLoading, setIsLoading] = useState(false);
-
+  const [isPanVerifying, setIsPanVerifying] = useState(false);
+  const [email, setEmail] = useState("");
   const [businessName, setBusinessName] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordShow, setPasswordShow] = useState(false);
   const [businessType, setBusinessType] = useState("");
   const [businessCategories, setBusinessCategories] = useState([]);
-  const [gumastaLicense, setGumastaLicense] = useState(null);
-  const [gumastaLicenseError, setGumastaLicenseError] = useState("");
-
-  const fileInputRef = useRef(null);
+  const [panCard, setPanCard] = useState("");
+  const [panVerified, setPanVerified] = useState(false);
+  const [panDetails, setPanDetails] = useState(null);
 
   const router = useRouter();
+
+  const handlePanCheck = async () => {
+    if (!panCard || panCard.length !== 10) {
+      toast.error("Please enter a valid 10-character PAN number");
+      return;
+    }
+
+    setIsPanVerifying(true);
+    try {
+      // First, get the access token
+      const authResponse = await fetch("/api/authorize-deepvue", {
+        method: "POST",
+      });
+
+      if (!authResponse.ok) {
+        throw new Error("Failed to get authorization token");
+      }
+
+      const authData = await authResponse.json();
+
+      // Now use the token to verify PAN
+      const verifyResponse = await fetch("/api/pan-udyam-status", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          pan_number: panCard,
+          ACCESS_TOKEN: authData.access_token,
+        }),
+      });
+
+      if (!verifyResponse.ok) {
+        throw new Error("Failed to verify PAN");
+      }
+
+      const verifyData = await verifyResponse.json();
+
+      if (
+        !verifyData.data?.udyam_exists ||
+        verifyData.data?.pan_details?.status !== "valid"
+      ) {
+        toast.error(
+          "The PAN number is not associated with a valid UDYAM registration"
+        );
+        setPanVerified(false);
+        return;
+      }
+
+      // Store relevant details
+      setPanDetails({
+        dob: verifyData.data.pan_details.dob,
+        gender: verifyData.data.pan_details.gender,
+        fullName: verifyData.data.pan_details.full_name,
+      });
+
+      setPanVerified(true);
+      toast.success(verifyData.message || "PAN verified successfully");
+    } catch (error) {
+      console.error("PAN verification error:", error);
+      toast.error("Failed to verify PAN number. Please try again.");
+      setPanVerified(false);
+    } finally {
+      setIsPanVerifying(false);
+    }
+  };
 
   const handleBusinessCategoryChange = (category) => {
     if (businessCategories.includes(category)) {
@@ -41,50 +106,23 @@ const BusinessRegistration = () => {
     }
   };
 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        // 5MB limit
-        setGumastaLicenseError("File size should be less than 5MB");
-        setGumastaLicense(null);
-      } else if (
-        !["application/pdf", "image/jpeg", "image/png"].includes(file.type)
-      ) {
-        setGumastaLicenseError("Only PDF, JPEG, and PNG files are allowed");
-        setGumastaLicense(null);
-      } else {
-        setGumastaLicenseError("");
-        setGumastaLicense(file);
-      }
-    }
-  };
-
   const handleSignUp = async (e) => {
     e.preventDefault();
     setIsLoading(true);
 
-    if (!gumastaLicense) {
-      setGumastaLicenseError(
-        "Gumasta License is required for business registration"
-      );
+    if (!panVerified) {
+      toast.error("Please verify your PAN number before registering");
       setIsLoading(false);
       return;
     }
 
     try {
-      // Create user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
         password
       );
       const uid = userCredential.user.uid;
-
-      // Upload Gumasta License file to Firebase Storage
-      const storageRef = ref(storage, `licenses/${uid}_gumasta_license`);
-      await uploadBytes(storageRef, gumastaLicense);
-      const gumastaLicenseURL = await getDownloadURL(storageRef);
 
       const username = `${businessName.toLowerCase()}-${
         Math.floor(Math.random() * 90000) + 10000
@@ -103,8 +141,9 @@ const BusinessRegistration = () => {
           "https://firebasestorage.googleapis.com/v0/b/recommendation-system-62a42.appspot.com/o/assets%2Favatar.png?alt=media&token=7782c79f-c178-4b02-8778-bb3b93965aa5",
         uid,
         plan: "free",
-        gumastaField: gumastaLicenseURL, // Updated to match your field name
-        gumastaVerified: "pending", // Updated to match your field value
+        panCard,
+        panVerified: true,
+        panDetails,
         createdAt: new Date(),
         updatedAt: new Date(),
         lastSignIn: new Date(),
@@ -120,8 +159,9 @@ const BusinessRegistration = () => {
         plan: "free",
         username,
         adminId: uid,
-        gumastaField: gumastaLicenseURL, // Updated to match your field name
-        gumastaVerified: "pending", // Updated to match your field value
+        panCard,
+        panVerified: true,
+        panDetails,
         createdAt: new Date(),
       };
 
@@ -130,52 +170,80 @@ const BusinessRegistration = () => {
         setDoc(doc(db, "businesses", uid), business),
       ]);
 
+      toast.success("Registration successful!");
       router.push("/map");
     } catch (error) {
       const { code, message } = error;
       console.error(code, message);
+
       if (code === "auth/email-already-in-use") {
-        alert("Email already in use! Please use a different email.");
+        toast.error("Email already in use! Please use a different email.");
       } else if (code === "auth/weak-password") {
-        alert("Password should be at least 6 characters long!");
+        toast.error("Password should be at least 6 characters long!");
       } else {
-        alert(message);
+        toast.error(message);
       }
       setIsLoading(false);
     }
   };
 
   return (
-    <form>
-      <div className="grid gap-6">
-        <div className="flex flex-col gap-4">
-          <div className="grid gap-6">
-            <div className="grid gap-2">
-              <Label htmlFor="businesname">Business Name</Label>
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="w-full space-y-8 bg-white p-8 rounded-xl shadow-lg">
+        <div>
+          <h2 className="mt-6 text-center text-xl md:text-3xl font-extrabold text-gray-900">
+            Business Registration
+          </h2>
+          <p className="mt-2 text-center text-sm text-gray-600">
+            Register your business with Thikana
+          </p>
+        </div>
+        <form className="mt-8 space-y-6">
+          <div className="rounded-md shadow-sm space-y-4">
+            {/* Business Name */}
+            <div>
+              <Label
+                htmlFor="businessname"
+                className="block text-sm font-medium"
+              >
+                Business Name
+              </Label>
               <Input
-                id="businesname"
+                id="businessname"
                 type="text"
-                placeholder="Business Name"
+                placeholder="Enter your business name"
                 required
                 value={businessName}
                 onChange={(e) => setBusinessName(e.target.value)}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="businessType">Business Type</Label>
-              <Input
-                id="businessType"
-                type="text"
-                placeholder="Business Type"
-                required
-                value={businessType}
-                onChange={(e) => setBusinessType(e.target.value)}
+                className="mt-1"
               />
             </div>
 
-            <div className="grid gap-2">
-              <Label>Business Category</Label>
-              <div className="flex flex-col gap-2">
+            {/* Business Type */}
+            <div>
+              <Label
+                htmlFor="businessType"
+                className="block text-sm font-medium"
+              >
+                Business Type
+              </Label>
+              <Input
+                id="businessType"
+                type="text"
+                placeholder="Enter business type"
+                required
+                value={businessType}
+                onChange={(e) => setBusinessType(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+
+            {/* Business Category */}
+            <div>
+              <Label className="block text-sm font-medium mb-2">
+                Business Category
+              </Label>
+              <div className="space-y-2 p-4 border rounded-md">
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="serviceBasedBusiness"
@@ -186,7 +254,7 @@ const BusinessRegistration = () => {
                   />
                   <Label
                     htmlFor="serviceBasedBusiness"
-                    className="cursor-pointer"
+                    className="cursor-pointer text-sm"
                   >
                     Service-Based Business
                   </Label>
@@ -201,7 +269,7 @@ const BusinessRegistration = () => {
                   />
                   <Label
                     htmlFor="productBasedBusiness"
-                    className="cursor-pointer"
+                    className="cursor-pointer text-sm"
                   >
                     Product-Based Business
                   </Label>
@@ -209,32 +277,11 @@ const BusinessRegistration = () => {
               </div>
             </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="firstname">First Name</Label>
-              <Input
-                id="firstname"
-                type="text"
-                placeholder="First Name"
-                required
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="lastname">Last Name</Label>
-              <Input
-                id="lastname"
-                type="text"
-                placeholder="Last Name"
-                required
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="phone">Phone</Label>
+            {/* Mobile Number */}
+            <div>
+              <Label htmlFor="phone" className="block text-sm font-medium">
+                Mobile Number
+              </Label>
               <Input
                 id="phone"
                 type="tel"
@@ -242,82 +289,123 @@ const BusinessRegistration = () => {
                 required
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
+                className="mt-1"
               />
             </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="email">Email</Label>
+            {/* PAN Number with Check Button */}
+            <div>
+              <Label htmlFor="panCard" className="block text-sm font-medium">
+                PAN Number <span className="text-red-500">*</span>
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  id="panCard"
+                  type="text"
+                  placeholder="ABCDE1234F"
+                  required
+                  value={panCard}
+                  onChange={(e) => {
+                    setPanCard(e.target.value.toUpperCase());
+                    setPanVerified(false);
+                  }}
+                  maxLength={10}
+                  className={`mt-1 ${panVerified ? "border-green-500" : ""}`}
+                />
+                <Button
+                  type="button"
+                  onClick={handlePanCheck}
+                  className="mt-1 whitespace-nowrap"
+                  variant={panVerified ? "outline" : "default"}
+                  disabled={isPanVerifying || !panCard || panCard.length !== 10}
+                >
+                  {isPanVerifying
+                    ? "Verifying..."
+                    : panVerified
+                      ? "Verified"
+                      : "CHECK"}
+                </Button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Please enter your 10-character PAN Card number
+              </p>
+            </div>
+
+            {/* First Name */}
+            <div>
+              <Label htmlFor="firstname" className="block text-sm font-medium">
+                First Name
+              </Label>
+              <Input
+                id="firstname"
+                type="text"
+                placeholder="Enter your first name"
+                required
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+
+            {/* Last Name */}
+            <div>
+              <Label htmlFor="lastname" className="block text-sm font-medium">
+                Last Name
+              </Label>
+              <Input
+                id="lastname"
+                type="text"
+                placeholder="Enter your last name"
+                required
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+
+            {/* Email */}
+            <div>
+              <Label htmlFor="email" className="block text-sm font-medium">
+                Email
+              </Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="m@example.com"
+                placeholder="Enter your email"
+                required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                required
+                className="mt-1"
               />
             </div>
 
-            <div className="grid gap-2">
-              <div className="flex items-center">
-                <Label htmlFor="password">Password</Label>
-              </div>
+            {/* Password */}
+            <div>
+              <Label htmlFor="password" className="block text-sm font-medium">
+                Password
+              </Label>
               <div className="relative">
                 <Input
                   id="password"
                   type={passwordShow ? "text" : "password"}
-                  placeholder="* * * * * *"
+                  placeholder="Enter your password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pr-10"
+                  className="mt-1 pr-10"
                 />
-                <div className="absolute right-2 top-0 bottom-0 flex items-center">
-                  <Button
-                    onClick={() => setPasswordShow(!passwordShow)}
-                    variant="ghost"
-                    type="button"
-                  >
-                    {passwordShow ? <EyeOff /> : <Eye />}
-                  </Button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setPasswordShow(!passwordShow)}
+                  className="absolute right-2 top-[6px] p-1"
+                >
+                  {passwordShow ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
               </div>
             </div>
+          </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="gumastaLicense" className="flex items-center">
-                Gumasta License <span className="text-red-500 ml-1">*</span>
-              </Label>
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="file"
-                    id="gumastaLicense"
-                    ref={fileInputRef}
-                    className="hidden"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={handleFileChange}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => fileInputRef.current.click()}
-                  >
-                    <Upload className="mr-2 h-4 w-4" />
-                    {gumastaLicense
-                      ? gumastaLicense.name
-                      : "Upload Gumasta License"}
-                  </Button>
-                </div>
-                {gumastaLicenseError && (
-                  <p className="text-red-500 text-sm">{gumastaLicenseError}</p>
-                )}
-                <p className="text-xs text-gray-500">
-                  Please upload your Gumasta License (PDF, JPG or PNG, max 5MB)
-                </p>
-              </div>
-            </div>
-
+          <div>
             <Button
               type="submit"
               onClick={handleSignUp}
@@ -329,28 +417,38 @@ const BusinessRegistration = () => {
                 !phone ||
                 !email ||
                 !password ||
-                !gumastaLicense ||
+                !panCard ||
+                panCard.length !== 10 ||
                 isLoading
               }
             >
-              Sign Up
+              {isLoading ? "Registering..." : "Register Business"}
             </Button>
           </div>
-          <div className="text-center text-sm">
-            Wanna join as User?{" "}
-            <Link href="/register" className="underline underline-offset-4">
-              Register as User
-            </Link>
+
+          <div className="text-center space-y-2">
+            <p className="text-sm text-gray-600">
+              Want to join as User?{" "}
+              <Link
+                href="/register"
+                className="font-medium text-primary hover:text-primary/80"
+              >
+                Register as User
+              </Link>
+            </p>
+            <p className="text-sm text-gray-600">
+              Already have an account?{" "}
+              <Link
+                href="/login"
+                className="font-medium text-primary hover:text-primary/80"
+              >
+                Login
+              </Link>
+            </p>
           </div>
-          <div className="text-center text-sm">
-            Have an account?{" "}
-            <Link href="/login" className="underline underline-offset-4">
-              Login
-            </Link>
-          </div>
-        </div>
+        </form>
       </div>
-    </form>
+    </div>
   );
 };
 
