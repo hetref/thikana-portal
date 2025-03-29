@@ -275,6 +275,69 @@ export default function Profile() {
     }
   };
 
+  // Add new useEffect for fetching saved posts
+  useEffect(() => {
+    const fetchSavedPosts = async () => {
+      if (!user?.uid) {
+        console.log("No user ID available");
+        return;
+      }
+
+      setLoadingSavedPosts(true);
+      try {
+        console.log("Fetching saved posts for user:", user.uid);
+        const savedPostsRef = collection(db, "users", user.uid, "savedPosts");
+        const unsubscribe = onSnapshot(
+          savedPostsRef,
+          async (snapshot) => {
+            console.log("Saved posts snapshot size:", snapshot.size);
+            const savedPostsData = await Promise.all(
+              snapshot.docs.map(async (savedPostDoc) => {
+                const postData = savedPostDoc.data();
+                console.log("Saved post data:", postData);
+                console.log("Post Author Name :", postData.authorName);
+                const postRef = doc(db, "posts", postData.postId);
+                const postDoc = await getDoc(postRef);
+                if (postDoc.exists()) {
+                  return {
+                    ...postDoc.data(),
+                    id: postDoc.id,
+                    savedAt: postData.timestamp,
+                    authorName: postData.authorName,
+                    authorProfileImage: postData.authorProfileImage,
+                    authorUsername: postData.authorUsername,
+                  };
+                }
+                console.log("Post not found:", postData.postId);
+                return null;
+              })
+            );
+
+            // Filter out any null values and sort by savedAt timestamp
+            const validPosts = savedPostsData
+              .filter((post) => post !== null)
+              .sort((a, b) => b.savedAt?.toMillis() - a.savedAt?.toMillis());
+
+            console.log("Valid saved posts:", validPosts);
+            setSavedPosts(validPosts);
+          },
+          (error) => {
+            console.error("Error in saved posts snapshot:", error);
+          }
+        );
+
+        return () => unsubscribe();
+      } catch (error) {
+        console.error("Error fetching saved posts:", error);
+        toast.error("Failed to load saved posts");
+      } finally {
+        setLoadingSavedPosts(false);
+      }
+    };
+
+    fetchSavedPosts();
+  }, [user?.uid]);
+
   return (
     <div className="min-h-screen">
       {/* Add style element for custom CSS */}

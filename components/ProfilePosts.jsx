@@ -19,8 +19,10 @@ import { db, auth } from "@/lib/firebase";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useRouter } from "next/navigation";
 
 const ProfilePosts = ({ post: initialPost, userData, onPostDelete }) => {
+  const router = useRouter();
   const [post, setPost] = useState(initialPost);
   const [title, setTitle] = useState(initialPost.title || "");
   const [content, setContent] = useState(
@@ -30,6 +32,9 @@ const ProfilePosts = ({ post: initialPost, userData, onPostDelete }) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLikeProcessing, setIsLikeProcessing] = useState(false);
   const [isPostOwner, setIsPostOwner] = useState(false);
+  const [commentsCount, setCommentsCount] = useState(
+    initialPost.commentsCount || 0
+  );
 
   useEffect(() => {
     // Check if the current user is the post owner
@@ -56,6 +61,21 @@ const ProfilePosts = ({ post: initialPost, userData, onPostDelete }) => {
     setTitle(post.title || "");
     setContent(post.content || post.description || "");
   }, [post]);
+
+  useEffect(() => {
+    // Set up realtime listener for comment count
+    if (!post.id) return;
+
+    const postRef = doc(db, "posts", post.id);
+    const unsubscribe = onSnapshot(postRef, (doc) => {
+      if (doc.exists()) {
+        const data = doc.data();
+        setCommentsCount(data.commentsCount || 0);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [post.id]);
 
   const handleDeletePost = async (postId) => {
     if (!window.confirm("Are you sure you want to delete this post?")) {
@@ -125,6 +145,12 @@ const ProfilePosts = ({ post: initialPost, userData, onPostDelete }) => {
       console.error("Error handling like:", error);
       setIsLikeProcessing(false);
     }
+  };
+
+  const handleCommentClick = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    router.push(`/feed/${post.id}`);
   };
 
   return (
@@ -238,9 +264,14 @@ const ProfilePosts = ({ post: initialPost, userData, onPostDelete }) => {
             <Heart className={`h-5 w-5 ${isLiked ? "fill-current" : ""}`} />
             <span>{likes || 0}</span>
           </Button>
-          <Button variant="ghost" size="sm" className="flex gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="flex gap-2"
+            onClick={handleCommentClick}
+          >
             <MessageCircle className="h-5 w-5" />
-            <span>{post.comments?.length || 0}</span>
+            <span>{commentsCount}</span>
           </Button>
         </div>
         <div className="text-sm text-muted-foreground">
