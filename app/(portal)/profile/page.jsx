@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -289,14 +289,15 @@ export default function Profile() {
             {/* Profile Card */}
             <Card className="overflow-hidden bg-white border-0 shadow-sm">
               {/* Cover Image */}
-              <div className="relative h-48 sm:h-64 md:h-72 bg-gradient-to-r from-blue-50 to-indigo-50">
+              <div className="relative h-full w-full">
                 <Dialog>
-                  <DialogTrigger className="w-full h-full">
+                  <DialogTrigger className="z-30 w-full h-full">
                     <Image
                       src={userData?.coverPic || "/coverimg.png"}
-                      fill
+                      width={1000}
+                      height={1000}
                       alt="Cover Image"
-                      className="object-cover transition-opacity hover:opacity-95"
+                      className=" z-30 object-cover transition-opacity hover:opacity-95 border border-black/40 rounded-t-xl"
                       priority
                     />
                   </DialogTrigger>
@@ -319,11 +320,14 @@ export default function Profile() {
                 {/* Profile picture positioned over cover image */}
                 <Dialog>
                   <DialogTrigger className="absolute bottom-0 left-8 transform translate-y-1/2">
-                    <Avatar className="w-24 h-24 border-4 border-white shadow-md hover:shadow-lg transition-all cursor-pointer">
+                    <Avatar className="z-50 w-24 h-24 border-4 border-white shadow-md hover:shadow-lg transition-all cursor-pointer">
                       <AvatarImage
                         src={userData?.profilePic || "/avatar.png"}
                         alt={userData?.name}
                       />
+                      <AvatarFallback>
+                        {userData?.businessName?.charAt(0) || "B"}
+                      </AvatarFallback>
                     </Avatar>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-md">
