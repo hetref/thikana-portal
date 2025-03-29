@@ -27,13 +27,28 @@ import {
   Heart,
   MessageCircle,
   Bookmark,
+  Share2,
+  Calendar,
+  User,
+  Bookmark,
+  Info,
+  Mail,
+  Phone,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import WhoToFollow from "@/components/WhoToFollow";
 import { useGetUserPosts } from "@/hooks/useGetPosts";
 import useGetUser from "@/hooks/useGetUser";
 import { auth, db } from "@/lib/firebase";
-import { collection, doc, getDoc, onSnapshot } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  onSnapshot,
+  getDocs,
+  query,
+  orderBy,
+} from "firebase/firestore";
 import ProfilePosts from "@/components/ProfilePosts";
 import Link from "next/link";
 import ShowProductsTabContent from "@/components/profile/ShowProductsTabContent";
@@ -44,6 +59,21 @@ import { sendEmailVerification } from "firebase/auth";
 import MoreInformationDialog from "@/components/profile/MoreInformationDialog";
 import FollowingDialog from "@/components/profile/FollowingDialog";
 import FollowerDialog from "@/components/profile/FollowerDialog";
+import PhotosGrid from "@/components/PhotosGrid";
+import AddPhotoModal from "@/components/AddPhotoModal";
+import ShareBusinessDialog from "@/components/profile/ShareBusinessDialog";
+import { cn } from "@/lib/utils";
+
+// Add a style element to hide scrollbars
+const scrollbarHideStyles = `
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+`;
 
 export default function Profile() {
   const router = useRouter();
@@ -52,12 +82,15 @@ export default function Profile() {
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const userId = user?.uid;
-  const userData = useGetUser(userId);
+  const [userData, setUserData] = useState(null);
   const { posts, loading, fetchMorePosts, hasMore, error } =
     useGetUserPosts(userId);
   const [showLocationIFrame, setShowLocationIFrame] = useState(false);
   const [savedPosts, setSavedPosts] = useState([]);
   const [loadingSavedPosts, setLoadingSavedPosts] = useState(false);
+  const [isAddPhotoModalOpen, setIsAddPhotoModalOpen] = useState(false);
+  const [userPhotos, setUserPhotos] = useState([]);
+  const [loadingPhotos, setLoadingPhotos] = useState(false);
   console.log("USERDATA", userData);
 
   useEffect(() => {
@@ -92,6 +125,54 @@ export default function Profile() {
     };
   }, [userId]);
 
+  // Fetch user data with photos
+  useEffect(() => {
+    if (!userId) return;
+
+    // Set up listener for real-time updates
+    const userRef = doc(db, "users", userId);
+    const unsubscribe = onSnapshot(userRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const userData = docSnap.data();
+        setUserData({
+          uid: userId,
+          ...userData,
+        });
+      } else {
+        setUserData(null);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [userId]);
+
+  // Fetch user photos from subcollection
+  useEffect(() => {
+    if (!userId) return;
+
+    setLoadingPhotos(true);
+    const photosRef = collection(db, "users", userId, "photos");
+    const photosQuery = query(photosRef, orderBy("timestamp", "desc"));
+
+    const unsubscribe = onSnapshot(
+      photosQuery,
+      (snapshot) => {
+        const photos = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setUserPhotos(photos);
+        setLoadingPhotos(false);
+      },
+      (error) => {
+        console.error("Error fetching photos:", error);
+        setLoadingPhotos(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [userId]);
+
   const handleLoadMore = () => {
     if (hasMore && !loading) {
       fetchMorePosts();
@@ -115,8 +196,11 @@ export default function Profile() {
     }
     if (!loading && !posts.length) {
       return (
-        <div className="text-center py-8 text-muted-foreground">
-          No posts yet
+        <div className="text-center py-12">
+          <FileTextIcon className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+          <p className="text-muted-foreground">
+            No posts yet. Share your first update!
+          </p>
         </div>
       );
     }
@@ -125,7 +209,7 @@ export default function Profile() {
         {posts.map((post) => (
           <Card
             key={post.id}
-            className="cursor-pointer hover:shadow-md transition-shadow"
+            className="cursor-pointer hover:shadow-md transition-shadow border border-gray-100"
           >
             <CardContent className="pt-6">
               <ProfilePosts post={post} userData={userData} />
@@ -138,6 +222,7 @@ export default function Profile() {
               variant="outline"
               onClick={handleLoadMore}
               disabled={loading}
+              className="rounded-full px-6"
             >
               {loading ? (
                 <>
@@ -257,263 +342,213 @@ export default function Profile() {
   }, [user?.uid]);
 
   return (
-    <div className="flex items-center justify-center w-full">
-      <div className="max-w-7xl w-full flex justify-center gap-6">
-        <main className="mx-auto w-full md:w-4/6 px-2 mt-[15px]">
-          <div className="grid grid-cols-1 gap-6">
-            <div className="w-full">
-              <Card className="bg-card">
-                <CardContent className="pt-6">
-                  <div className="flex flex-col items-center text-center">
-                    <div className="relative mb-12">
-                      {/* <Avatar className="w-full h-full border">
-                        <AvatarImage
-                          src={userData?.coverPic || "/avatar.png"}
-                        />
-                      </Avatar> */}
+    <div className="min-h-screen">
+      {/* Add style element for custom CSS */}
+      <style jsx global>
+        {scrollbarHideStyles}
+      </style>
 
-                      <Dialog>
-                        <DialogTrigger>
-                          <Image
-                            src={userData?.coverPic || "/coverimg.png"}
-                            width={2000}
-                            height={2000}
-                            alt="Cover Image"
-                            className="w-full h-full object-cover"
-                          />
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Cover Image</DialogTitle>
-                            <DialogDescription className="pt-4">
-                              <Image
-                                src={userData?.coverPic || "/coverimg.png"}
-                                width={2000}
-                                height={2000}
-                                alt="Cover Image"
-                                className="w-full h-full object-cover"
-                              />
-                            </DialogDescription>
-                          </DialogHeader>
-                        </DialogContent>
-                      </Dialog>
-                      <Dialog>
-                        <DialogTrigger>
-                          <Avatar className="w-24 h-24 border absolute left-[50%] -translate-x-1/2 -translate-y-1/2">
-                            <AvatarImage
-                              src={userData?.profilePic || "/avatar.png"}
-                            />
-                          </Avatar>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Profile Image</DialogTitle>
-                            <DialogDescription className="pt-4">
-                              <Image
-                                src={userData?.profilePic || "/avatar.png"}
-                                width={2000}
-                                height={2000}
-                                alt="Profile Image"
-                                className="w-full h-full object-cover"
-                              />
-                            </DialogDescription>
-                          </DialogHeader>
-                        </DialogContent>
-                      </Dialog>
+      <div className="max-w-7xl mx-auto">
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Main content */}
+          <main className="flex-1 space-y-6">
+            {/* Profile Card */}
+            <Card className="overflow-hidden bg-white border-0 shadow-sm">
+              {/* Cover Image */}
+              <div className="relative h-48 sm:h-64 md:h-72 bg-gradient-to-r from-blue-50 to-indigo-50">
+                <Dialog>
+                  <DialogTrigger className="w-full h-full">
+                    <Image
+                      src={userData?.coverPic || "/coverimg.png"}
+                      fill
+                      alt="Cover Image"
+                      className="object-cover transition-opacity hover:opacity-95"
+                      priority
+                    />
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-xl">
+                    <DialogHeader>
+                      <DialogTitle>Cover Image</DialogTitle>
+                    </DialogHeader>
+                    <div className="mt-2 rounded-md overflow-hidden">
+                      <Image
+                        src={userData?.coverPic || "/coverimg.png"}
+                        width={1200}
+                        height={600}
+                        alt="Cover Image"
+                        className="w-full object-cover rounded-md"
+                      />
                     </div>
-                    <h1 className="mt-4 text-2xl font-bold">
+                  </DialogContent>
+                </Dialog>
+
+                {/* Profile picture positioned over cover image */}
+                <Dialog>
+                  <DialogTrigger className="absolute bottom-0 left-8 transform translate-y-1/2">
+                    <Avatar className="w-24 h-24 border-4 border-white shadow-md hover:shadow-lg transition-all cursor-pointer">
+                      <AvatarImage
+                        src={userData?.profilePic || "/avatar.png"}
+                        alt={userData?.name}
+                      />
+                    </Avatar>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Profile Picture</DialogTitle>
+                    </DialogHeader>
+                    <div className="mt-2 rounded-md overflow-hidden">
+                      <Image
+                        src={userData?.profilePic || "/avatar.png"}
+                        width={400}
+                        height={400}
+                        alt="Profile Image"
+                        className="w-full object-cover rounded-md"
+                      />
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              {/* Profile info */}
+              <div className="pt-16 px-4 sm:px-6 pb-6">
+                <div className="flex flex-col md:items-start md:justify-between gap-4">
+                  <div className="flex-1 space-y-2">
+                    <h1 className="text-2xl font-bold text-gray-900">
                       {userData?.businessName || "Business Name"}
                     </h1>
-                    <h3 className="text-base font-semibold">
-                      Owner - {userData?.name || "Name"}
-                    </h3>
-                    <p className="mt-2 text-sm">
+                    <div className="flex items-center text-gray-600 gap-1">
+                      <User className="w-4 h-4" />
+                      <span>{userData?.name || "Owner Name"}</span>
+                    </div>
+                    {/* <div className="flex items-center text-gray-600 gap-1">
+                      <Calendar className="w-4 h-4" />
+                      <span className="text-sm">Joined {formattedDate}</span>
+                    </div>
+                    {userData?.role === "business" && userData?.phone && (
+                      <div className="flex items-center text-gray-600 gap-1">
+                        <Phone className="w-4 h-4" />
+                        <span className="text-sm">{userData.phone}</span>
+                      </div>
+                    )} */}
+                    {/* {userData?.role === "business" && userData?.email && (
+                      <div className="flex items-center text-gray-600 gap-1">
+                        <Mail className="w-4 h-4" />
+                        <span className="text-sm">{userData.email}</span>
+                      </div>
+                    )} */}
+                    <p className="text-gray-700 mt-2">
                       {userData?.bio || "Amazing Bio..."}
                     </p>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex w-full gap-2 mt-3 md:mt-0">
+                    {userId === user?.uid && (
+                      <Button
+                        asChild
+                        variant="default"
+                        className="bg-black hover:bg-black/90 px-4 w-full"
+                      >
+                        <Link href="/profile/settings">
+                          <EditIcon className="w-4 h-4 mr-2" />
+                          Edit Profile
+                        </Link>
+                      </Button>
+                    )}
 
                     {userData?.role === "business" && (
-                      <div className="flex mt-4 gap-4 justify-center">
-                        <Button
-                          asChild
-                          variant="outline"
-                          className="flex gap-2 items-center"
-                        >
-                          <Link href="/website-builder">
-                            <EditIcon className="h-4 w-4" />
-                            Edit Website
-                          </Link>
-                        </Button>
-
-                        <Button
-                          asChild
-                          variant="default"
-                          className="bg-blue-600 hover:bg-blue-700 flex gap-2 items-center"
-                        >
-                          <Link href="/website-builder">
-                            <Globe className="h-4 w-4" />
-                            Create Website
-                          </Link>
-                        </Button>
-                      </div>
-                    )}
-
-                    <div className="w-full mt-6">
-                      <div className="flex justify-between mb-4">
-                        <FollowingDialog
-                          followingCount={followingCount}
-                          userId={userId && userId}
-                        />
-                        <Separator orientation="vertical" />
-                        <FollowerDialog
-                          followerCount={followersCount}
-                          userId={userId && userId}
-                        />
-                        <Separator orientation="vertical" />
-                        {/* <div>
-                          <div className="font-semibold">{followersCount}</div>
-                          <div className="text-sm text-muted-foreground">
-                            Followers
-                          </div>
-                        </div>
-                        <Separator orientation="vertical" /> */}
-                        <div>
-                          <div className="font-semibold">{posts.length}</div>
-                          <div className="text-sm text-muted-foreground">
-                            Posts
-                          </div>
-                        </div>
-                        <Separator orientation="vertical" />
-                        <div>
-                          <div className="font-semibold">
-                            {userData?.photos?.length || 0}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            Photos
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    {/* {userId === user?.uid && ( */}
-                    {/* <> */}
-                    <div className="flex items-center w-full gap-2">
-                      {userId === user?.uid && (
-                        <Link
-                          className="w-full flex items-center justify-center gap-2 bg-black/90 px-4 py-2 rounded-md text-white hover:bg-black transition-all ease-in-out duration-200"
-                          href="/profile/settings"
-                        >
-                          <EditIcon className="w-4 h-4 mr-2" />
-                          Edit Profile
-                        </Link>
-                      )}
-                      {userData?.role === "business" && (
-                        <>
-                          <Button variant="ghost" asChild>
-                            <Link
-                              href={userData?.website || "#"}
-                              target="_blank"
-                            >
-                              <Globe className="w-4 w-4" />
-                            </Link>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            onClick={() =>
-                              setShowLocationIFrame(!showLocationIFrame)
-                            }
-                          >
-                            <MapPinIcon className="w-4 h-4" />
-                          </Button>
-                          {userData && (
-                            <MoreInformationDialog userData={userData} />
-                          )}
-                        </>
-                      )}
-                    </div>
-                    {showLocationIFrame && userData?.role === "business" && (
-                      <div className="w-full mt-4">
-                        <iframe
-                          src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d7544.081477968485!2d73.08964204800337!3d19.017926421940366!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3be7e9d390c16fad%3A0x45a26096b6c171fd!2sKamothe%2C%20Panvel%2C%20Navi%20Mumbai%2C%20Maharashtra!5e0!3m2!1sen!2sin!4v1739571469059!5m2!1sen!2sin"
-                          style={{ border: "0" }}
-                          allowFullScreen=""
-                          loading="lazy"
-                          referrerPolicy="no-referrer-when-downgrade"
-                          className="w-full h-[200px] rounded-lg"
-                        ></iframe>
-                      </div>
-                    )}
-                    {/* </> */}
-                    {/* )} */}
-                    {/* {userId === user?.uid && (
                       <>
-                        <Link
-                          className="w-full mt-4 flex items-center justify-center gap-2 bg-black/90 px-4 py-2 rounded-md text-white hover:bg-black transition-all ease-in-out duration-200"
-                          href="/profile/settings"
+                        <Button
+                          variant="outline"
+                          className=""
+                          onClick={() =>
+                            setShowLocationIFrame(!showLocationIFrame)
+                          }
                         >
-                          <EditIcon className="w-4 h-4 mr-2" />
-                          Edit Profile
-                        </Link>
+                          <MapPinIcon className="w-4 h-4 mr-1" />
+                          Location
+                        </Button>
+
                         {userData && (
-                          <ProfileEditModal
-                            isOpen={isModalOpen}
-                            onClose={() => setIsModalOpen(false)}
-                            currentUser={userData}
-                          />
+                          <MoreInformationDialog userData={userData} />
                         )}
+
+                        <ShareBusinessDialog userData={userData} />
                       </>
-                    )} */}
-                    {/* <div className="w-full mt-6 space-y-2 text-sm">
-                      <div className="flex items-center text-muted-foreground">
-                        <MapPinIcon className="w-4 h-4 mr-2" />
-                        {userData?.location ? (
-                          <a
-                            href={userData?.location || "#"}
-                            className="hover:underline"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            {userData.location}
-                          </a>
-                        ) : (
-                          "No location"
-                        )}
-                      </div>
-                      <div className="flex items-center text-muted-foreground">
-                        <LinkIcon className="w-4 h-4 mr-2" />
-                        {userData?.website ? (
-                          <a
-                            href={
-                              userData.website.startsWith("http")
-                                ? userData.website
-                                : `https://${userData.website}`
-                            }
-                            className="hover:underline"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            {userData.website}
-                          </a>
-                        ) : (
-                          "No website"
-                        )}
-                      </div>
-                      <div className="flex items-center text-muted-foreground">
-                        <CalendarIcon className="w-4 h-4 mr-2" />
-                        Joined {formattedDate}
-                      </div>
-                    </div> */}
+                    )}
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+                </div>
+
+                {/* Stats row */}
+                <div className="mt-6 grid grid-cols-4 gap-4 divide-x divide-gray-200 rounded-lg border p-4 bg-gray-50">
+                  <FollowingDialog
+                    followingCount={followingCount}
+                    userId={userId && userId}
+                    className="flex flex-col items-center cursor-pointer"
+                  />
+                  <FollowerDialog
+                    followerCount={followersCount}
+                    userId={userId && userId}
+                    className="flex flex-col items-center pl-4 cursor-pointer"
+                  />
+                  <div className="flex flex-col items-center pl-4">
+                    <div className="font-semibold text-gray-900">
+                      {posts.length}
+                    </div>
+                    <div className="text-sm text-gray-600">Posts</div>
+                  </div>
+                  <div className="flex flex-col items-center pl-4">
+                    <div className="font-semibold text-gray-900">
+                      {userPhotos.length || 0}
+                    </div>
+                    <div className="text-sm text-gray-600">Photos</div>
+                  </div>
+                </div>
+
+                {/* Location map */}
+                {showLocationIFrame && userData?.role === "business" && (
+                  <div className="mt-6 rounded-lg border overflow-hidden bg-white shadow-sm">
+                    <div className="p-4 border-b">
+                      <h3 className="font-medium flex items-center gap-2 text-gray-900">
+                        <MapPinIcon className="w-4 h-4" />
+                        Business Location
+                      </h3>
+                      {userData?.locations?.address ? (
+                        <div className="mt-1 text-sm text-gray-600">
+                          {userData.locations.address}
+                        </div>
+                      ) : null}
+                    </div>
+                    <iframe
+                      src={
+                        userData?.locations?.mapUrl ||
+                        "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d7544.081477968485!2d73.08964204800337!3d19.017926421940366!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3be7e9d390c16fad%3A0x45a26096b6c171fd!2sKamothe%2C%20Panvel%2C%20Navi%20Mumbai%2C%20Maharashtra!5e0!3m2!1sen!2sin!4v1739571469059!5m2!1sen!2sin"
+                      }
+                      style={{ border: "0" }}
+                      allowFullScreen=""
+                      loading="lazy"
+                      referrerPolicy="no-referrer-when-downgrade"
+                      className="w-full h-[300px]"
+                    ></iframe>
+                  </div>
+                )}
+              </div>
+            </Card>
+
+            {/* Email verification warning */}
             {userEmailStatus() === false && (
-              <div className="w-full text-center text-lg">
-                <p>Please verify your email to access the platform features.</p>
-                <Button
-                  onClick={verifyEmailHandler}
-                  className="bg-emerald-800 mt-3"
-                >
-                  Verify Email
-                </Button>
+              <div className="rounded-lg bg-amber-50 border border-amber-200 p-4 shadow-sm">
+                <div className="flex flex-col items-center text-center">
+                  <p className="text-amber-800 mb-3">
+                    Please verify your email to access all platform features.
+                  </p>
+                  <Button
+                    onClick={verifyEmailHandler}
+                    className="bg-amber-600 hover:bg-amber-700 rounded-full px-6"
+                  >
+                    Verify Email
+                  </Button>
+                </div>
               </div>
             )}
             {userEmailStatus() === true && (
@@ -746,11 +781,13 @@ export default function Profile() {
                 </TabsContent>
               </Tabs>
             )}
-          </div>
-        </main>
-        <aside className="hidden lg:block w-2/6 mt-[15px]">
-          <WhoToFollow />
-        </aside>
+          </main>
+
+          {/* Right sidebar */}
+          <aside className="hidden lg:block lg:w-80 space-y-6">
+            <WhoToFollow />
+          </aside>
+        </div>
       </div>
     </div>
   );

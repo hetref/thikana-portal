@@ -1,27 +1,25 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  CalendarIcon,
   FileTextIcon,
-  HeartIcon,
-  LinkIcon,
   MapPinIcon,
   Loader2Icon,
   Images,
-  EditIcon,
   SquareChartGantt,
   Globe,
   Minus,
   Plus,
+  User,
+  Calendar,
+  Phone,
+  Mail,
+  Info,
 } from "lucide-react";
-import Sidebar from "@/components/Sidebar";
-import WhoToFollow from "@/components/WhoToFollow";
 import { useSearchParams } from "next/navigation";
 import { useGetUserPosts } from "@/hooks/useGetPosts";
 import useGetUser from "@/hooks/useGetUser";
@@ -30,11 +28,9 @@ import {
   collection,
   doc,
   getDoc,
-  getDocs,
   onSnapshot,
-  updateDoc,
-  arrayUnion,
-  arrayRemove,
+  query,
+  orderBy,
   setDoc,
   deleteDoc,
 } from "firebase/firestore";
@@ -46,113 +42,212 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogHeader,
-  DialogClose,
 } from "@/components/ui/dialog";
 import Link from "next/link";
 import ShowProductsTabContent from "@/components/profile/ShowProductsTabContent";
 import Image from "next/image";
-import { userEmailStatus } from "@/utils/userStatus";
-import toast from "react-hot-toast";
-import { sendEmailVerification } from "firebase/auth";
 import MoreInformationDialog from "@/components/profile/MoreInformationDialog";
 import FollowingDialog from "@/components/profile/FollowingDialog";
 import FollowerDialog from "@/components/profile/FollowerDialog";
+import ShareBusinessDialog from "@/components/profile/ShareBusinessDialog";
+import toast from "react-hot-toast";
+import { cn } from "@/lib/utils";
 
-export default function Profile() {
+// Add a style element to hide scrollbars
+const scrollbarHideStyles = `
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+`;
+
+export default function UserProfile() {
   const router = useRouter();
-  const [user, setUser] = useState(null);
-  const [likedPosts, setLikedPosts] = useState([]);
+  const params = useParams();
+  const username = params.username;
+  const searchParams = useSearchParams();
+  const [currentUser, setCurrentUser] = useState(null);
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [showLocationIFrame, setShowLocationIFrame] = useState(false);
-  const searchParams = useSearchParams();
-  const nuserId = searchParams.get("user");
-  const userData = useGetUser(nuserId);
-  const { posts, loading, fetchMorePosts, hasMore, error } =
-    useGetUserPosts(nuserId);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [userPhotos, setUserPhotos] = useState([]);
+  const [loadingPhotos, setLoadingPhotos] = useState(false);
 
-  console.log("NUSERID", nuserId);
+  // Get the user ID from the search params or by looking up the username
+  const paramUserId = searchParams.get("user");
+  const [userId, setUserId] = useState(paramUserId);
+  const userData = useGetUser(userId);
+  const {
+    posts,
+    loading: postsLoading,
+    fetchMorePosts,
+    hasMore,
+    error,
+  } = useGetUserPosts(userId);
 
+  // If we don't have a userId from search params, look it up by username
+  useEffect(() => {
+    const fetchUserIdByUsername = async () => {
+      if (!username || paramUserId) return;
+      try {
+        const usernameDoc = await getDoc(doc(db, "usernames", username));
+        if (usernameDoc.exists()) {
+          const uid = usernameDoc.data().uid;
+          setUserId(uid);
+        }
+      } catch (err) {
+        console.error("Error fetching user by username:", err);
+      }
+    };
+
+    fetchUserIdByUsername();
+  }, [username, paramUserId]);
+
+  // Check if the current user is logged in
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((authUser) => {
       if (authUser) {
-        if (nuserId === authUser.uid) router.push("/profile");
-        setUser(authUser);
-      } else {
-        router.push("/login");
+        // Redirect to /profile if the user is viewing their own profile
+        if (userId === authUser.uid) {
+          router.push("/profile");
+        }
+        setCurrentUser(authUser);
       }
+      setLoading(false);
     });
     return () => unsubscribe();
-  }, [router]);
+  }, [userId, router]);
 
+  // Fetch followers and following counts
   useEffect(() => {
-    if (!nuserId) return;
-    if (nuserId === auth.currentUser?.uid) router.push("/profile");
-    const followersRef = collection(db, "users", nuserId, "followers");
-    const followingRef = collection(db, "users", nuserId, "following");
+    if (!userId) return;
+
+    const followersRef = collection(db, "users", userId, "followers");
+    const followingRef = collection(db, "users", userId, "following");
 
     const unsubscribeFollowers = onSnapshot(followersRef, (snapshot) => {
       setFollowersCount(snapshot.size);
-      console.log("Followers count:", snapshot.size);
     });
 
     const unsubscribeFollowing = onSnapshot(followingRef, (snapshot) => {
       setFollowingCount(snapshot.size);
-      console.log("Following count:", snapshot.size);
     });
 
     return () => {
       unsubscribeFollowers();
       unsubscribeFollowing();
     };
-  }, [nuserId]);
+  }, [userId]);
 
+  // Check if current user is following this profile
   useEffect(() => {
-    if (!user || !nuserId) return;
+    if (!currentUser || !userId) return;
 
-    const followingRef = collection(db, "users", user.uid, "following");
+    const followingRef = collection(db, "users", currentUser.uid, "following");
     const unsubscribe = onSnapshot(followingRef, (snapshot) => {
-      const isUserFollowing = snapshot.docs.some((doc) => doc.id === nuserId);
+      const isUserFollowing = snapshot.docs.some((doc) => doc.id === userId);
       setIsFollowing(isUserFollowing);
     });
 
     return () => unsubscribe();
-  }, [user, nuserId]);
+  }, [currentUser, userId]);
+
+  // Fetch user photos
+  useEffect(() => {
+    if (!userId) return;
+
+    setLoadingPhotos(true);
+    const photosRef = collection(db, "users", userId, "photos");
+    const photosQuery = query(photosRef, orderBy("timestamp", "desc"));
+
+    const unsubscribe = onSnapshot(
+      photosQuery,
+      (snapshot) => {
+        const photos = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        console.log("PHOTOS", photos);
+        setUserPhotos(photos);
+        setLoadingPhotos(false);
+      },
+      (error) => {
+        console.error("Error fetching photos:", error);
+        setLoadingPhotos(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [userId]);
 
   const handleLoadMore = () => {
-    if (hasMore && !loading) {
+    if (hasMore && !postsLoading) {
       fetchMorePosts();
     }
   };
 
-  const formattedDate = new Date(
-    user?.metadata?.creationTime
-  ).toLocaleDateString("en-US", {
-    month: "long",
-    year: "numeric",
-  });
+  const handleFollowToggle = async () => {
+    if (!currentUser || !userId) return;
+
+    try {
+      if (isFollowing) {
+        // Unfollow logic
+        await Promise.all([
+          deleteDoc(doc(db, "users", userId, "followers", currentUser.uid)),
+          deleteDoc(doc(db, "users", currentUser.uid, "following", userId)),
+        ]);
+        toast.success("Unfollowed successfully");
+      } else {
+        // Follow logic
+        await Promise.all([
+          setDoc(doc(db, "users", userId, "followers", currentUser.uid), {
+            uid: currentUser.uid,
+            timestamp: new Date(),
+          }),
+          setDoc(doc(db, "users", currentUser.uid, "following", userId), {
+            uid: userId,
+            timestamp: new Date(),
+          }),
+        ]);
+        toast.success("Followed successfully");
+      }
+    } catch (error) {
+      console.error("Error updating follow status:", error);
+      toast.error("Failed to update follow status");
+    }
+  };
 
   const renderPosts = () => {
-    if (loading && !posts.length) {
+    if (postsLoading && !posts.length) {
       return (
         <div className="flex justify-center py-8">
-          <Loader2Icon className="w-6 h-6 animate-spin" />
+          <Loader2Icon className="w-6 h-6 animate-spin text-primary/70" />
         </div>
       );
     }
-    if (!loading && !posts.length) {
+    if (!postsLoading && !posts.length) {
       return (
-        <div className="text-center py-8 text-muted-foreground">
-          No posts yet
+        <div className="text-center py-12">
+          <FileTextIcon className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+          <p className="text-muted-foreground">No posts yet.</p>
         </div>
       );
     }
     return (
       <div className="space-y-4">
         {posts.map((post) => (
-          <Card key={post.id} className="p-4">
-            <ProfilePosts post={post} userData={userData} />
+          <Card
+            key={post.id}
+            className="cursor-pointer hover:shadow-md transition-shadow border border-gray-100"
+          >
+            <CardContent className="pt-6">
+              <ProfilePosts post={post} userData={userData} />
+            </CardContent>
           </Card>
         ))}
         {hasMore && (
@@ -160,9 +255,10 @@ export default function Profile() {
             <Button
               variant="outline"
               onClick={handleLoadMore}
-              disabled={loading}
+              disabled={postsLoading}
+              className="rounded-full px-6"
             >
-              {loading ? (
+              {postsLoading ? (
                 <>
                   <Loader2Icon className="w-4 h-4 mr-2 animate-spin" />
                   Loading...
@@ -177,322 +273,366 @@ export default function Profile() {
     );
   };
 
-  const handleFollowToggle = async () => {
-    if (!user || !nuserId) return;
-
-    const userRef = doc(db, "users", user.uid, "following", nuserId);
-    const nuserRef = doc(db, "users", nuserId, "followers", user.uid);
-
-    try {
-      if (isFollowing) {
-        await Promise.all([deleteDoc(userRef), deleteDoc(nuserRef)]);
-        setIsFollowing(false);
-      } else {
-        await Promise.all([
-          setDoc(userRef, {
-            uid: nuserId,
-            timestamp: new Date(),
-          }),
-          setDoc(nuserRef, {
-            uid: user.uid,
-            timestamp: new Date(),
-          }),
-        ]);
-        setIsFollowing(true);
-      }
-    } catch (error) {
-      console.error("Error updating following status:", error);
-    }
-  };
-
-  const verifyEmailHandler = () => {
-    if (user) {
-      sendEmailVerification(user)
-        .then(() => {
-          toast.success("Email Verification Link Sent Sucessfully!");
-        })
-        .catch((error) => {
-          console.error("Error sending email verification:", error);
-        });
-    }
-  };
-
   if (loading) {
     return (
-      <div className="flex items-center justify-center w-full h-screen">
-        <Loader2Icon className="w-6 h-6 animate-spin" />
-        <span className="ml-2">Loading...</span>
+      <div className="flex justify-center items-center py-20">
+        <Loader2Icon className="w-8 h-8 animate-spin text-primary/70" />
+        <span className="ml-2">Loading profile...</span>
       </div>
     );
   }
 
+  const formattedDate = userData?.createdAt
+    ? new Date(userData.createdAt.toDate()).toLocaleDateString("en-US", {
+        month: "long",
+        year: "numeric",
+      })
+    : "";
+
   return (
-    <div className="flex items-center justify-center w-full">
-      <div className="max-w-7xl w-full grid grid-cols-1 gap-0 py-8 lg:grid-cols-[300px_minmax(0,1fr)_300px] lg:gap-0.5">
-        <aside className="hidden lg:block">
-          <div className="sticky top-20">
-            <Sidebar />
-          </div>
-        </aside>
-        <main className="max-w-[580px] mx-auto w-full px-2">
-          <div className="grid grid-cols-1 gap-6">
-            <div className="w-full">
-              <Card className="bg-card">
-                <CardContent className="pt-6">
-                  <div className="flex flex-col items-center text-center">
-                    <div className="relative mb-12">
-                      <Dialog>
-                        <DialogTrigger>
-                          <Image
-                            src={userData?.coverPic || "/coverimg.png"}
-                            width={2000}
-                            height={2000}
-                            alt="Cover Image"
-                            className="w-full h-full object-cover"
-                          />
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Cover Image</DialogTitle>
-                            <DialogDescription className="pt-4">
-                              <Image
-                                src={userData?.coverPic || "/coverimg.png"}
-                                width={2000}
-                                height={2000}
-                                alt="Cover Image"
-                                className="w-full h-full object-cover"
-                              />
-                            </DialogDescription>
-                          </DialogHeader>
-                        </DialogContent>
-                      </Dialog>
-                      <Dialog>
-                        <DialogTrigger>
-                          <Avatar className="w-24 h-24 border absolute left-[50%] -translate-x-1/2 -translate-y-1/2">
-                            <AvatarImage
-                              src={userData?.profilePic || "/avatar.png"}
-                            />
-                          </Avatar>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Profile Image</DialogTitle>
-                            <DialogDescription className="pt-4">
-                              <Image
-                                src={userData?.profilePic || "/avatar.png"}
-                                width={2000}
-                                height={2000}
-                                alt="Profile Image"
-                                className="w-full h-full object-cover"
-                              />
-                            </DialogDescription>
-                          </DialogHeader>
-                        </DialogContent>
-                      </Dialog>
-                    </div>
-                    <h1 className="mt-4 text-2xl font-bold">
-                      {userData?.businessName || "Business Name"}
-                    </h1>
-                    <h3 className="text-base font-semibold">
-                      Owner - {userData?.name || "Name"}
-                    </h3>
-                    <p className="mt-2 text-sm">
-                      {userData?.bio || "Amazing Bio..."}
-                    </p>
-                    <div className="w-full mt-6">
-                      <div className="flex justify-between mb-4">
-                        <FollowingDialog
-                          followingCount={followingCount}
-                          userId={nuserId && nuserId}
-                        />
-                        <Separator orientation="vertical" />
-                        <FollowerDialog
-                          followerCount={followersCount}
-                          userId={nuserId && nuserId}
-                        />
-                        <Separator orientation="vertical" />
-                        <div>
-                          <div className="font-semibold">{posts.length}</div>
-                          <div className="text-sm text-muted-foreground">
-                            Posts
-                          </div>
-                        </div>
-                        <Separator orientation="vertical" />
-                        <div>
-                          <div className="font-semibold">
-                            {userData?.photos?.length || 0}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            Photos
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center w-full gap-2">
-                      {nuserId === user?.uid && (
-                        <Link
-                          className="w-full flex items-center justify-center gap-2 bg-black/90 px-4 py-2 rounded-md text-white hover:bg-black transition-all ease-in-out duration-200"
-                          href="/profile/settings"
-                        >
-                          <EditIcon className="w-4 h-4 mr-2" />
-                          Edit Profile
-                        </Link>
-                      )}
-                      {nuserId !== user?.uid && (
-                        <Button
-                          onClick={handleFollowToggle}
-                          className="w-full flex items-center justify-center gap-2 bg-black/90 px-4 py-2 rounded-md text-white hover:bg-black transition-all ease-in-out duration-200"
-                        >
-                          {isFollowing ? (
-                            <Minus className="w-4 h-4" />
-                          ) : (
-                            <Plus className="w-4 h-4" />
-                          )}
-                          {isFollowing ? "Unfollow" : "Follow"}
-                        </Button>
-                      )}
-                      <Button variant="ghost" asChild>
-                        <Link href={userData?.website || "#"} target="_blank">
-                          <Globe className="w-4 h-4" />
-                        </Link>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        onClick={() =>
-                          setShowLocationIFrame(!showLocationIFrame)
-                        }
-                      >
-                        <MapPinIcon className="w-4 h-4" />
-                      </Button>
-                      {userData && (
-                        <MoreInformationDialog userData={userData} />
-                      )}
-                    </div>
-                    {showLocationIFrame && (
-                      <div className="w-full mt-4">
-                        <iframe
-                          src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d7544.081477968485!2d73.08964204800337!3d19.017926421940366!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3be7e9d390c16fad%3A0x45a26096b6c171fd!2sKamothe%2C%20Panvel%2C%20Navi%20Mumbai%2C%20Maharashtra!5e0!3m2!1sen!2sin!4v1739571469059!5m2!1sen!2sin"
-                          style={{ border: "0" }}
-                          allowFullScreen=""
-                          loading="lazy"
-                          referrerPolicy="no-referrer-when-downgrade"
-                          className="w-full h-[200px] rounded-lg"
-                        ></iframe>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+    <div className="space-y-6 py-6">
+      {/* Add style element for custom CSS */}
+      <style jsx global>
+        {scrollbarHideStyles}
+      </style>
+
+      {/* Profile Card */}
+      <Card className="overflow-hidden bg-white border-0 shadow-sm">
+        {/* Cover Image */}
+        <div className="relative h-full w-full">
+          <Dialog>
+            <DialogTrigger className="z-30 w-full h-full">
+              <Image
+                src={userData?.coverPic || "/coverimg.png"}
+                width={1000}
+                height={1000}
+                alt="Cover Image"
+                className=" z-30 object-cover transition-opacity hover:opacity-95 border border-black/40 rounded-t-xl"
+                priority
+              />
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-xl">
+              <DialogHeader>
+                <DialogTitle>Cover Image</DialogTitle>
+              </DialogHeader>
+              <div className="mt-2 rounded-md overflow-hidden">
+                <Image
+                  src={userData?.coverPic || "/coverimg.png"}
+                  width={1200}
+                  height={600}
+                  alt="Cover Image"
+                  className="w-full object-cover rounded-md"
+                />
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Profile picture positioned over cover image */}
+          <Dialog>
+            <DialogTrigger className="absolute bottom-0 left-8 transform translate-y-1/2">
+              <Avatar className="z-50 w-24 h-24 border-4 border-white shadow-md hover:shadow-lg transition-all cursor-pointer">
+                <AvatarImage
+                  src={userData?.profilePic || "/avatar.png"}
+                  alt={userData?.name}
+                />
+                <AvatarFallback>
+                  {userData?.businessName?.charAt(0) || "B"}
+                </AvatarFallback>
+              </Avatar>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Profile Picture</DialogTitle>
+              </DialogHeader>
+              <div className="mt-2 rounded-md overflow-hidden">
+                <Image
+                  src={userData?.profilePic || "/avatar.png"}
+                  width={400}
+                  height={400}
+                  alt="Profile Image"
+                  className="w-full object-cover rounded-md"
+                />
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        {/* Profile info */}
+        <div className="pt-16 px-4 sm:px-6 pb-6">
+          <div className="flex flex-col md:items-start md:justify-between gap-4">
+            <div className="flex-1 space-y-2">
+              <h1 className="text-2xl font-bold text-gray-900">
+                {userData?.businessName || "Business Name"}
+              </h1>
+              <div className="flex items-center text-gray-600 gap-1">
+                <User className="w-4 h-4" />
+                <span>{userData?.name || "Owner Name"}</span>
+              </div>
+              {formattedDate && (
+                <div className="flex items-center text-gray-600 gap-1">
+                  <Calendar className="w-4 h-4" />
+                  <span className="text-sm">Joined {formattedDate}</span>
+                </div>
+              )}
+              {userData?.role === "business" && userData?.phone && (
+                <div className="flex items-center text-gray-600 gap-1">
+                  <Phone className="w-4 h-4" />
+                  <span className="text-sm">{userData.phone}</span>
+                </div>
+              )}
+              {userData?.role === "business" && userData?.email && (
+                <div className="flex items-center text-gray-600 gap-1">
+                  <Mail className="w-4 h-4" />
+                  <span className="text-sm">{userData.email}</span>
+                </div>
+              )}
+              <p className="text-gray-700 mt-2">
+                {userData?.bio || "Amazing Bio..."}
+              </p>
             </div>
-            {userEmailStatus() === false && (
-              <div className="w-full text-center text-lg">
-                <p>Please verify your email to access the platform features.</p>
+
+            {/* Action buttons */}
+            <div className="flex w-full gap-2 mt-3 md:mt-0">
+              {currentUser && (
                 <Button
-                  onClick={verifyEmailHandler}
-                  className="bg-emerald-800 mt-3"
+                  onClick={handleFollowToggle}
+                  variant={isFollowing ? "outline" : "default"}
+                  className={
+                    isFollowing ? "px-4" : "bg-black hover:bg-black/90 px-4"
+                  }
                 >
-                  Verify Email
+                  {isFollowing ? (
+                    <>
+                      <Minus className="w-4 h-4 mr-2" />
+                      Unfollow
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Follow
+                    </>
+                  )}
                 </Button>
+              )}
+
+              {userData?.role === "business" && (
+                <>
+                  <Button
+                    variant="outline"
+                    className=""
+                    onClick={() => setShowLocationIFrame(!showLocationIFrame)}
+                  >
+                    <MapPinIcon className="w-4 h-4 mr-1" />
+                    Location
+                  </Button>
+
+                  {userData && <MoreInformationDialog userData={userData} />}
+
+                  {userData && <ShareBusinessDialog userData={userData} />}
+
+                  {userData?.website && (
+                    <Button variant="outline" asChild className="px-3">
+                      <Link
+                        href={userData.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <Globe className="w-4 h-4 mr-1" />
+                        Website
+                      </Link>
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Stats row */}
+          <div className="mt-6 grid grid-cols-4 gap-4 divide-x divide-gray-200 rounded-lg border p-4 bg-gray-50">
+            <FollowingDialog
+              followingCount={followingCount}
+              userId={userId}
+              className="flex flex-col items-center cursor-pointer"
+            />
+            <FollowerDialog
+              followerCount={followersCount}
+              userId={userId}
+              className="flex flex-col items-center pl-4 cursor-pointer"
+            />
+            <div className="flex flex-col items-center pl-4">
+              <div className="font-semibold text-gray-900">{posts.length}</div>
+              <div className="text-sm text-gray-600">Posts</div>
+            </div>
+            <div className="flex flex-col items-center pl-4">
+              <div className="font-semibold text-gray-900">
+                {userPhotos.length || 0}
+              </div>
+              <div className="text-sm text-gray-600">Photos</div>
+            </div>
+          </div>
+
+          {/* Location map */}
+          {showLocationIFrame && userData?.role === "business" && (
+            <div className="mt-6 rounded-lg border overflow-hidden bg-white shadow-sm">
+              <div className="p-4 border-b">
+                <h3 className="font-medium flex items-center gap-2 text-gray-900">
+                  <MapPinIcon className="w-4 h-4" />
+                  Business Location
+                </h3>
+                {userData?.locations?.address ? (
+                  <div className="mt-1 text-sm text-gray-600">
+                    {userData.locations.address}
+                  </div>
+                ) : null}
+              </div>
+              <iframe
+                src={
+                  userData?.locations?.mapUrl ||
+                  "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d7544.081477968485!2d73.08964204800337!3d19.017926421940366!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3be7e9d390c16fad%3A0x45a26096b6c171fd!2sKamothe%2C%20Panvel%2C%20Navi%20Mumbai%2C%20Maharashtra!5e0!3m2!1sen!2sin!4v1739571469059!5m2!1sen!2sin"
+                }
+                style={{ border: "0" }}
+                allowFullScreen=""
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                className="w-full h-[300px]"
+              ></iframe>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* Content tabs */}
+      <Card className="border-0 shadow-sm overflow-hidden bg-white">
+        <Tabs defaultValue="posts" className="w-full">
+          <div className="border-b">
+            <TabsList className="justify-start h-auto p-0 bg-transparent overflow-x-auto scrollbar-hide whitespace-nowrap">
+              <TabsTrigger
+                value="posts"
+                className={cn(
+                  "rounded-none border-b-2 border-transparent",
+                  "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
+                  "px-6 py-3 font-medium text-sm transition-all duration-200"
+                )}
+              >
+                <FileTextIcon className="w-4 h-4 mr-2" />
+                Posts
+              </TabsTrigger>
+              <TabsTrigger
+                value="photos"
+                className={cn(
+                  "rounded-none border-b-2 border-transparent",
+                  "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
+                  "px-6 py-3 font-medium text-sm transition-all duration-200"
+                )}
+              >
+                <Images className="w-4 h-4 mr-2" />
+                Photos
+              </TabsTrigger>
+              <TabsTrigger
+                value="products"
+                className={cn(
+                  "rounded-none border-b-2 border-transparent",
+                  "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
+                  "px-6 py-3 font-medium text-sm transition-all duration-200"
+                )}
+              >
+                <SquareChartGantt className="w-4 h-4 mr-2" />
+                Products
+              </TabsTrigger>
+            </TabsList>
+          </div>
+
+          <TabsContent
+            value="posts"
+            className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+          >
+            {renderPosts()}
+          </TabsContent>
+
+          <TabsContent
+            value="photos"
+            className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+          >
+            {loadingPhotos ? (
+              <div className="flex justify-center py-10">
+                <Loader2Icon className="w-8 h-8 animate-spin text-gray-400" />
+              </div>
+            ) : userPhotos.length > 0 ? (
+              <div className="grid grid-cols-2 gap-4">
+                {userPhotos?.map((photo) => (
+                  <Dialog key={photo.id}>
+                    <DialogTrigger asChild>
+                      <div className="rounded-lg overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer group">
+                        <div className="relative">
+                          <Image
+                            src={photo.photoUrl}
+                            alt={photo.caption || "Business photo"}
+                            width={500}
+                            height={350}
+                            className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                        </div>
+                        {photo.caption && (
+                          <div className="p-2 bg-white">
+                            <p className="text-sm font-medium truncate">
+                              {photo.caption}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {photo.timestamp
+                                ? new Date(photo.timestamp).toLocaleDateString()
+                                : ""}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-xl">
+                      <DialogHeader>
+                        <DialogTitle>
+                          {photo.caption || "Business Photo"}
+                        </DialogTitle>
+                        <DialogDescription>
+                          {photo.timestamp
+                            ? new Date(photo.timestamp).toLocaleDateString()
+                            : ""}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="mt-2 rounded-md overflow-hidden">
+                        <Image
+                          src={photo.photoUrl}
+                          width={800}
+                          height={800}
+                          alt={photo.caption || "Business photo"}
+                          className="w-full object-contain max-h-[70vh]"
+                        />
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <Images className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+                <p className="text-muted-foreground">No photos available</p>
               </div>
             )}
-            {userEmailStatus() === true && (
-              <Tabs defaultValue="posts" className="w-full">
-                <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent overflow-x-auto whitespace-nowrap sm:text-sm">
-                  <TabsTrigger
-                    value="posts"
-                    className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 font-semibold text-sm sm:text-sm"
-                  >
-                    <FileTextIcon className="w-5 h-5" />
-                    Posts
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="photos"
-                    className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 font-semibold text-sm sm:text-sm"
-                  >
-                    <Images className="w-5 h-5" />
-                    Photos
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="products"
-                    className="flex items-center gap-2 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 font-semibold text-sm sm:text-sm"
-                  >
-                    <SquareChartGantt className="w-5 h-5" />
-                    Products
-                  </TabsTrigger>
-                </TabsList>
-                <TabsContent value="posts" className="p-6">
-                  {renderPosts()}
-                </TabsContent>
-                <TabsContent value="photos" className="p-6">
-                  {userData?.photos && userData.photos.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-4">
-                      {userData.photos.map((photo, index) => (
-                        <Dialog key={index}>
-                          <DialogTrigger asChild>
-                            <div>
-                              <Image
-                                width={1000}
-                                height={1000}
-                                src={photo.photoUrl}
-                                alt={photo.title}
-                                className="w-full h-auto rounded-lg rounded-b-none"
-                              />
-                              <div className="bg-black bg-opacity-90 border-t-2 border-white text-white p-2 rounded-b-lg">
-                                <p>{photo.title}</p>
-                                <p>
-                                  {new Date(photo.addedOn).toLocaleDateString()}
-                                </p>
-                              </div>
-                            </div>
-                          </DialogTrigger>
-                          <DialogContent className="w-full max-w-3xl p-4 flex flex-col gap-2 justify-center items-center">
-                            <DialogTitle>{photo.title}</DialogTitle>
-                            <DialogDescription>
-                              {new Date(photo.addedOn).toLocaleDateString()}
-                            </DialogDescription>
-                            <Image
-                              width={1000}
-                              height={1000}
-                              src={photo.photoUrl}
-                              alt="Full View"
-                              className="max-w-full rounded-lg max-h-[80svh] max-w-[80vw]]"
-                            />
-                          </DialogContent>
-                        </Dialog>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center">
-                      <p className="text-muted-foreground">
-                        No Photos Added Yet
-                      </p>
-                      <Button
-                        className="mt-2"
-                        onClick={() => {
-                          /* Add photo logic */
-                        }}
-                      >
-                        Add Photo
-                      </Button>
-                    </div>
-                  )}
-                </TabsContent>
-                <TabsContent value="products" className="p-6">
-                  {userData && user && (
-                    <ShowProductsTabContent
-                      userId={nuserId}
-                      userData={userData}
-                    />
-                  )}
-                </TabsContent>
-              </Tabs>
+          </TabsContent>
+
+          <TabsContent
+            value="products"
+            className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+          >
+            {userData && (
+              <ShowProductsTabContent
+                userId={userId}
+                userData={userData}
+                isViewOnly={true}
+                currentUserView={false}
+              />
             )}
-          </div>
-        </main>
-        <aside className="hidden lg:block">
-          <WhoToFollow />
-        </aside>
-      </div>
+          </TabsContent>
+        </Tabs>
+      </Card>
     </div>
   );
 }

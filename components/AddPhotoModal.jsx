@@ -5,29 +5,22 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  collection,
-  addDoc,
-  doc,
-  getDoc,
-  updateDoc,
-  arrayUnion,
-  setDoc,
-} from "firebase/firestore";
+import { collection, addDoc } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
+import { Loader2, Upload, ImageIcon, X } from "lucide-react";
+import toast from "react-hot-toast";
 
 export default function AddPhotoModal({ isOpen, onClose, userId }) {
-  const [title, setTitle] = useState("");
   const [imageFile, setImageFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  console.log("USERID", userId);
 
   const handleImageChange = (e) => {
     const file = e.target.files?.[0];
@@ -48,7 +41,7 @@ export default function AddPhotoModal({ isOpen, onClose, userId }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!imageFile || !title) return;
+    if (!imageFile) return;
 
     setIsLoading(true);
     setUploadProgress(0);
@@ -58,21 +51,20 @@ export default function AddPhotoModal({ isOpen, onClose, userId }) {
         setUploadProgress(progress);
       });
       await addPhotoToFirestore(userId, {
-        title,
         imageUrl,
-        createdAt: new Date().toISOString(),
       });
       setUploadProgress(100);
+      toast.success("Photo added successfully!");
       setTimeout(() => {
         onClose();
-        setTitle("");
         setImageFile(null);
         setPreviewUrl(null);
         setIsLoading(false);
         setUploadProgress(0);
-      }, 2000);
+      }, 1000);
     } catch (error) {
       console.error("Error adding photo:", error);
+      toast.error("Failed to upload photo. Please try again.");
       setIsLoading(false);
       setUploadProgress(0);
     }
@@ -107,102 +99,122 @@ export default function AddPhotoModal({ isOpen, onClose, userId }) {
   }
 
   async function addPhotoToFirestore(userId, photoData) {
-    // const userPhotosRef = collection(db, "users", userId, "photos");
-    // await addDoc(userPhotosRef, photoData);
+    // Add the photo to the subcollection with a random document ID
+    const userPhotosRef = collection(db, "users", userId, "photos");
 
-    // Update the user document to include the new photo object
-    const userRef = doc(db, "users", userId);
-    const userDoc = await getDoc(userRef);
+    // Create photo data with required fields
+    const photoDocData = {
+      photoUrl: photoData.imageUrl,
+      timestamp: new Date().toISOString(),
+    };
 
-    if (userDoc.exists()) {
-      const userData = userDoc.data();
-      const photosArray = userData.photos || []; // Check if photos array exists
-
-      // Create the new photo object
-      const newPhotoObject = {
-        photoUrl: photoData.imageUrl,
-        title: photoData.title,
-        addedOn: new Date().toISOString(),
-      };
-
-      // Update the user document
-      await updateDoc(userRef, {
-        photos: arrayUnion(newPhotoObject), // Add the new photo object to the array
-      });
-    } else {
-      // If the user document does not exist, handle accordingly (optional)
-      console.error("User document does not exist.");
-
-      // Optionally, create the user document with an empty photos array
-      await setDoc(userRef, {
-        photos: [
-          {
-            photoUrl: photoData.imageUrl,
-            title: photoData.title,
-            addedOn: new Date().toISOString(),
-          },
-        ],
-      });
-    }
+    // Add the document to the subcollection
+    await addDoc(userPhotosRef, photoDocData);
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Add Photo</DialogTitle>
+      <DialogContent className="sm:max-w-[460px] p-0 overflow-hidden">
+        <DialogHeader className="bg-primary/5 p-6 border-b">
+          <DialogTitle className="text-xl font-semibold">Add Photo</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="title">Title</Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="image">Image</Label>
-            <Input
-              id="image"
-              type="file"
-              accept="image/*"
-              onChange={handleImageChange}
-              required
-            />
-          </div>
-          {previewUrl && (
-            <div className="space-y-2">
-              <div className="w-full h-40 relative">
-                <img
-                  src={previewUrl || "/placeholder.svg"}
-                  alt="Preview"
-                  className="w-full h-full object-cover rounded-md"
-                />
-              </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {!previewUrl ? (
+            <div
+              className="border-2 border-dashed rounded-lg p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer"
+              onClick={() => document.getElementById("photo-upload").click()}
+            >
+              <ImageIcon className="h-10 w-10 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-base font-medium mb-1">
+                Click to upload an image
+              </p>
+              <p className="text-sm text-muted-foreground mb-4">
+                PNG, JPG or WEBP (max. 10MB)
+              </p>
               <Button
                 type="button"
-                variant="destructive"
-                onClick={handleRemoveImage}
+                variant="outline"
+                size="sm"
+                className="mx-auto"
               >
-                Remove Image
+                <Upload className="h-4 w-4 mr-2" />
+                Choose file
               </Button>
+              <Input
+                id="photo-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="hidden"
+              />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="w-full aspect-video relative bg-black/5 rounded-lg overflow-hidden">
+                <img
+                  src={previewUrl}
+                  alt="Preview"
+                  className="w-full h-full object-contain"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white rounded-full h-8 w-8"
+                  onClick={handleRemoveImage}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           )}
+
           {isLoading && (
-            <div className="text-center">
-              <p>Uploading... {uploadProgress.toFixed(0)}%</p>
-              {uploadProgress === 100 && <p>Upload complete!</p>}
+            <div className="bg-muted p-3 rounded-md">
+              <div className="flex items-center mb-2">
+                <div className="w-full bg-muted-foreground/20 rounded-full h-2.5 mr-2">
+                  <div
+                    className="bg-primary h-2.5 rounded-full transition-all duration-300"
+                    style={{ width: `${uploadProgress}%` }}
+                  ></div>
+                </div>
+                <span className="text-xs font-medium">
+                  {uploadProgress.toFixed(0)}%
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {uploadProgress < 100
+                  ? "Uploading your photo..."
+                  : "Upload complete!"}
+              </p>
             </div>
           )}
-          <Button
-            type="submit"
-            className="w-full bg-primary hover:bg-blend-darken"
-            disabled={!imageFile || !title || isLoading}
-          >
-            {isLoading ? "Uploading..." : "Add Photo"}
-          </Button>
+
+          <DialogFooter className="flex justify-end gap-2 mt-6 pt-4 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={isLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="bg-primary hover:bg-primary/90"
+              disabled={!imageFile || isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                "Upload Photo"
+              )}
+            </Button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

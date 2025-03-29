@@ -1,7 +1,9 @@
 "use client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import Map from "./Map";
 import {
   Select,
@@ -105,6 +107,7 @@ export default function WhoToFollow() {
       setOffset(currentOffset + LIMIT);
     } catch (error) {
       console.error("Error fetching recommended businesses:", error);
+      toast.error("Failed to load recommendations");
     } finally {
       setLoading(false);
     }
@@ -162,6 +165,8 @@ export default function WhoToFollow() {
         ),
       ]);
 
+      toast.success("Followed successfully");
+
       // Remove the followed business from the list immediately
       setBusinesses((prevBusinesses) =>
         prevBusinesses.filter((business) => business.id !== businessId)
@@ -179,6 +184,7 @@ export default function WhoToFollow() {
       }
     } catch (error) {
       console.error("Error following business:", error);
+      toast.error("Failed to follow business");
     }
   };
 
@@ -199,6 +205,7 @@ export default function WhoToFollow() {
       toast.success(`Business unfollowed successfully`);
     } catch (error) {
       console.error("Error unfollowing business:", error);
+      toast.error("Failed to unfollow business");
       toast.error("Failed to unfollow business");
     }
   };
@@ -228,18 +235,27 @@ export default function WhoToFollow() {
     }
   };
 
+  const getRecommendationBadge = (business) => {
+    if (business.recommendation_type === "location") {
+      return business.distance_km ? `${business.distance_km}km away` : "Nearby";
+    }
+    return "Based on activity";
+  };
+
   return (
-    <div className="space-y-4 sticky top-[80px] max-h-[80vh] overflow-y-auto">
-      <Card>
-        <CardHeader>
+    <div className="sticky top-20">
+      <Card className="overflow-hidden shadow-md border-none">
+        <CardHeader className="p-6 pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-xl">Who to Follow</CardTitle>
+            <CardTitle className="font-semibold text-lg">
+              Who to Follow
+            </CardTitle>
             <Select
               value={recommendationType}
               onValueChange={handleRecommendationTypeChange}
             >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Select type" />
+              <SelectTrigger className="w-[140px] h-8 text-xs">
+                <SelectValue placeholder="Filter by" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="location">Location Based</SelectItem>
@@ -247,15 +263,52 @@ export default function WhoToFollow() {
               </SelectContent>
             </Select>
           </div>
-          <hr />
+          <Separator className="my-3" />
         </CardHeader>
-        <CardContent className="grid gap-4">
-          {userEmailStatus() === false && (
-            <div className="flex flex-col gap-4 justify-center items-center]">
-              <p>Please verify your email to continue.</p>
+
+        <CardContent className="p-6 pt-0">
+          {userEmailStatus() === false ? (
+            <div className="flex flex-col gap-4 items-center py-6 px-2 text-center">
+              <p className="text-sm text-muted-foreground">
+                Please verify your email to see recommendations.
+              </p>
+              <Button
+                size="sm"
+                className="text-xs bg-amber-600 hover:bg-amber-700"
+                onClick={() => {
+                  sendEmailVerification(auth.currentUser)
+                    .then(() => toast.success("Verification email sent"))
+                    .catch(() =>
+                      toast.error("Failed to send verification email")
+                    );
+                }}
+              >
+                Verify Email
+              </Button>
             </div>
-          )}
-          {userEmailStatus() === true && (
+          ) : loading && businesses.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 space-y-3">
+              <Loader2 className="h-8 w-8 animate-spin text-primary/50" />
+              <p className="text-sm text-muted-foreground">
+                Loading recommendations...
+              </p>
+            </div>
+          ) : businesses.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 space-y-2 text-center">
+              <RefreshCw className="h-8 w-8 text-muted-foreground/50" />
+              <p className="text-sm text-muted-foreground">
+                No recommendations found
+              </p>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => fetchRecommendedBusinesses(0)}
+                className="text-xs"
+              >
+                Refresh
+              </Button>
+            </div>
+          ) : (
             <>
               <div className="flex flex-col items-center gap-2">
                 {businesses.length === 0 && !loading ? (
@@ -357,23 +410,29 @@ export default function WhoToFollow() {
                   ))
                 )}
               </div>
+
               {hasMore && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handleLoadMore}
                   disabled={loading}
-                  className="w-full"
+                  className="w-full mt-4 text-xs h-8"
                 >
-                  {loading ? "Loading..." : "Load More"}
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    "Load More"
+                  )}
                 </Button>
               )}
             </>
           )}
-          <hr />
         </CardContent>
       </Card>
-      {/* <Map /> */}
     </div>
   );
 }
