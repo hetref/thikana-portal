@@ -21,6 +21,11 @@ import toast from "react-hot-toast";
 import ImageUpload from "./ImageUpload";
 import { storage } from "@/lib/firebase";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
+import { Loader2 } from "lucide-react";
 
 const basicInfoSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -161,158 +166,254 @@ export default function BasicInfoForm() {
   }
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex justify-center items-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading your profile...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <ImageUpload
-          label="Profile Image"
-          currentImage={form.getValues("profilePic")}
-          onImageChange={setProfileImageFile}
-        />
-        <ImageUpload
-          label="Cover Image"
-          currentImage={form.getValues("coverPic")}
-          onImageChange={setCoverImageFile}
-          isCover
-        />
-        {uploadingType && (
-          <div>
-            {uploadingType === "profileImg"
-              ? `Profile Image Uploading... ${uploadingProgress.profileImg.toFixed(
-                  0
-                )}%`
-              : `Cover Image Uploading... ${uploadingProgress.coverImg.toFixed(
-                  0
-                )}%`}
-          </div>
-        )}
-        <FormField
-          control={form.control}
-          name="name"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Name</FormLabel>
-              <FormControl>
-                <Input
-                  placeholder="John Doe"
-                  {...field}
-                  disabled={isSubmitting}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="businessName"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Business Name</FormLabel>
-              <FormControl>
-                <Input
-                  placeholder="Acme Inc."
-                  {...field}
-                  disabled={isSubmitting}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="phone"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Phone</FormLabel>
-              <FormControl>
-                <Input
-                  placeholder="+1234567890"
-                  {...field}
-                  disabled={isSubmitting}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="address"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Address</FormLabel>
-              <FormControl>
-                <Input
-                  placeholder="123 Business St, City, Country"
-                  {...field}
-                  disabled={isSubmitting}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="location"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Location</FormLabel>
-              <FormControl>
-                <Input
-                  placeholder="City, Country"
-                  {...field}
-                  disabled={isSubmitting}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="bio"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Bio</FormLabel>
-              <FormControl>
-                <Textarea
-                  placeholder="Tell us about your business..."
-                  {...field}
-                  disabled={isSubmitting}
-                />
-              </FormControl>
-              <FormDescription>Max 500 characters</FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="website"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Website</FormLabel>
-              <FormControl>
-                <Input
-                  placeholder="https://www.example.com"
-                  {...field}
-                  disabled={isSubmitting}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Saving..." : "Save Changes"}
-        </Button>
-      </form>
-    </Form>
+    <Card className="w-full shadow-md border-0">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-2xl font-bold">Business Profile</CardTitle>
+        <p className="text-muted-foreground">
+          Update your business information and profile images
+        </p>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <Tabs defaultValue="images" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-4">
+                <TabsTrigger value="images">Images</TabsTrigger>
+                <TabsTrigger value="info">Business Information</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="images" className="space-y-6">
+                <div className="flex flex-col gap-6">
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">Profile Image</h3>
+                    <ImageUpload
+                      label="Profile Image"
+                      currentImage={form.getValues("profilePic")}
+                      onImageChange={setProfileImageFile}
+                      className="aspect-square rounded-full"
+                    />
+                    {uploadingType === "profileImg" && (
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Uploading...</span>
+                          <span>
+                            {uploadingProgress.profileImg.toFixed(0)}%
+                          </span>
+                        </div>
+                        <Progress
+                          value={uploadingProgress.profileImg}
+                          className="h-2"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">Cover Image</h3>
+                    <ImageUpload
+                      label="Cover Image"
+                      currentImage={form.getValues("coverPic")}
+                      onImageChange={setCoverImageFile}
+                      isCover
+                      className="aspect-[3/1] rounded-md"
+                    />
+                    {uploadingType === "coverImg" && (
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Uploading...</span>
+                          <span>{uploadingProgress.coverImg.toFixed(0)}%</span>
+                        </div>
+                        <Progress
+                          value={uploadingProgress.coverImg}
+                          className="h-2"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="info" className="space-y-6">
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Personal Details</h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Full Name</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="John Doe"
+                              {...field}
+                              disabled={isSubmitting}
+                              className="border-input hover:border-primary focus:border-primary transition-colors"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Phone Number</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="+1234567890"
+                              {...field}
+                              disabled={isSubmitting}
+                              className="border-input hover:border-primary focus:border-primary transition-colors"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Business Details</h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="businessName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Business Name</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Acme Inc."
+                              {...field}
+                              disabled={isSubmitting}
+                              className="border-input hover:border-primary focus:border-primary transition-colors"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="website"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Website</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="https://www.example.com"
+                              {...field}
+                              disabled={isSubmitting}
+                              className="border-input hover:border-primary focus:border-primary transition-colors"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid gap-4">
+                    <FormField
+                      control={form.control}
+                      name="address"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Business Address</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="123 Business St, City, Country"
+                              {...field}
+                              disabled={isSubmitting}
+                              className="border-input hover:border-primary focus:border-primary transition-colors"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="location"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Location</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="City, Country"
+                              {...field}
+                              disabled={isSubmitting}
+                              className="border-input hover:border-primary focus:border-primary transition-colors"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="bio"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Business Bio</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Tell us about your business..."
+                            {...field}
+                            disabled={isSubmitting}
+                            className="min-h-[120px] resize-y border-input hover:border-primary focus:border-primary transition-colors"
+                          />
+                        </FormControl>
+                        <FormDescription className="text-xs">
+                          Write a short description about your business. Max 500
+                          characters.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </TabsContent>
+            </Tabs>
+
+            <div className="flex justify-end pt-2">
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                className="min-w-[120px] transition-all"
+              >
+                {isSubmitting ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Saving...
+                  </span>
+                ) : (
+                  "Save Changes"
+                )}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
   );
 }
