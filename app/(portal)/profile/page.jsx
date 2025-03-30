@@ -45,6 +45,7 @@ import {
   Mail,
   Phone,
   Settings,
+  LayoutDashboard,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import WhoToFollow from "@/components/WhoToFollow";
@@ -599,6 +600,19 @@ export default function Profile() {
                         <Link href="/profile/settings">
                           <EditIcon className="w-4 h-4 mr-2" />
                           Edit Profile
+                        </Link>
+                      </Button>
+                    )}
+
+                    {isCurrentUser && isBusinessUser && (
+                      <Button
+                        asChild
+                        variant="default"
+                        className="bg-primary hover:bg-primary/90 px-4 w-full"
+                      >
+                        <Link href="/dashboard">
+                          <LayoutDashboard className="w-4 h-4 mr-2" />
+                          Dashboard
                         </Link>
                       </Button>
                     )}

@@ -46,6 +46,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 
 export default function ServicesPage() {
   const [services, setServices] = useState([]);
@@ -56,6 +58,8 @@ export default function ServicesPage() {
     name: "",
     description: "",
     price: "",
+    isVariablePrice: false,
+    approximatePrice: "",
     duration: "",
   });
 
@@ -94,6 +98,13 @@ export default function ServicesPage() {
     }));
   };
 
+  const handleCheckboxChange = (checked) => {
+    setFormData((prev) => ({
+      ...prev,
+      isVariablePrice: checked,
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     const user = auth.currentUser;
@@ -101,11 +112,21 @@ export default function ServicesPage() {
 
     try {
       const serviceData = {
-        ...formData,
-        price: parseFloat(formData.price),
+        name: formData.name,
+        description: formData.description,
+        isVariablePrice: formData.isVariablePrice,
+        duration: formData.duration,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
+
+      // Add price based on whether it's variable or fixed
+      if (formData.isVariablePrice) {
+        serviceData.approximatePrice =
+          parseFloat(formData.approximatePrice) || 0;
+      } else {
+        serviceData.price = parseFloat(formData.price) || 0;
+      }
 
       if (editingService) {
         // Update existing service
@@ -132,6 +153,8 @@ export default function ServicesPage() {
         name: "",
         description: "",
         price: "",
+        isVariablePrice: false,
+        approximatePrice: "",
         duration: "",
       });
       fetchServices();
@@ -146,7 +169,11 @@ export default function ServicesPage() {
     setFormData({
       name: service.name,
       description: service.description,
-      price: service.price.toString(),
+      price: service.price ? service.price.toString() : "",
+      isVariablePrice: service.isVariablePrice || false,
+      approximatePrice: service.approximatePrice
+        ? service.approximatePrice.toString()
+        : "",
       duration: service.duration,
     });
     setIsAddDialogOpen(true);
@@ -222,20 +249,51 @@ export default function ServicesPage() {
                   required
                 />
               </div>
-              <div>
-                <Label htmlFor="price">Price (₹)</Label>
-                <Input
-                  id="price"
-                  name="price"
-                  type="number"
-                  value={formData.price}
-                  onChange={handleInputChange}
-                  placeholder="0.00"
-                  min="0"
-                  step="0.01"
-                  required
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="isVariablePrice"
+                  checked={formData.isVariablePrice}
+                  onCheckedChange={handleCheckboxChange}
                 />
+                <Label htmlFor="isVariablePrice">
+                  Price varies based on requirements
+                </Label>
               </div>
+              {formData.isVariablePrice ? (
+                <div>
+                  <Label htmlFor="approximatePrice">
+                    Approximate Price (₹)
+                  </Label>
+                  <Input
+                    id="approximatePrice"
+                    name="approximatePrice"
+                    type="number"
+                    value={formData.approximatePrice}
+                    onChange={handleInputChange}
+                    placeholder="0.00"
+                    min="0"
+                    step="0.01"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    An estimate to give customers an idea of your pricing
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <Label htmlFor="price">Fixed Price (₹)</Label>
+                  <Input
+                    id="price"
+                    name="price"
+                    type="number"
+                    value={formData.price}
+                    onChange={handleInputChange}
+                    placeholder="0.00"
+                    min="0"
+                    step="0.01"
+                    required={!formData.isVariablePrice}
+                  />
+                </div>
+              )}
               <div>
                 <Label htmlFor="duration">Duration</Label>
                 <Input
@@ -268,7 +326,23 @@ export default function ServicesPage() {
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Price</span>
-                  <span className="font-semibold">₹{service.price}</span>
+                  {service.isVariablePrice ? (
+                    <div className="flex items-center">
+                      <Badge
+                        variant="outline"
+                        className="bg-amber-50 text-amber-700 border-amber-200"
+                      >
+                        Variable
+                      </Badge>
+                      {service.approximatePrice > 0 && (
+                        <span className="ml-2 font-semibold">
+                          ~₹{service.approximatePrice}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="font-semibold">₹{service.price}</span>
+                  )}
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Duration</span>

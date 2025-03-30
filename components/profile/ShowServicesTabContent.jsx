@@ -3,7 +3,17 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
-import { collection, getDocs, query, orderBy, where } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  query,
+  orderBy,
+  where,
+  addDoc,
+  serverTimestamp,
+  doc,
+  getDoc,
+} from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,14 +23,45 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Settings, ArrowRight, Clock, Loader2 } from "lucide-react";
+import {
+  Settings,
+  ArrowRight,
+  Clock,
+  Loader2,
+  MessageSquare,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import toast from "react-hot-toast";
 
 export default function ShowServicesTabContent({ userId, userData }) {
   const router = useRouter();
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [contactDialogOpen, setContactDialogOpen] = useState(false);
+  const [contactForm, setContactForm] = useState({
+    serviceId: "",
+    message: "",
+    submitting: false,
+  });
 
   useEffect(() => {
     const fetchServices = async () => {
@@ -46,6 +87,64 @@ export default function ShowServicesTabContent({ userId, userData }) {
       fetchServices();
     }
   }, [userId]);
+
+  const handleContactSubmit = async (e) => {
+    e.preventDefault();
+    if (!contactForm.serviceId || !contactForm.message) {
+      toast.error("Please select a service and enter a message");
+      return;
+    }
+
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      toast.error("You must be logged in to contact a business");
+      router.push("/login");
+      return;
+    }
+
+    setContactForm((prev) => ({ ...prev, submitting: true }));
+
+    try {
+      // Fetch complete user data from Firestore to get the most up-to-date information
+      const userDocRef = doc(db, "users", currentUser.uid);
+      const userDoc = await getDoc(userDocRef);
+      const customerData = userDoc.exists() ? userDoc.data() : {};
+
+      const selectedService = services.find(
+        (service) => service.id === contactForm.serviceId
+      );
+
+      await addDoc(collection(db, "users", userId, "inquiries"), {
+        businessId: userId,
+        businessName: userData?.businessName || "",
+        customerId: currentUser.uid,
+        customerName:
+          customerData?.name || currentUser.displayName || "Anonymous",
+        customerEmail: customerData?.email || currentUser.email || "",
+        customerPhone: customerData?.phone || "",
+        customerPhoto: customerData?.profilePic || currentUser.photoURL || "",
+        serviceId: contactForm.serviceId,
+        serviceName: selectedService?.name || "",
+        message: contactForm.message,
+        status: "pending",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      toast.success("Your inquiry has been sent to the business");
+      setContactForm({
+        serviceId: "",
+        message: "",
+        submitting: false,
+      });
+      setContactDialogOpen(false);
+    } catch (error) {
+      console.error("Error sending inquiry:", error);
+      toast.error("Failed to send inquiry. Please try again.");
+    } finally {
+      setContactForm((prev) => ({ ...prev, submitting: false }));
+    }
+  };
 
   if (loading) {
     return (
@@ -100,12 +199,23 @@ export default function ShowServicesTabContent({ userId, userData }) {
                   {service.name}
                 </CardTitle>
                 <div className="flex justify-between items-center">
-                  <Badge
-                    variant="secondary"
-                    className="mt-2 bg-primary/10 text-primary hover:bg-primary/20"
-                  >
-                    ₹{service.price}
-                  </Badge>
+                  {service.isVariablePrice ? (
+                    <Badge
+                      variant="secondary"
+                      className="mt-2 bg-amber-50 text-amber-700 border-amber-200"
+                    >
+                      Price varies as per requirements
+                      {service.approximatePrice > 0 &&
+                        ` ~₹${service.approximatePrice}`}
+                    </Badge>
+                  ) : (
+                    <Badge
+                      variant="secondary"
+                      className="mt-2 bg-primary/10 text-primary hover:bg-primary/20"
+                    >
+                      ₹{service.price}
+                    </Badge>
+                  )}
                   <div className="flex items-center text-muted-foreground text-sm">
                     <Clock className="h-3.5 w-3.5 mr-1" />
                     {service.duration}
@@ -121,11 +231,17 @@ export default function ShowServicesTabContent({ userId, userData }) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => router.push(`/profile/services`)}
+                  onClick={() => {
+                    setContactForm((prev) => ({
+                      ...prev,
+                      serviceId: service.id,
+                    }));
+                    setContactDialogOpen(true);
+                  }}
                   className="text-primary hover:text-primary-hover hover:bg-primary/5"
                 >
                   Contact Business
-                  <ArrowRight className="ml-2 h-4 w-4" />
+                  <MessageSquare className="ml-2 h-4 w-4" />
                 </Button>
                 <Button
                   variant="ghost"
@@ -141,6 +257,73 @@ export default function ShowServicesTabContent({ userId, userData }) {
           ))}
         </div>
       )}
+
+      {/* Contact Business Dialog */}
+      <Dialog open={contactDialogOpen} onOpenChange={setContactDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>
+              Contact {userData?.businessName || "Business"}
+            </DialogTitle>
+            <DialogDescription>
+              Send an inquiry about a service you're interested in
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleContactSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="service">Select a Service</Label>
+              <Select
+                value={contactForm.serviceId}
+                onValueChange={(value) =>
+                  setContactForm((prev) => ({ ...prev, serviceId: value }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a service" />
+                </SelectTrigger>
+                <SelectContent>
+                  {services.map((service) => (
+                    <SelectItem key={service.id} value={service.id}>
+                      {service.name}{" "}
+                      {service.isVariablePrice
+                        ? `(Variable Price${service.approximatePrice ? ` ~₹${service.approximatePrice}` : ""})`
+                        : `(₹${service.price})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="message">Your Message</Label>
+              <Textarea
+                id="message"
+                value={contactForm.message}
+                onChange={(e) =>
+                  setContactForm((prev) => ({
+                    ...prev,
+                    message: e.target.value,
+                  }))
+                }
+                placeholder="Describe what you're looking for, ask about availability, etc."
+                rows={4}
+                required
+              />
+            </div>
+            <DialogFooter>
+              <Button type="submit" disabled={contactForm.submitting}>
+                {contactForm.submitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  "Send Inquiry"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

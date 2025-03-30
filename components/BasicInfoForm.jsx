@@ -176,30 +176,48 @@ export default function BasicInfoForm() {
   };
 
   async function updateProfile(userData) {
-    const userRef = doc(db, "users", user.uid);
-    await setDoc(
-      userRef,
-      {
-        ...userData,
-        businessTags,
-        business_categories: businessCategories,
-      },
-      { merge: true }
-    );
+    try {
+      // Update user document
+      const userRef = doc(db, "users", user.uid);
+      await setDoc(
+        userRef,
+        {
+          ...userData,
+          businessTags,
+          business_categories: businessCategories,
+        },
+        { merge: true }
+      );
 
-    // Also update the business document
-    const businessRef = doc(db, "businesses", user.uid);
-    await setDoc(
-      businessRef,
-      {
-        businessName: userData.businessName,
+      // Also update the business document
+      const businessRef = doc(db, "businesses", user.uid);
+
+      // Create an object with only the fields that have values
+      const businessData = {
         business_categories: businessCategories,
         businessTags: businessTags,
-        profilePic: userData.profilePic,
-        coverPic: userData.coverPic,
-      },
-      { merge: true }
-    );
+      };
+
+      // Only add these fields if they exist in userData
+      if (userData.businessName) {
+        businessData.businessName = userData.businessName;
+      }
+
+      if (userData.profilePic) {
+        businessData.profilePic = userData.profilePic;
+      }
+
+      if (userData.coverPic) {
+        businessData.coverPic = userData.coverPic;
+      }
+
+      await setDoc(businessRef, businessData, { merge: true });
+
+      console.log("Profile updated successfully");
+    } catch (error) {
+      console.error("Error in updateProfile function:", error);
+      throw error; // Re-throw to be caught by the calling function
+    }
   }
 
   async function uploadImage(file, type) {
@@ -241,22 +259,44 @@ export default function BasicInfoForm() {
       let profileImageUrl = null;
       let coverImageUrl = null;
 
+      // Upload profile image if it exists
       if (profileImageFile) {
-        toast.loading("Uploading Profile Image...", { id: toastId });
-        profileImageUrl = await uploadImage(profileImageFile, "profileImg");
+        try {
+          toast.loading("Uploading Profile Image...", { id: toastId });
+          profileImageUrl = await uploadImage(profileImageFile, "profileImg");
+        } catch (uploadError) {
+          console.error("Profile image upload failed:", uploadError);
+          toast.error("Failed to upload profile image", { id: toastId });
+          throw uploadError;
+        }
       }
+
+      // Upload cover image if it exists
       if (coverImageFile) {
-        toast.loading("Uploading Cover Image...", { id: toastId });
-        coverImageUrl = await uploadImage(coverImageFile, "coverImg");
+        try {
+          toast.loading("Uploading Cover Image...", { id: toastId });
+          coverImageUrl = await uploadImage(coverImageFile, "coverImg");
+        } catch (uploadError) {
+          console.error("Cover image upload failed:", uploadError);
+          toast.error("Failed to upload cover image", { id: toastId });
+          throw uploadError;
+        }
       }
 
       toast.loading("Saving Data...", { id: toastId });
 
       const updatedData = {
         ...data,
-        ...(profileImageUrl ? { profilePic: profileImageUrl } : {}),
-        ...(coverImageUrl ? { coverPic: coverImageUrl } : {}),
       };
+
+      // Only add image URLs if they were successfully uploaded
+      if (profileImageUrl) {
+        updatedData.profilePic = profileImageUrl;
+      }
+
+      if (coverImageUrl) {
+        updatedData.coverPic = coverImageUrl;
+      }
 
       setUploadingType(null);
       setUploadingProgress({
@@ -264,13 +304,20 @@ export default function BasicInfoForm() {
         coverImg: 0,
       });
 
-      await updateProfile(updatedData);
-      toast.success("Details Saved Successfully!", { id: toastId });
+      // Save to Firestore
+      try {
+        await updateProfile(updatedData);
+        toast.success("Details Saved Successfully!", { id: toastId });
+      } catch (updateError) {
+        console.error("Failed to save data to Firestore:", updateError);
+        toast.error("Failed to update basic information. Please try again.", {
+          id: toastId,
+        });
+        throw updateError;
+      }
     } catch (error) {
-      console.error("Error updating basic information:", error);
-      toast.error("Failed to update basic information. Please try again.", {
-        id: toastId,
-      });
+      console.error("Error in form submission:", error);
+      // Toast error is handled in the nested try-catch blocks
     } finally {
       setIsSubmitting(false);
     }
@@ -296,16 +343,18 @@ export default function BasicInfoForm() {
             <div className="md:col-span-2">
               <ImageUpload
                 label="Profile Image"
-                currentImage={form.getValues("profilePic")}
+                currentImage={form.getValues("profilePic") || ""}
                 onImageChange={setProfileImageFile}
+                isSubmitting={isSubmitting}
               />
             </div>
             <div className="md:col-span-2">
               <ImageUpload
                 label="Cover Image"
-                currentImage={form.getValues("coverPic")}
+                currentImage={form.getValues("coverPic") || ""}
                 onImageChange={setCoverImageFile}
                 isCover
+                isSubmitting={isSubmitting}
               />
             </div>
 
