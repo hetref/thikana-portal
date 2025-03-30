@@ -9,6 +9,20 @@ import '@grapesjs/studio-sdk/style';
 import { auth, db } from '../../../lib/firebase';
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { collection, query, where, orderBy, limit, getDocs, addDoc, serverTimestamp, setDoc, doc } from 'firebase/firestore';
+import TopNavbar from '@/components/TopNavbar';
+import { useRouter } from 'next/navigation';
+
+// Add keyframes for toast animations
+const toastAnimationStyles = `
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeOut {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(20px); }
+}
+`;
 
 const predefinedSections = {
   hero: `
@@ -70,6 +84,8 @@ export default function Home() {
   const [userPages, setUserPages] = useState([]);
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
   const [lastSaved, setLastSaved] = useState(null);
+  const [customToasts, setCustomToasts] = useState([]);
+  const router = useRouter();
 
   useEffect(() => {
     console.log('Setting up auth listener');
@@ -745,8 +761,43 @@ export default function Home() {
         toastConfig.content = 'Failed to save pages';
         toastConfig.variant = ToastVariant.Error;
         break;
+      case 'site-published':
+        toastConfig.header = 'Success';
+        toastConfig.content = 'Website published! Link copied to clipboard.';
+        toastConfig.variant = ToastVariant.Success;
+        break;
+      case 'site-published-no-copy':
+        toastConfig.header = 'Success';
+        toastConfig.content = 'Website published! View it at /sites/your-site-id';
+        toastConfig.variant = ToastVariant.Success;
+        break;
+      case 'publish-error':
+        toastConfig.header = 'Error';
+        toastConfig.content = 'Failed to publish website';
+        toastConfig.variant = ToastVariant.Error;
+        break;
+      case 'publish-error-no-pages':
+        toastConfig.header = 'Error';
+        toastConfig.content = 'No pages available to publish';
+        toastConfig.variant = ToastVariant.Error;
+        break;
     }
     
+    // Add custom toast to state
+    const toastId = id + '-' + Date.now();
+    const newToast = {
+      id: toastId,
+      ...toastConfig
+    };
+    
+    setCustomToasts(prev => [...prev, newToast]);
+    
+    // Remove toast after 3 seconds
+    setTimeout(() => {
+      setCustomToasts(prev => prev.filter(t => t.id !== toastId));
+    }, 3000);
+    
+    // Still call GrapesJS toast in case it's needed for editor functionality
     editor?.runCommand(StudioCommands.toastAdd, toastConfig);
   };
 
@@ -797,53 +848,258 @@ export default function Home() {
     };
   }, [editor, user, userPages, autoSaveEnabled]);
 
+  // Add new function to handle publishing
+  const handlePublish = async () => {
+    console.log("Starting publish process...");
+    if (!user) {
+      console.error('User not authenticated');
+      showToast('publish-error');
+      return;
+    }
+    
+    try {
+      // First save current content
+      await saveDesign();
+      console.log("Saved all current content");
+      
+      // Create a unique public ID for the website
+      const publicId = `site_${user.uid.slice(0, 8)}_${Date.now()}`;
+      console.log("Generated site ID:", publicId);
+      
+      // Get the user's pages from local state
+      if (!userPages || userPages.length === 0) {
+        console.error('No pages found to publish');
+        showToast('publish-error-no-pages');
+        return;
+      }
+      
+      console.log(`Found ${userPages.length} pages to publish`);
+      
+      // Transform the pages to the format needed for publishing - OPTIMIZED FOR SIZE
+      const pagesData = userPages.map(page => {
+        console.log(`Processing page: ${page.name}`);
+        
+        // Get direct HTML from GrapesJS if it's available in the current editor
+        let grapesHtml = '';
+        if (editor && editor.Pages) {
+          try {
+            // Find the page in the editor
+            const editorPage = editor.Pages.getAll().find(p => p.get('name') === page.name);
+            if (editorPage) {
+              // Select the page to get its content
+              editor.Pages.select(editorPage);
+              // Get the raw HTML directly from the editor
+              grapesHtml = editor.getHtml();
+              console.log(`Got raw HTML directly from GrapesJS for page ${page.name}, length:`, grapesHtml.length);
+            }
+          } catch (err) {
+            console.error('Error getting direct HTML from editor:', err);
+          }
+        }
+
+        // Extract essential CSS only
+        let cssContent = page.css || '';
+        
+        // Extract essential HTML content
+        const htmlContent = grapesHtml || page.component || '';
+        
+        // Remove projectData to reduce size - since we have the essential HTML and CSS
+        // This significantly reduces document size
+        return {
+          name: page.name || 'Untitled Page',
+          html: htmlContent,
+          css: cssContent,
+          id: page.id
+          // projectData and pageProjectData removed to reduce document size
+        };
+      });
+      
+      // Get total size of the data to be published
+      const dataJson = JSON.stringify({
+        userId: user.uid,
+        userEmail: user.email,
+        siteName: 'My Thikana Site',
+        pages: pagesData,
+        createdAt: null, // placeholder for serverTimestamp
+        updatedAt: null, // placeholder for serverTimestamp
+        isPublished: true
+      });
+      
+      const dataSizeInBytes = new Blob([dataJson]).size;
+      console.log(`Estimated data size: ${dataSizeInBytes} bytes (Firestore limit is 1,048,576 bytes)`);
+      
+      if (dataSizeInBytes > 900000) { // Getting close to the 1MB limit
+        console.warn("Data size is close to Firestore limit, splitting large pages if needed");
+        
+        // If size is too large, simplify further by removing unnecessary data
+        for (let i = 0; i < pagesData.length; i++) {
+          const pageSize = JSON.stringify(pagesData[i]).length;
+          console.log(`Page "${pagesData[i].name}" size: ${pageSize} bytes`);
+          
+          // If a single page is too large, truncate or simplify it
+          if (pageSize > 500000) { // A page is using more than ~500KB
+            console.warn(`Page "${pagesData[i].name}" is very large, optimizing content`);
+            
+            // Keep only essential HTML and CSS
+            pagesData[i] = {
+              name: pagesData[i].name,
+              html: pagesData[i].html,
+              css: pagesData[i].css,
+              id: pagesData[i].id
+            };
+          }
+        }
+      }
+      
+      // Create the site data
+      const siteData = {
+        userId: user.uid,
+        userEmail: user.email,
+        siteName: 'My Thikana Site',
+        pages: pagesData,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        isPublished: true
+      };
+      
+      console.log("Publishing site data:", JSON.stringify(siteData).substring(0, 100) + "...");
+      
+      // Create the document in Firestore
+      const siteRef = doc(db, 'public_sites', publicId);
+      await setDoc(siteRef, siteData);
+      
+      console.log("Site published successfully!");
+      
+      // Generate the URL for the published site
+      const fullUrl = `${window.location.origin}/sites/${publicId}`;
+      console.log("Published URL:", fullUrl);
+      
+      // Try to copy to clipboard
+      try {
+        await navigator.clipboard.writeText(fullUrl);
+        console.log("URL copied to clipboard");
+        showToast('site-published');
+      } catch (clipErr) {
+        console.error("Failed to copy URL to clipboard:", clipErr);
+        showToast('site-published-no-copy');
+      }
+    } catch (error) {
+      console.error('Error publishing site:', error);
+      showToast('publish-error');
+    }
+  };
+
   if (isLoading) {
     return <div>Loading...</div>;
   }
 
   return (
-    <main className="flex h-screen flex-col justify-between p-5 gap-2">
-      <div className="p-1 flex gap-5 items-center">
-        <div className="font-bold">Website Builder</div>
+    <div className="flex flex-col h-screen w-full">
+      {/* Add animation styles */}
+      <style dangerouslySetInnerHTML={{ __html: toastAnimationStyles }} />
+      
+      {/* TopNavbar - fixed at top */}
+      <div className="fixed top-0 left-0 right-0 z-50 w-full">
+        <TopNavbar type="authenticated" />
+      </div>
+      
+      {/* Custom Toast Container */}
+      <div className="fixed bottom-4 right-4 z-[100] flex flex-col-reverse gap-2">
+        {customToasts.map(toast => (
+          <div 
+            key={toast.id}
+            className={`p-4 rounded-md shadow-lg max-w-xs ${
+              toast.variant === ToastVariant.Success ? 'bg-green-100 border-l-4 border-green-500 text-green-800' :
+              toast.variant === ToastVariant.Error ? 'bg-red-100 border-l-4 border-red-500 text-red-800' :
+              'bg-blue-100 border-l-4 border-blue-500 text-blue-800'
+            }`}
+            style={{
+              animation: 'fadeIn 0.3s ease-out forwards',
+              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+            }}
+          >
+            <div className="flex justify-between items-start">
+              <h3 className="font-bold text-sm">{toast.header}</h3>
+              <button 
+                onClick={() => setCustomToasts(prev => prev.filter(t => t.id !== toast.id))}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ×
+              </button>
+            </div>
+            <p className="text-sm mt-1 text-gray-700">{toast.content}</p>
+          </div>
+        ))}
+      </div>
+      
+      {/* Main content - adjusted to account for the navbar */}
+      <div className="flex flex-col pt-16 h-screen w-full">
+        {/* Control bar */}
+        <div className="px-6 py-3 flex gap-4 items-center border-b border-gray-700 bg-gradient-to-r from-gray-900 to-gray-800 shadow-md">
+          <div className="font-bold text-white text-lg mr-2">Thikana Builder</div>
         {user ? (
           <>
-            <button className="border rounded px-2" onClick={getProjetData}>
-              Save Current Page
+              <div className="flex items-center gap-3">
+                <button 
+                  className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white py-1.5 px-3 rounded-md transition-colors duration-200 text-sm font-medium shadow-sm" 
+                  onClick={getProjetData}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                  </svg>
+                  Save Page
             </button>
-            <button className="border rounded px-2" onClick={saveDesign}>
-              Save All Pages
+                <button 
+                  className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white py-1.5 px-3 rounded-md transition-colors duration-200 text-sm font-medium shadow-sm" 
+                  onClick={saveDesign}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                  Save All
             </button>
             <button
-              className={`border rounded px-2 ${autoSaveEnabled ? 'bg-green-100' : 'bg-red-100'}`}
-              onClick={() => setAutoSaveEnabled(!autoSaveEnabled)}
-            >
-              Auto-Save: {autoSaveEnabled ? 'ON' : 'OFF'}
+                  className={`flex items-center gap-1 py-1.5 px-3 rounded-md transition-colors duration-200 text-sm font-medium shadow-sm ${
+                    autoSaveEnabled 
+                      ? 'bg-green-600 hover:bg-green-700 text-white' 
+                      : 'bg-gray-600 hover:bg-gray-700 text-white'
+                  }`}
+                  onClick={() => setAutoSaveEnabled(!autoSaveEnabled)}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                  </svg>
+                  Auto-Save: {autoSaveEnabled ? 'ON' : 'OFF'}
             </button>
-            {lastSaved && (
-              <span className="text-xs text-gray-500">
-                Last auto-saved: {lastSaved.toLocaleTimeString()}
-              </span>
-            )}
-            <button
-              className="border rounded px-2"
-              onClick={() => auth.signOut()}
-            >
-              Sign Out
-            </button>
-            <span className="ml-auto">{user.email}</span>
-          </>
-        ) : (
           <button
-            className="border rounded px-2"
-            onClick={() => setShowAuthModal(true)}
+                  className="flex items-center gap-1 bg-purple-600 hover:bg-purple-700 text-white py-1.5 px-3 rounded-md transition-colors duration-200 text-sm font-medium shadow-sm" 
+                  onClick={handlePublish}
           >
-            Sign In
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                  </svg>
+                  Publish
           </button>
-        )}
+              </div>
+              
+              <div className="ml-auto flex items-center gap-4">
+                {lastSaved && (
+                  <span className="text-xs text-gray-300 bg-gray-700 py-1 px-2 rounded italic">
+                    Last saved: {lastSaved.toLocaleTimeString()}
+                  </span>
+                )}
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                  <span className="text-sm text-gray-300">{user.email}</span>
+                </div>
+              </div>
+            </>
+          ) : null}
       </div>
 
+        {/* Auth Modal */}
       {showAuthModal && !user && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-8 rounded-lg">
             <h2 className="text-2xl font-bold mb-4">Sign In / Sign Up</h2>
             {authError && (
@@ -900,21 +1156,22 @@ export default function Home() {
         </div>
       )}
 
-      <div className="flex-1 w-full h-full overflow-hidden">
+        {/* Editor Container */}
+        <div className="flex-1 w-full overflow-hidden" style={{ height: 'calc(100vh - 120px)' }}>
         {user ? (
           <GrapesJsStudio
             onReady={onReady}
             options={{
-              licenseKey: process.env.NEXT_PUBLIC_GRAPESJS_LICENSE_KEY || 'FREE',
+                licenseKey: process.env.NEXT_PUBLIC_GRAPESJS_LICENSE_KEY || 'FREE',
               project: {
                 default: {
-                  pages: [{
-                    name: 'Loading...',
-                    component: `<div class="flex justify-center items-center h-full">
-                      <p class="text-gray-500">Loading your pages...</p>
+                    pages: [{
+                      name: 'Loading...',
+                      component: `<div class="flex justify-center items-center h-full">
+                        <p class="text-gray-500">Loading your pages...</p>
                       </div>`,
-                    styles: ''
-                  }]
+                      styles: ''
+                    }]
                 },
               },
             }}
@@ -936,6 +1193,7 @@ export default function Home() {
           </div>
         )}
       </div>
-    </main>
+      </div>
+    </div>
   );
 }

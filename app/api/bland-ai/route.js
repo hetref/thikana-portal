@@ -31,6 +31,7 @@ export async function POST(request) {
         reduce_latency: true,
         wait_for_greeting: true,
         voice_id: scriptData.voiceId || "clara", // default voice
+        caller_id: "+12344145236", // Add your Twilio number here
         metadata: {
           businessId,
           callType,

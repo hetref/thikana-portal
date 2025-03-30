@@ -24,6 +24,8 @@ import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import { Loader2 } from "lucide-react";
 import { Plus, X, Edit2, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 const basicInfoSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -32,7 +34,6 @@ const basicInfoSchema = z.object({
     .min(2, "Business name must be at least 2 characters"),
   phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, "Invalid phone number"),
   address: z.string().min(5, "Address must be at least 5 characters"),
-  location: z.string().min(2, "Location must be at least 2 characters"),
   bio: z.string().max(500, "Bio must not exceed 500 characters"),
   website: z.string().url("Invalid URL").optional().or(z.literal("")),
   about: z.string().min(10, "About must be at least 10 characters"),
@@ -54,6 +55,7 @@ export default function BasicInfoForm() {
   const [editingTagValue, setEditingTagValue] = useState("");
   const [isAddingCustomTag, setIsAddingCustomTag] = useState(false);
   const [customTagValue, setCustomTagValue] = useState("");
+  const [businessCategories, setBusinessCategories] = useState([]);
 
   const user = auth.currentUser;
   const form = useForm({
@@ -63,7 +65,6 @@ export default function BasicInfoForm() {
       businessName: "",
       phone: "",
       address: "",
-      location: "",
       bio: "",
       website: "",
       about: "",
@@ -83,6 +84,7 @@ export default function BasicInfoForm() {
           const userData = userDocSnap.data();
           form.reset(userData);
           setBusinessTags(userData.businessTags || []);
+          setBusinessCategories(userData.business_categories || []);
         }
       } catch (error) {
         console.error("Error fetching user data:", error);
@@ -163,9 +165,59 @@ export default function BasicInfoForm() {
     }
   };
 
+  const handleBusinessCategoryChange = (category) => {
+    setBusinessCategories((prev) => {
+      if (prev.includes(category)) {
+        return prev.filter((item) => item !== category);
+      } else {
+        return [...prev, category];
+      }
+    });
+  };
+
   async function updateProfile(userData) {
-    const userRef = doc(db, "users", user.uid);
-    await setDoc(userRef, { ...userData, businessTags }, { merge: true });
+    try {
+      // Update user document
+      const userRef = doc(db, "users", user.uid);
+      await setDoc(
+        userRef,
+        {
+          ...userData,
+          businessTags,
+          business_categories: businessCategories,
+        },
+        { merge: true }
+      );
+
+      // Also update the business document
+      const businessRef = doc(db, "businesses", user.uid);
+
+      // Create an object with only the fields that have values
+      const businessData = {
+        business_categories: businessCategories,
+        businessTags: businessTags,
+      };
+
+      // Only add these fields if they exist in userData
+      if (userData.businessName) {
+        businessData.businessName = userData.businessName;
+      }
+
+      if (userData.profilePic) {
+        businessData.profilePic = userData.profilePic;
+      }
+
+      if (userData.coverPic) {
+        businessData.coverPic = userData.coverPic;
+      }
+
+      await setDoc(businessRef, businessData, { merge: true });
+
+      console.log("Profile updated successfully");
+    } catch (error) {
+      console.error("Error in updateProfile function:", error);
+      throw error; // Re-throw to be caught by the calling function
+    }
   }
 
   async function uploadImage(file, type) {
@@ -207,22 +259,44 @@ export default function BasicInfoForm() {
       let profileImageUrl = null;
       let coverImageUrl = null;
 
+      // Upload profile image if it exists
       if (profileImageFile) {
-        toast.loading("Uploading Profile Image...", { id: toastId });
-        profileImageUrl = await uploadImage(profileImageFile, "profileImg");
+        try {
+          toast.loading("Uploading Profile Image...", { id: toastId });
+          profileImageUrl = await uploadImage(profileImageFile, "profileImg");
+        } catch (uploadError) {
+          console.error("Profile image upload failed:", uploadError);
+          toast.error("Failed to upload profile image", { id: toastId });
+          throw uploadError;
+        }
       }
+
+      // Upload cover image if it exists
       if (coverImageFile) {
-        toast.loading("Uploading Cover Image...", { id: toastId });
-        coverImageUrl = await uploadImage(coverImageFile, "coverImg");
+        try {
+          toast.loading("Uploading Cover Image...", { id: toastId });
+          coverImageUrl = await uploadImage(coverImageFile, "coverImg");
+        } catch (uploadError) {
+          console.error("Cover image upload failed:", uploadError);
+          toast.error("Failed to upload cover image", { id: toastId });
+          throw uploadError;
+        }
       }
 
       toast.loading("Saving Data...", { id: toastId });
 
       const updatedData = {
         ...data,
-        ...(profileImageUrl ? { profilePic: profileImageUrl } : {}),
-        ...(coverImageUrl ? { coverPic: coverImageUrl } : {}),
       };
+
+      // Only add image URLs if they were successfully uploaded
+      if (profileImageUrl) {
+        updatedData.profilePic = profileImageUrl;
+      }
+
+      if (coverImageUrl) {
+        updatedData.coverPic = coverImageUrl;
+      }
 
       setUploadingType(null);
       setUploadingProgress({
@@ -230,13 +304,20 @@ export default function BasicInfoForm() {
         coverImg: 0,
       });
 
-      await updateProfile(updatedData);
-      toast.success("Details Saved Successfully!", { id: toastId });
+      // Save to Firestore
+      try {
+        await updateProfile(updatedData);
+        toast.success("Details Saved Successfully!", { id: toastId });
+      } catch (updateError) {
+        console.error("Failed to save data to Firestore:", updateError);
+        toast.error("Failed to update basic information. Please try again.", {
+          id: toastId,
+        });
+        throw updateError;
+      }
     } catch (error) {
-      console.error("Error updating basic information:", error);
-      toast.error("Failed to update basic information. Please try again.", {
-        id: toastId,
-      });
+      console.error("Error in form submission:", error);
+      // Toast error is handled in the nested try-catch blocks
     } finally {
       setIsSubmitting(false);
     }
@@ -262,16 +343,18 @@ export default function BasicInfoForm() {
             <div className="md:col-span-2">
               <ImageUpload
                 label="Profile Image"
-                currentImage={form.getValues("profilePic")}
+                currentImage={form.getValues("profilePic") || ""}
                 onImageChange={setProfileImageFile}
+                isSubmitting={isSubmitting}
               />
             </div>
             <div className="md:col-span-2">
               <ImageUpload
                 label="Cover Image"
-                currentImage={form.getValues("coverPic")}
+                currentImage={form.getValues("coverPic") || ""}
                 onImageChange={setCoverImageFile}
                 isCover
+                isSubmitting={isSubmitting}
               />
             </div>
 
@@ -373,25 +456,6 @@ export default function BasicInfoForm() {
                   <FormControl>
                     <Input
                       placeholder="123 Business St, City, Country"
-                      {...field}
-                      disabled={isSubmitting}
-                      className="bg-gray-50 dark:bg-gray-800"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="location"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Location</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="City, Country"
                       {...field}
                       disabled={isSubmitting}
                       className="bg-gray-50 dark:bg-gray-800"
@@ -565,6 +629,44 @@ export default function BasicInfoForm() {
                       </Button>
                     </div>
                   )}
+                </div>
+              </div>
+            </div>
+
+            <div className="md:col-span-2">
+              <FormLabel>Business Category</FormLabel>
+              <div className="mt-2 space-y-2 p-4 bg-gray-50 dark:bg-gray-800 rounded-md">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="serviceBasedBusiness"
+                    checked={businessCategories.includes("service")}
+                    onCheckedChange={() =>
+                      handleBusinessCategoryChange("service")
+                    }
+                    disabled={isSubmitting}
+                  />
+                  <Label
+                    htmlFor="serviceBasedBusiness"
+                    className="text-sm cursor-pointer"
+                  >
+                    Service-Based Business
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="productBasedBusiness"
+                    checked={businessCategories.includes("product")}
+                    onCheckedChange={() =>
+                      handleBusinessCategoryChange("product")
+                    }
+                    disabled={isSubmitting}
+                  />
+                  <Label
+                    htmlFor="productBasedBusiness"
+                    className="text-sm cursor-pointer"
+                  >
+                    Product-Based Business
+                  </Label>
                 </div>
               </div>
             </div>
