@@ -68,6 +68,11 @@ export async function POST(req, { params }) {
         userData.razorpayInfo.webhookSecret,
         ENCRYPTION_KEY
       ).toString(CryptoJS.enc.Utf8);
+      console.log(
+        "DECRYPTED WEBHOOK SECRET PREV",
+        decryptedWebhookSecret,
+        ENCRYPTION_KEY
+      );
 
       // Verify the webhook signature - try multiple methods as Razorpay's verification can be tricky
       let signatureIsValid = false;
