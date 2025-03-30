@@ -109,6 +109,9 @@ export async function POST(req, { params }) {
             .update(rawBody)
             .digest("hex");
 
+          console.log("Expected signature:", expectedSignature);
+          console.log("DECRYPTED WEBHOOK SECRET", decryptedWebhookSecret);
+
           signatureIsValid = expectedSignature === razorpaySignature;
           if (signatureIsValid) verificationMethod = "trimmed-secret";
         } catch (err) {
