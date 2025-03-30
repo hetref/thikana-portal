@@ -102,7 +102,7 @@ export async function POST(req, { params }) {
         // Try alternative decryption approach using triple DES as fallback
         try {
           console.log("Attempting alternative decryption method...");
-          decryptedWebhookSecret = CryptoJS.TripleDES.decrypt(
+          decryptedWebhookSecret = CryptoJS.AES.decrypt(
             userData.razorpayInfo.webhookSecret,
             ENCRYPTION_KEY
           ).toString(CryptoJS.enc.Utf8);

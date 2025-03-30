@@ -45,6 +45,9 @@ export default function SettingsTab() {
   const [hasWebhook, setHasWebhook] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showSecret, setShowSecret] = useState(false);
+  const [decryptedSecret, setDecryptedSecret] = useState("");
+  const [isDecrypting, setIsDecrypting] = useState(false);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((currentUser) => {
@@ -72,11 +75,25 @@ export default function SettingsTab() {
 
       if (userDocSnap.exists()) {
         const userData = userDocSnap.data();
-        setHasWebhook(
-          userData.razorpayInfo && userData.razorpayInfo.webhookSecret
-            ? true
-            : false
-        );
+        const hasSecret =
+          userData.razorpayInfo && userData.razorpayInfo.webhookSecret;
+        setHasWebhook(hasSecret ? true : false);
+
+        // If there's a webhook secret, fetch and decrypt it
+        if (hasSecret) {
+          setIsDecrypting(true);
+          try {
+            const encryptedSecret = userData.razorpayInfo.webhookSecret;
+            const bytes = CryptoJS.AES.decrypt(encryptedSecret, ENCRYPTION_KEY);
+            const decryptedValue = bytes.toString(CryptoJS.enc.Utf8);
+            setDecryptedSecret(decryptedValue);
+          } catch (decryptError) {
+            console.error("Error decrypting webhook secret:", decryptError);
+            toast.error("Failed to decrypt the webhook secret");
+          } finally {
+            setIsDecrypting(false);
+          }
+        }
       }
     } catch (error) {
       console.error("Error checking webhook status:", error);
@@ -97,6 +114,8 @@ export default function SettingsTab() {
     setIsSaving(true);
 
     try {
+      console.log("ENCRYPTION_KEY", ENCRYPTION_KEY);
+      console.log("webhookSecret", webhookSecret);
       // Encrypt the webhook secret
       const encryptedSecret = CryptoJS.AES.encrypt(
         webhookSecret,
@@ -176,6 +195,10 @@ export default function SettingsTab() {
       toast.error(`Error testing webhook: ${error.message}`);
       console.error("Error testing webhook:", error);
     }
+  };
+
+  const toggleSecretVisibility = () => {
+    setShowSecret(!showSecret);
   };
 
   if (loading) {
@@ -263,13 +286,26 @@ export default function SettingsTab() {
                 <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="webhook-secret"
-                  type="password"
-                  placeholder="Your Razorpay webhook secret"
+                  type={showSecret ? "text" : "password"}
+                  placeholder={
+                    hasWebhook
+                      ? "Enter new webhook secret"
+                      : "Your Razorpay webhook secret"
+                  }
                   className="pl-10"
                   value={webhookSecret}
                   onChange={(e) => setWebhookSecret(e.target.value)}
                 />
               </div>
+              {hasWebhook && (
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={toggleSecretVisibility}
+                >
+                  {showSecret ? "Hide Secret" : "Show Secret"}
+                </Button>
+              )}
               <Button onClick={handleWebhookSecretSave} disabled={isSaving}>
                 {isSaving ? (
                   <>
@@ -281,9 +317,24 @@ export default function SettingsTab() {
                 )}
               </Button>
             </div>
+            {hasWebhook && !isDecrypting && (
+              <div className="mt-2 text-sm">
+                <span className="font-medium">Current Secret: </span>
+                {showSecret
+                  ? decryptedSecret
+                  : `${decryptedSecret.substring(0, 3)}${"•".repeat(8)}${decryptedSecret.substring(decryptedSecret.length - 3)}`}
+              </div>
+            )}
+            {isDecrypting && (
+              <div className="mt-2 text-sm flex items-center">
+                <RefreshCw className="mr-2 h-3 w-3 animate-spin" />
+                Loading current secret...
+              </div>
+            )}
             <p className="text-sm text-muted-foreground">
-              After setting up your webhook in Razorpay, enter the webhook
-              secret here to verify incoming requests
+              {hasWebhook
+                ? "To update your webhook, enter a new secret above and save it"
+                : "After setting up your webhook in Razorpay, enter the webhook secret here to verify incoming requests"}
             </p>
           </div>
 
