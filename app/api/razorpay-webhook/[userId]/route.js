@@ -14,7 +14,13 @@ import CryptoJS from "crypto-js";
 import crypto from "crypto";
 
 // Use the same encryption key as in SettingsTab.jsx
-const ENCRYPTION_KEY = "your-encryption-key";
+const ENCRYPTION_KEY = process.env.NEXT_PUBLIC_ENCRYPTION_KEY || "";
+
+// Log the encryption key for debugging (redacted for security)
+console.log(
+  "ENCRYPTION_KEY in webhook (first 3 chars):",
+  ENCRYPTION_KEY ? ENCRYPTION_KEY.substring(0, 3) + "..." : "EMPTY"
+);
 
 export async function POST(req, { params }) {
   try {
@@ -76,12 +82,71 @@ export async function POST(req, { params }) {
         ENCRYPTION_KEY ? ENCRYPTION_KEY.length : 0
       );
 
-      // Use the same decryption approach as in SettingsTab.jsx
-      const bytes = CryptoJS.AES.decrypt(
-        userData.razorpayInfo.webhookSecret,
-        ENCRYPTION_KEY
-      );
-      const decryptedWebhookSecret = bytes.toString(CryptoJS.enc.Utf8);
+      // Use the same decryption approach as in SettingsTab.jsx with better error handling
+      let decryptedWebhookSecret = "";
+      try {
+        // First check if we have valid inputs
+        if (!userData.razorpayInfo.webhookSecret) {
+          throw new Error("Encrypted webhook secret is empty");
+        }
+
+        if (!ENCRYPTION_KEY) {
+          throw new Error("Encryption key is missing");
+        }
+
+        // Attempt decryption
+        const bytes = CryptoJS.AES.decrypt(
+          userData.razorpayInfo.webhookSecret,
+          ENCRYPTION_KEY
+        );
+
+        // Check if bytes is valid
+        console.log("Decryption bytes valid:", !!bytes && !!bytes.words);
+
+        // Convert to string
+        decryptedWebhookSecret = bytes.toString(CryptoJS.enc.Utf8);
+
+        if (!decryptedWebhookSecret) {
+          throw new Error("Decryption result is empty");
+        }
+      } catch (decryptError) {
+        console.error("Decryption error:", decryptError.message);
+        console.error("Decryption error details:", decryptError);
+
+        // Try alternative approach for debugging
+        try {
+          console.log("Trying alternative decryption approach...");
+
+          // Get raw webhook secret (for testing only - remove in production)
+          const userDocTestRef = doc(db, "users", urlUserId);
+          const userDocTestSnap = await getDoc(userDocTestRef);
+          const rawSecret = userDocTestSnap.data().razorpayInfo.webhookSecret;
+          console.log(
+            "Raw webhook secret format:",
+            typeof rawSecret,
+            "length:",
+            rawSecret?.length || 0
+          );
+
+          // Try direct decryption without trimming
+          const altDecrypted = CryptoJS.AES.decrypt(
+            rawSecret,
+            ENCRYPTION_KEY
+          ).toString(CryptoJS.enc.Utf8);
+          console.log(
+            "Alternative decryption result length:",
+            altDecrypted?.length || 0
+          );
+        } catch (altError) {
+          console.error(
+            "Alternative decryption also failed:",
+            altError.message
+          );
+        }
+
+        // Fall back to test secret
+        console.log("Decryption failed, falling back to test secret");
+      }
 
       // Log the decrypted secret (masked version for security)
       if (decryptedWebhookSecret) {
