@@ -1338,14 +1338,14 @@ export default function PaymentsTab() {
                           </div>
                         </>
                       )}
-                      {subscriptionDetails.total_count !== undefined && (
+                      {/* {subscriptionDetails.total_count !== undefined && (
                         <div>
                           <p className="text-sm font-medium text-muted-foreground">
                             Total Payments
                           </p>
                           <p>{subscriptionDetails.total_count}</p>
                         </div>
-                      )}
+                      )} */}
                       {subscriptionDetails.paid_count !== undefined && (
                         <div>
                           <p className="text-sm font-medium text-muted-foreground">
@@ -1373,7 +1373,7 @@ export default function PaymentsTab() {
               )}
 
               {/* Payment History */}
-              {subscriptionDetails?.payments &&
+              {/* {subscriptionDetails?.payments &&
                 subscriptionDetails.payments.length > 0 && (
                   <div>
                     <h3 className="text-lg font-medium mb-2">
@@ -1418,7 +1418,7 @@ export default function PaymentsTab() {
                       </Table>
                     </div>
                   </div>
-                )}
+                )} */}
             </div>
           )}
 
