@@ -50,6 +50,7 @@ import MoreInformationDialog from "@/components/profile/MoreInformationDialog";
 import FollowingDialog from "@/components/profile/FollowingDialog";
 import FollowerDialog from "@/components/profile/FollowerDialog";
 import ShareBusinessDialog from "@/components/profile/ShareBusinessDialog";
+import RequestCallButton from "@/components/RequestCallButton";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
 
@@ -417,6 +418,13 @@ export default function UserProfile() {
 
               {userData?.role === "business" && (
                 <>
+                  {currentUser && userData && currentUser.uid !== userId && (
+                    <RequestCallButton
+                      businessId={userId}
+                      businessName={userData.businessName}
+                    />
+                  )}
+
                   <Button
                     variant="outline"
                     className=""

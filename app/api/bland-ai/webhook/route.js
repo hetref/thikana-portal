@@ -1,63 +1,105 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase";
-import { doc, setDoc, collection, addDoc } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  updateDoc,
+  serverTimestamp,
+  collection,
+  query,
+  where,
+  getDocs,
+  writeBatch,
+} from "firebase/firestore";
 
-export async function POST(request) {
+export async function POST(req) {
   try {
-    const callUpdate = await request.json();
-    console.log("Received Bland AI webhook:", callUpdate);
+    // Get the raw payload for detailed logging
+    const rawData = await req.text();
+    console.log("RAW Bland AI Webhook payload:", rawData);
 
-    // Extract data from the webhook payload
-    const { call_id, status, transcript, metadata } = callUpdate;
-    const { businessId, userId } = metadata || {};
-
-    if (!businessId || !userId) {
-      console.error(
-        "Missing businessId or userId in webhook metadata",
-        metadata
+    // Parse the JSON payload
+    let data;
+    try {
+      data = JSON.parse(rawData);
+      console.log(
+        "Parsed Bland AI Webhook payload:",
+        JSON.stringify(data, null, 2)
       );
+    } catch (parseError) {
+      console.error("Failed to parse webhook payload:", parseError);
       return NextResponse.json(
-        {
-          error: "Missing business ID or user ID in metadata",
-        },
+        { error: "Invalid JSON payload" },
         { status: 400 }
       );
     }
 
-    // Store call data in Firestore
-    try {
-      const callRef = doc(db, "users", userId, "calls", call_id.toString());
-      await setDoc(
-        callRef,
-        {
-          callId: call_id,
-          status,
-          transcript,
-          updatedAt: new Date().toISOString(),
-          ...metadata,
-        },
-        { merge: true }
+    // Extract info from the webhook payload
+    const { task_id, call_id, status, call_details, transcript } = data;
+
+    console.log(
+      `WEBHOOK RECEIVED: Status=${status}, task_id=${task_id}, call_id=${call_id}`
+    );
+
+    if (!task_id && !call_id) {
+      console.error("Missing both task_id and call_id in webhook payload");
+      return NextResponse.json(
+        { error: "Missing task_id or call_id in webhook payload" },
+        { status: 400 }
       );
-
-      // Add to call history if the call is completed
-      if (status === "completed" || status === "failed") {
-        await addDoc(collection(db, "users", userId, "callHistory"), {
-          callId: call_id,
-          timestamp: new Date().toISOString(),
-          transcript,
-          status,
-          ...metadata,
-        });
-      }
-
-      console.log(`Successfully updated call ${call_id} with status ${status}`);
-    } catch (dbError) {
-      console.error("Error storing call data in Firestore:", dbError);
     }
 
-    return NextResponse.json({ success: true });
+    // We're ignoring detailed status tracking now. Just log the webhook.
+    console.log(
+      `Received webhook with status ${status}, but not updating status per user requirements`
+    );
+
+    // Store the call transcript if available for history
+    if (transcript && task_id && task_id.includes("_")) {
+      const [businessId] = task_id.split("_");
+
+      try {
+        // Try to find the request document
+        const requestRef = doc(
+          db,
+          "users",
+          businessId,
+          "requestCalls",
+          task_id
+        );
+        const requestSnapshot = await getDoc(requestRef);
+
+        if (requestSnapshot.exists()) {
+          console.log(`Storing transcript for request ${task_id}`);
+
+          // Only update the transcript and other non-status data
+          await updateDoc(requestRef, {
+            transcript: transcript || "",
+            lastWebhookReceived: serverTimestamp(),
+          });
+
+          console.log(`Successfully stored transcript for ${task_id}`);
+        }
+      } catch (error) {
+        console.error(`Error storing transcript for ${task_id}:`, error);
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      message:
+        "Webhook received, status tracking disabled per user requirements",
+      webhookData: {
+        task_id,
+        call_id,
+        status,
+      },
+    });
   } catch (error) {
     console.error("Error processing webhook:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error", details: error.message },
+      { status: 500 }
+    );
   }
 }

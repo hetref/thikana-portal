@@ -44,6 +44,8 @@ import {
   Info,
   Mail,
   Phone,
+  Settings,
+  LayoutDashboard,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import WhoToFollow from "@/components/WhoToFollow";
@@ -74,6 +76,7 @@ import PhotosGrid from "@/components/PhotosGrid";
 import AddPhotoModal from "@/components/AddPhotoModal";
 import ShareBusinessDialog from "@/components/profile/ShareBusinessDialog";
 import { cn } from "@/lib/utils";
+import ShowServicesTabContent from "@/components/profile/ShowServicesTabContent";
 
 // Add a style element to hide scrollbars
 const scrollbarHideStyles = `
@@ -601,6 +604,19 @@ export default function Profile() {
                       </Button>
                     )}
 
+                    {isCurrentUser && isBusinessUser && (
+                      <Button
+                        asChild
+                        variant="default"
+                        className="bg-primary hover:bg-primary/90 px-4 w-full"
+                      >
+                        <Link href="/dashboard">
+                          <LayoutDashboard className="w-4 h-4 mr-2" />
+                          Dashboard
+                        </Link>
+                      </Button>
+                    )}
+
                     {isBusinessUser && (
                       <>
                         <Button
@@ -733,17 +749,32 @@ export default function Profile() {
                         <Images className="w-4 h-4 mr-2" />
                         Photos
                       </TabsTrigger>
-                      <TabsTrigger
-                        value="products"
-                        className={cn(
-                          "rounded-none border-b-2 border-transparent",
-                          "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                          "px-6 py-3 font-medium text-sm transition-all duration-200"
-                        )}
-                      >
-                        <SquareChartGantt className="w-4 h-4 mr-2" />
-                        Products
-                      </TabsTrigger>
+                      {userData?.business_categories?.includes("product") && (
+                        <TabsTrigger
+                          value="products"
+                          className={cn(
+                            "rounded-none border-b-2 border-transparent",
+                            "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
+                            "px-6 py-3 font-medium text-sm transition-all duration-200"
+                          )}
+                        >
+                          <SquareChartGantt className="w-4 h-4 mr-2" />
+                          Products
+                        </TabsTrigger>
+                      )}
+                      {userData?.business_categories?.includes("service") && (
+                        <TabsTrigger
+                          value="services"
+                          className={cn(
+                            "rounded-none border-b-2 border-transparent",
+                            "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
+                            "px-6 py-3 font-medium text-sm transition-all duration-200"
+                          )}
+                        >
+                          <Settings className="w-4 h-4 mr-2" />
+                          Services
+                        </TabsTrigger>
+                      )}
                       <TabsTrigger
                         value="saved"
                         className={cn(
@@ -814,18 +845,34 @@ export default function Profile() {
                     )}
                   </TabsContent>
 
-                  <TabsContent
-                    value="products"
-                    className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
-                  >
-                    {userData && user && (
-                      <ShowProductsTabContent
-                        userId={userId}
-                        userData={userData}
-                        currentUserView={true}
-                      />
-                    )}
-                  </TabsContent>
+                  {userData?.business_categories?.includes("product") && (
+                    <TabsContent
+                      value="products"
+                      className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                    >
+                      {userData && user && (
+                        <ShowProductsTabContent
+                          userId={userId}
+                          userData={userData}
+                          currentUserView={true}
+                        />
+                      )}
+                    </TabsContent>
+                  )}
+
+                  {userData?.business_categories?.includes("service") && (
+                    <TabsContent
+                      value="services"
+                      className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                    >
+                      {userData && user && (
+                        <ShowServicesTabContent
+                          userId={userId}
+                          userData={userData}
+                        />
+                      )}
+                    </TabsContent>
+                  )}
 
                   <TabsContent
                     value="saved"

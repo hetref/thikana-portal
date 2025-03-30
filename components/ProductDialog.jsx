@@ -7,12 +7,20 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Minus, Plus, ShoppingCart } from "lucide-react";
+import { Edit, Minus, Plus } from "lucide-react";
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { recordPurchase } from "@/lib/inventory-operations";
 
-export function ProductDialog({ product, isOpen, onClose, userId, userData }) {
+export function ProductDialog({ 
+  product, 
+  isOpen, 
+  onClose, 
+  userId, 
+  userData, 
+  userType = 'customer', 
+  onEditProduct 
+}) {
   const [isLoading, setIsLoading] = useState(false);
   const [quantity, setQuantity] = useState(1);
 
@@ -27,10 +35,6 @@ export function ProductDialog({ product, isOpen, onClose, userId, userData }) {
       body: JSON.stringify({ userId, amount }),
     });
 
-    // if (!response.ok) {
-    //   throw new Error("Failed to create Razorpay order");
-    // }
-
     const order = await response.json();
     return order;
   };
@@ -41,7 +45,7 @@ export function ProductDialog({ product, isOpen, onClose, userId, userData }) {
       amount: amount * 100, // Razorpay expects amount in paise
       currency: "INR",
       name: userData.name,
-      description: "Buy Our Produt",
+      description: "Buy Our Product",
       order_id: order.id,
       handler: async function (response) {
         try {
@@ -87,7 +91,18 @@ export function ProductDialog({ product, isOpen, onClose, userId, userData }) {
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>{product.name}</DialogTitle>
+          <DialogTitle className="flex justify-between items-center">
+            {product.name}
+            {userType === 'business' && (
+              <Button 
+                variant="outline" 
+                size="icon"
+                onClick={onEditProduct}
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+            )}
+          </DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-4 py-4 justify-center w-full">
           <div className="w-full flex items-center justify-center">
@@ -101,7 +116,9 @@ export function ProductDialog({ product, isOpen, onClose, userId, userData }) {
           </div>
           <p className="text-lg text-gray-800">{product.description}</p>
           <p className="font-bold text-xl text-center">₹{totalPrice()}</p>
-          {product.quantity > 0 && (
+          
+          {/* Quantity section for customers */}
+          {userType === 'customer' && product.quantity > 0 && (
             <div className="flex items-center justify-center">
               <label htmlFor="quantity" className="mr-2 text-lg">
                 Quantity:
@@ -137,22 +154,18 @@ export function ProductDialog({ product, isOpen, onClose, userId, userData }) {
               </button>
             </div>
           )}
-          {product.quantity === 0 && (
-            <p className="text-sm text-gray-800 text-center">Out of stock</p>
-          )}
-          <div className="flex gap-4">
-            {product.quantity === 0 ? (
-              <>
+
+          {/* Buttons section - different for business and customer */}
+          {userType === 'customer' && (
+            <div className="flex gap-4">
+              {product.quantity === 0 ? (
                 <Button
                   className="flex-1 w-full"
-                  // onClick={handleNotify}
-                  // disabled={isLoading}
+                  disabled
                 >
-                  Notify Me
+                  Out of Stock
                 </Button>
-              </>
-            ) : (
-              <>
+              ) : (
                 <Button
                   className="flex-1"
                   onClick={handleBuyNow}
@@ -160,12 +173,9 @@ export function ProductDialog({ product, isOpen, onClose, userId, userData }) {
                 >
                   {isLoading ? "Processing..." : "Buy Now"}
                 </Button>
-                <Button variant="outline" className="flex-1">
-                  <ShoppingCart className="mr-2 h-4 w-4" /> Add to Cart
-                </Button>
-              </>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

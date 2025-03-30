@@ -14,7 +14,7 @@ import {
   Button,
 } from "@react-email/components";
 
-const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://thikana.in";
+const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://thikana.in";
 
 const getTypeIcon = (type) => {
   switch (type) {
