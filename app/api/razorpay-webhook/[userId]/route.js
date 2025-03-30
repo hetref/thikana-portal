@@ -429,7 +429,37 @@ async function updateSubscriptionStatus(
   subscriptionData
 ) {
   try {
-    // Find the subscription in the subscriptions collection
+    // Extract uniqueId from subscription notes if available
+    const uniqueId = subscriptionData.notes?.uniqueId;
+
+    if (uniqueId) {
+      console.log("Found uniqueId in notes:", uniqueId);
+
+      // First try to get the document directly using the uniqueId as document ID
+      const subscriptionDocRef = doc(
+        db,
+        "users",
+        userId,
+        "subscriptions",
+        uniqueId
+      );
+      const subscriptionDoc = await getDoc(subscriptionDocRef);
+
+      if (subscriptionDoc.exists()) {
+        // Document exists with uniqueId, update it directly
+        await updateDoc(subscriptionDocRef, {
+          status: status,
+          updatedAt: Timestamp.now(),
+          subscriptionData: subscriptionData,
+        });
+
+        console.log(`Updated subscription document with uniqueId: ${uniqueId}`);
+        return;
+      }
+    }
+
+    // Fallback: If uniqueId not found or document doesn't exist, search by subscriptionId
+    console.log("Falling back to search by subscriptionId:", subscriptionId);
     const subsRef = collection(db, "users", userId, "subscriptions");
     const q = query(subsRef, where("subscriptionId", "==", subscriptionId));
     const querySnapshot = await getDocs(q);
@@ -444,7 +474,7 @@ async function updateSubscriptionStatus(
       return updateDoc(doc.ref, {
         status: status,
         updatedAt: Timestamp.now(),
-        subscriptionData: subscriptionData, // Store the full subscription data for reference
+        subscriptionData: subscriptionData,
       });
     });
 
@@ -469,6 +499,41 @@ async function updateSubscriptionStatusFromPayment(userId, paymentData) {
       return;
     }
 
+    // Check if uniqueId is available in notes
+    const uniqueId = paymentData.notes?.uniqueId;
+
+    if (uniqueId) {
+      console.log("Found uniqueId in payment notes:", uniqueId);
+
+      // Try to get the subscription document directly using the uniqueId
+      const subscriptionDocRef = doc(
+        db,
+        "users",
+        userId,
+        "subscriptions",
+        uniqueId
+      );
+      const subscriptionDoc = await getDoc(subscriptionDocRef);
+
+      if (subscriptionDoc.exists()) {
+        // Document exists with uniqueId, update it directly
+        await updateDoc(subscriptionDocRef, {
+          lastPaymentId: paymentData.id,
+          lastPaymentAmount: paymentData.amount,
+          lastPaymentDate: Timestamp.now(),
+          lastPaymentStatus: paymentData.status,
+          updatedAt: Timestamp.now(),
+        });
+
+        console.log(
+          `Updated payment info for subscription with uniqueId: ${uniqueId}`
+        );
+        return;
+      }
+    }
+
+    // Fallback: If uniqueId not found or document doesn't exist, search by subscriptionId
+    console.log("Falling back to search by subscriptionId:", subscriptionId);
     // Update the subscription status
     const subsRef = collection(db, "users", userId, "subscriptions");
     const q = query(subsRef, where("subscriptionId", "==", subscriptionId));
