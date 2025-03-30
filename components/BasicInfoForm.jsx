@@ -24,6 +24,8 @@ import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import { Loader2 } from "lucide-react";
 import { Plus, X, Edit2, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 const basicInfoSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -32,7 +34,6 @@ const basicInfoSchema = z.object({
     .min(2, "Business name must be at least 2 characters"),
   phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, "Invalid phone number"),
   address: z.string().min(5, "Address must be at least 5 characters"),
-  location: z.string().min(2, "Location must be at least 2 characters"),
   bio: z.string().max(500, "Bio must not exceed 500 characters"),
   website: z.string().url("Invalid URL").optional().or(z.literal("")),
   about: z.string().min(10, "About must be at least 10 characters"),
@@ -54,6 +55,7 @@ export default function BasicInfoForm() {
   const [editingTagValue, setEditingTagValue] = useState("");
   const [isAddingCustomTag, setIsAddingCustomTag] = useState(false);
   const [customTagValue, setCustomTagValue] = useState("");
+  const [businessCategories, setBusinessCategories] = useState([]);
 
   const user = auth.currentUser;
   const form = useForm({
@@ -63,7 +65,6 @@ export default function BasicInfoForm() {
       businessName: "",
       phone: "",
       address: "",
-      location: "",
       bio: "",
       website: "",
       about: "",
@@ -83,6 +84,7 @@ export default function BasicInfoForm() {
           const userData = userDocSnap.data();
           form.reset(userData);
           setBusinessTags(userData.businessTags || []);
+          setBusinessCategories(userData.business_categories || []);
         }
       } catch (error) {
         console.error("Error fetching user data:", error);
@@ -163,9 +165,37 @@ export default function BasicInfoForm() {
     }
   };
 
+  const handleBusinessCategoryChange = (category) => {
+    setBusinessCategories((prev) => {
+      if (prev.includes(category)) {
+        return prev.filter((item) => item !== category);
+      } else {
+        return [...prev, category];
+      }
+    });
+  };
+
   async function updateProfile(userData) {
     const userRef = doc(db, "users", user.uid);
-    await setDoc(userRef, { ...userData, businessTags }, { merge: true });
+    await setDoc(
+      userRef,
+      {
+        ...userData,
+        businessTags,
+        business_categories: businessCategories,
+      },
+      { merge: true }
+    );
+
+    // Also update the business document
+    const businessRef = doc(db, "businesses", user.uid);
+    await setDoc(
+      businessRef,
+      {
+        business_categories: businessCategories,
+      },
+      { merge: true }
+    );
   }
 
   async function uploadImage(file, type) {
@@ -383,25 +413,6 @@ export default function BasicInfoForm() {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="location"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Location</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="City, Country"
-                      {...field}
-                      disabled={isSubmitting}
-                      className="bg-gray-50 dark:bg-gray-800"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             <div className="md:col-span-2">
               <FormField
                 control={form.control}
@@ -565,6 +576,44 @@ export default function BasicInfoForm() {
                       </Button>
                     </div>
                   )}
+                </div>
+              </div>
+            </div>
+
+            <div className="md:col-span-2">
+              <FormLabel>Business Category</FormLabel>
+              <div className="mt-2 space-y-2 p-4 bg-gray-50 dark:bg-gray-800 rounded-md">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="serviceBasedBusiness"
+                    checked={businessCategories.includes("service")}
+                    onCheckedChange={() =>
+                      handleBusinessCategoryChange("service")
+                    }
+                    disabled={isSubmitting}
+                  />
+                  <Label
+                    htmlFor="serviceBasedBusiness"
+                    className="text-sm cursor-pointer"
+                  >
+                    Service-Based Business
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="productBasedBusiness"
+                    checked={businessCategories.includes("product")}
+                    onCheckedChange={() =>
+                      handleBusinessCategoryChange("product")
+                    }
+                    disabled={isSubmitting}
+                  />
+                  <Label
+                    htmlFor="productBasedBusiness"
+                    className="text-sm cursor-pointer"
+                  >
+                    Product-Based Business
+                  </Label>
                 </div>
               </div>
             </div>
