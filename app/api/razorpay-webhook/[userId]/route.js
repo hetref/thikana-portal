@@ -312,16 +312,39 @@ async function updatePaymentStatus(userId, paymentId, status, paymentData) {
     console.log("USERID", userId);
     console.log("PAYMENTID", paymentId);
     console.log("STATUS", status);
-    console.log("PAYMENTDATA", paymentData);
-    // Find the payment in the payments collection
+
+    // Extract uniqueId from payment notes if available
+    const uniqueId = paymentData.notes?.uniqueId;
+
+    if (uniqueId) {
+      console.log("Found uniqueId in notes:", uniqueId);
+
+      // First try to get the document directly using the uniqueId as document ID
+      const paymentDocRef = doc(db, "users", userId, "paymentLinks", uniqueId);
+      const paymentDoc = await getDoc(paymentDocRef);
+
+      if (paymentDoc.exists()) {
+        // Document exists with uniqueId, update it directly
+        await updateDoc(paymentDocRef, {
+          status: status,
+          updatedAt: Timestamp.now(),
+          paymentData: paymentData,
+        });
+
+        console.log(`Updated payment document with uniqueId: ${uniqueId}`);
+        return;
+      }
+    }
+
+    // Fallback: If uniqueId not found or document doesn't exist, search by linkId
+    console.log("Falling back to search by linkId:", paymentId);
     const paymentsRef = collection(db, "users", userId, "paymentLinks");
     const q = query(paymentsRef, where("linkId", "==", paymentId));
     const querySnapshot = await getDocs(q);
 
     if (querySnapshot.empty) {
-      // Payment not found, let's create a record
-      console.log(`Payment ${paymentId} not found, creating a new record`);
-      // Ideally we would create a new payment record here
+      // Payment not found, log the situation
+      console.log(`Payment ${paymentId} not found in database`);
       return;
     }
 
@@ -330,7 +353,7 @@ async function updatePaymentStatus(userId, paymentId, status, paymentData) {
       return updateDoc(doc.ref, {
         status: status,
         updatedAt: Timestamp.now(),
-        paymentData: paymentData, // Store the full payment data for reference
+        paymentData: paymentData,
       });
     });
 
@@ -346,7 +369,31 @@ async function updatePaymentStatus(userId, paymentId, status, paymentData) {
 // Function to update payment link status in Firestore
 async function updatePaymentLinkStatus(userId, linkId, status, linkData) {
   try {
-    // Find the payment link in the paymentLinks collection
+    // Extract uniqueId from link notes if available
+    const uniqueId = linkData.notes?.uniqueId;
+
+    if (uniqueId) {
+      console.log("Found uniqueId in notes:", uniqueId);
+
+      // First try to get the document directly using the uniqueId as document ID
+      const linkDocRef = doc(db, "users", userId, "paymentLinks", uniqueId);
+      const linkDoc = await getDoc(linkDocRef);
+
+      if (linkDoc.exists()) {
+        // Document exists with uniqueId, update it directly
+        await updateDoc(linkDocRef, {
+          status: status,
+          updatedAt: Timestamp.now(),
+          linkData: linkData,
+        });
+
+        console.log(`Updated payment link document with uniqueId: ${uniqueId}`);
+        return;
+      }
+    }
+
+    // Fallback: If uniqueId not found or document doesn't exist, search by linkId
+    console.log("Falling back to search by linkId:", linkId);
     const linksRef = collection(db, "users", userId, "paymentLinks");
     const q = query(linksRef, where("linkId", "==", linkId));
     const querySnapshot = await getDocs(q);
@@ -361,7 +408,7 @@ async function updatePaymentLinkStatus(userId, linkId, status, linkData) {
       return updateDoc(doc.ref, {
         status: status,
         updatedAt: Timestamp.now(),
-        linkData: linkData, // Store the full payment link data for reference
+        linkData: linkData,
       });
     });
 
