@@ -360,6 +360,7 @@ export default function PaymentsTab() {
         body: JSON.stringify({
           userId: user.uid,
           planId: selectedPlan.id,
+          planName: selectedPlan.name,
           customerEmail: data.customerEmail,
           customerName: data.customerName,
           customerPhone: data.customerPhone,
@@ -377,20 +378,20 @@ export default function PaymentsTab() {
       }
 
       // Save to Firestore
-      await addDoc(collection(db, "users", user.uid, "subscriptions"), {
-        planId: data.planId,
-        planName: selectedPlan.name,
-        customerEmail: data.customerEmail,
-        customerName: data.customerName,
-        customerPhone: data.customerPhone,
-        notes: {
-          userId: user.uid,
-          ...(data.notes ? { customNote: data.notes } : {}),
-        },
-        subscriptionId: result.id,
-        status: "created",
-        createdAt: serverTimestamp(),
-      });
+      // await addDoc(collection(db, "users", user.uid, "subscriptions"), {
+      //   planId: data.planId,
+      //   planName: selectedPlan.name,
+      //   customerEmail: data.customerEmail,
+      //   customerName: data.customerName,
+      //   customerPhone: data.customerPhone,
+      //   notes: {
+      //     userId: user.uid,
+      //     ...(data.notes ? { customNote: data.notes } : {}),
+      //   },
+      //   subscriptionId: result.id,
+      //   status: "created",
+      //   createdAt: serverTimestamp(),
+      // });
 
       toast.success("Subscription created successfully");
 

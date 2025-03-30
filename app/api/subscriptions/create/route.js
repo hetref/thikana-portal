@@ -36,6 +36,7 @@ export async function POST(req) {
     const {
       userId,
       planId,
+      planName,
       customerEmail,
       customerName,
       customerPhone,
@@ -182,6 +183,7 @@ export async function POST(req) {
       uniqueId: uniqueId,
       subscriptionId: subscription.id,
       planId: subscription.plan_id,
+      planName: planName,
       status: subscription.status,
       customerEmail: customerEmail,
       customerName: customerName || null,
