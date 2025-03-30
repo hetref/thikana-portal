@@ -9,7 +9,7 @@ import { db } from "@/lib/firebase"; // Ensure you import the db instance from y
 import { Loader2, ShoppingBag, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
-export function ProductGrid({ userId, userData }) {
+export function ProductGrid({ userId, userData, userType = "customer" }) {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -159,6 +159,7 @@ export function ProductGrid({ userId, userData }) {
           }}
           userId={userId}
           userData={userData}
+          userType={userType}
         />
       )}
     </>

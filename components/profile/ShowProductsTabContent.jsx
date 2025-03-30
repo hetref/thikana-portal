@@ -6,7 +6,7 @@ import { Button } from "../ui/button";
 import Link from "next/link";
 import { Blocks } from "lucide-react";
 import { getProducts } from "@/lib/inventory-operations";
-import { CartProvider } from "../ProductDialog";
+import { CartProvider } from "../CartContext";
 
 const ShowProductsTabContent = ({
   userId,
@@ -34,7 +34,11 @@ const ShowProductsTabContent = ({
       )}
 
       <CartProvider>
-        <ProductGrid userId={userId} userData={userData} />
+        <ProductGrid 
+          userId={userId} 
+          userData={userData} 
+          userType={currentUserView ? "business" : "customer"} 
+        />
       </CartProvider>
     </div>
   );
