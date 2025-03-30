@@ -13,7 +13,8 @@ import { db } from "@/lib/firebase";
 import CryptoJS from "crypto-js";
 import crypto from "crypto";
 
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
+// Use the same encryption key as in SettingsTab.jsx
+const ENCRYPTION_KEY = "your-encryption-key";
 
 export async function POST(req, { params }) {
   try {
@@ -64,7 +65,7 @@ export async function POST(req, { params }) {
 
     // Decrypt the webhook secret
     try {
-      // Log the encrypted webhook secret
+      // Log relevant information
       console.log(
         "Encrypted webhook secret:",
         userData.razorpayInfo.webhookSecret
@@ -75,81 +76,49 @@ export async function POST(req, { params }) {
         ENCRYPTION_KEY ? ENCRYPTION_KEY.length : 0
       );
 
-      let decryptedWebhookSecret = "";
+      // Use the same decryption approach as in SettingsTab.jsx
+      const bytes = CryptoJS.AES.decrypt(
+        userData.razorpayInfo.webhookSecret,
+        ENCRYPTION_KEY
+      );
+      const decryptedWebhookSecret = bytes.toString(CryptoJS.enc.Utf8);
 
-      try {
-        // Decrypt the webhook secret
-        const bytes = CryptoJS.AES.decrypt(
-          userData.razorpayInfo.webhookSecret,
-          ENCRYPTION_KEY
-        );
-
-        // Log intermediate result
+      // Log the decrypted secret (masked version for security)
+      if (decryptedWebhookSecret) {
         console.log(
-          "Decryption bytes length:",
-          bytes.words ? bytes.words.length : 0
+          "DECRYPTED WEBHOOK SECRET:",
+          decryptedWebhookSecret.length > 6
+            ? `${decryptedWebhookSecret.substring(0, 3)}...${decryptedWebhookSecret.substring(decryptedWebhookSecret.length - 3)}`
+            : "TOO SHORT"
         );
-
-        // Convert to string
-        decryptedWebhookSecret = bytes.toString(CryptoJS.enc.Utf8);
-
-        // Check if decryption produced a valid string
-        if (!decryptedWebhookSecret) {
-          console.error("Decryption produced empty result");
-        }
-      } catch (decryptError) {
-        console.error("Error during decryption:", decryptError.message);
-        // Try alternative decryption approach using triple DES as fallback
-        try {
-          console.log("Attempting alternative decryption method...");
-          decryptedWebhookSecret = CryptoJS.AES.decrypt(
-            userData.razorpayInfo.webhookSecret,
-            ENCRYPTION_KEY
-          ).toString(CryptoJS.enc.Utf8);
-        } catch (fallbackError) {
-          console.error(
-            "Fallback decryption also failed:",
-            fallbackError.message
-          );
-        }
+      } else {
+        console.error("Failed to decrypt webhook secret (empty result)");
       }
 
-      // Safe logging - show only first and last 3 chars
-      console.log(
-        "DECRYPTED WEBHOOK SECRET:",
-        decryptedWebhookSecret
-          ? decryptedWebhookSecret.length > 6
-            ? decryptedWebhookSecret.substring(0, 3) +
-              "..." +
-              decryptedWebhookSecret.substring(
-                decryptedWebhookSecret.length - 3
-              )
-            : "TOO SHORT"
-          : "EMPTY"
-      );
+      // FOR DEBUGGING: Full secret (remove in production)
+      console.log("FULL WEBHOOK SECRET:", decryptedWebhookSecret);
 
-      // FOR DEBUGGING ONLY: Log the full secret to check its validity
-      // IMPORTANT: Remove this in production
-      console.log(
-        "FULL WEBHOOK SECRET (ONLY FOR DEBUGGING):",
-        decryptedWebhookSecret
-      );
-
-      // Try using a test secret directly for verification if decryption fails
+      // Try a test secret if decryption failed
       if (!decryptedWebhookSecret) {
-        console.log(
-          "Decryption failed, checking if we have a test webhook secret in environment"
-        );
+        console.log("Using TEST_WEBHOOK_SECRET as fallback");
         const testWebhookSecret = process.env.TEST_WEBHOOK_SECRET;
         if (testWebhookSecret) {
           console.log(
-            "Using TEST_WEBHOOK_SECRET from environment for verification"
+            "TEST_WEBHOOK_SECRET available, using it for verification"
           );
           decryptedWebhookSecret = testWebhookSecret;
+        } else {
+          return NextResponse.json(
+            { error: "Failed to decrypt webhook secret" },
+            { status: 500 }
+          );
         }
       }
 
-      // Verify the webhook signature - try multiple methods as Razorpay's verification can be tricky
+      // Parse the webhook data
+      const webhookData = JSON.parse(rawBody);
+
+      // Verify the webhook signature
       let signatureIsValid = false;
       let verificationMethod = "";
 
@@ -220,7 +189,6 @@ export async function POST(req, { params }) {
       );
 
       // Signature verified, now process the webhook event
-      const webhookData = JSON.parse(rawBody);
       const event = webhookData.event;
       const payload =
         webhookData.payload?.payment?.entity ||
