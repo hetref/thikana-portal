@@ -309,21 +309,25 @@ export default function PlansTab() {
           selectedPlan.rawNotes &&
           typeof selectedPlan.rawNotes === "object"
         ) {
-          // Update the note in the existing structure
+          // Add userId to notes
+          const updatedNotes = {
+            ...selectedPlan.rawNotes,
+            userId: user.uid,
+          };
+
+          // Update the customNote in the existing structure
           if (planData.notes) {
-            // Try to update the existing structure
-            if (selectedPlan.rawNotes.note) {
-              selectedPlan.rawNotes.note = planData.notes;
-            } else if (selectedPlan.rawNotes.notes) {
-              selectedPlan.rawNotes.notes = planData.notes;
-            } else {
-              // Just create a new object
-              selectedPlan.rawNotes = { note: planData.notes };
-            }
+            updatedNotes.customNote = planData.notes;
           }
 
           // Replace the plain notes with the structured rawNotes
-          planData.notes = selectedPlan.rawNotes;
+          planData.notes = updatedNotes;
+        } else {
+          // Create a new notes object with userId
+          planData.notes = {
+            userId: user.uid,
+            customNote: planData.notes || "",
+          };
         }
 
         // Update plan via API
@@ -349,6 +353,12 @@ export default function PlansTab() {
         toast.success("Subscription plan updated successfully");
         setIsViewPlanDialogOpen(false);
       } else {
+        // Add userId to notes for new plans
+        planData.notes = {
+          userId: user.uid,
+          customNote: planData.notes || "",
+        };
+
         // Create plan via API
         const response = await fetch("/api/subscriptions/create-plan", {
           method: "POST",

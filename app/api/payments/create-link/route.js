@@ -23,6 +23,7 @@ export async function POST(req) {
       customerName,
       customerPhone,
       expiresAt,
+      notes,
     } = await req.json();
 
     if (!userId || !amount || !description) {
@@ -86,6 +87,7 @@ export async function POST(req) {
         sms: Boolean(customerPhone),
       },
       reminder_enable: true,
+      notes: notes || { userId: userId },
     };
 
     // Add expiry if provided
@@ -119,6 +121,7 @@ export async function POST(req) {
       customerPhone: customerPhone || null,
       shortUrl: paymentLink.short_url,
       status: paymentLink.status,
+      notes: notes || { userId: userId },
       createdAt: serverTimestamp(),
     };
 

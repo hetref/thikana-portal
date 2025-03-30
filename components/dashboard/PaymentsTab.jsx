@@ -297,6 +297,10 @@ export default function PaymentsTab() {
       const paymentData = {
         ...data,
         amount: Number(data.amount) * 100, // Convert to paise
+        notes: {
+          userId: user.uid, // Add userId to notes
+          ...(data.notes ? { customNote: data.notes } : {}), // If user provided notes, add them as customNote
+        },
       };
 
       // Create payment link via API
@@ -359,7 +363,10 @@ export default function PaymentsTab() {
           customerEmail: data.customerEmail,
           customerName: data.customerName,
           customerPhone: data.customerPhone,
-          notes: data.notes,
+          notes: {
+            userId: user.uid, // Add userId to notes
+            ...(data.notes ? { customNote: data.notes } : {}), // If user provided notes, add them as customNote
+          },
         }),
       });
 
@@ -376,7 +383,10 @@ export default function PaymentsTab() {
         customerEmail: data.customerEmail,
         customerName: data.customerName,
         customerPhone: data.customerPhone,
-        notes: data.notes,
+        notes: {
+          userId: user.uid,
+          ...(data.notes ? { customNote: data.notes } : {}),
+        },
         subscriptionId: result.id,
         status: "created",
         createdAt: serverTimestamp(),

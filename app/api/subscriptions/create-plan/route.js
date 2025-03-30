@@ -98,12 +98,21 @@ export async function POST(req) {
     if (notes) {
       // Format notes as a dictionary as required by Razorpay
       if (typeof notes === "object" && !Array.isArray(notes)) {
-        // If notes is already an object, use it directly
-        planData.notes = notes;
+        // If notes is already an object, ensure it includes userId
+        planData.notes = {
+          ...notes,
+          userId: userId, // Ensure userId is always present
+        };
       } else {
-        // Otherwise, create an object with a 'note' property
-        planData.notes = { note: notes };
+        // Otherwise, create an object with a customNote property and userId
+        planData.notes = {
+          customNote: notes,
+          userId: userId,
+        };
       }
+    } else {
+      // Always include userId in notes even if no other notes provided
+      planData.notes = { userId: userId };
     }
 
     // Add trial period if provided

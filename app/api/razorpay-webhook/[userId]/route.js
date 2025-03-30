@@ -17,9 +17,10 @@ const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 
 export async function POST(req, { params }) {
   try {
-    const { userId } = params;
+    // We'll still use the URL parameter to find the webhook secret for verification
+    const { userId: urlUserId } = await params;
 
-    if (!userId) {
+    if (!urlUserId) {
       return NextResponse.json(
         { error: "User ID is required" },
         { status: 400 }
@@ -41,7 +42,7 @@ export async function POST(req, { params }) {
     }
 
     // Get user's webhook secret from Firestore
-    const userDocRef = doc(db, "users", userId);
+    const userDocRef = doc(db, "users", urlUserId);
     const userDocSnap = await getDoc(userDocRef);
 
     if (!userDocSnap.exists()) {
@@ -60,105 +61,221 @@ export async function POST(req, { params }) {
     }
 
     // Decrypt the webhook secret
-    const decryptedWebhookSecret = CryptoJS.AES.decrypt(
-      userData.razorpayInfo.webhookSecret,
-      ENCRYPTION_KEY
-    ).toString(CryptoJS.enc.Utf8);
+    try {
+      const decryptedWebhookSecret = CryptoJS.AES.decrypt(
+        userData.razorpayInfo.webhookSecret,
+        ENCRYPTION_KEY
+      ).toString(CryptoJS.enc.Utf8);
 
-    // Verify the webhook signature
-    const expectedSignature = crypto
-      .createHmac("sha256", decryptedWebhookSecret)
-      .update(rawBody)
-      .digest("hex");
+      // Verify the webhook signature - try multiple methods as Razorpay's verification can be tricky
+      let signatureIsValid = false;
+      let verificationMethod = "";
 
-    if (expectedSignature !== razorpaySignature) {
-      console.error("Signature verification failed");
+      // Method 1: Standard string-based verification (most common)
+      try {
+        const expectedSignature = crypto
+          .createHmac("sha256", decryptedWebhookSecret)
+          .update(rawBody)
+          .digest("hex");
+
+        signatureIsValid = expectedSignature === razorpaySignature;
+        if (signatureIsValid) verificationMethod = "string-based";
+      } catch (err) {
+        console.error("Method 1 verification error:", err);
+      }
+
+      // Method 2: Try with Buffer (sometimes needed for binary content)
+      if (!signatureIsValid) {
+        try {
+          const bufferBody = Buffer.from(rawBody);
+          const expectedSignature = crypto
+            .createHmac("sha256", decryptedWebhookSecret)
+            .update(bufferBody)
+            .digest("hex");
+
+          signatureIsValid = expectedSignature === razorpaySignature;
+          if (signatureIsValid) verificationMethod = "buffer-based";
+        } catch (err) {
+          console.error("Method 2 verification error:", err);
+        }
+      }
+
+      // Method 3: Try with trimmed secret (in case there are whitespace issues)
+      if (!signatureIsValid) {
+        try {
+          const trimmedSecret = decryptedWebhookSecret.trim();
+          const expectedSignature = crypto
+            .createHmac("sha256", trimmedSecret)
+            .update(rawBody)
+            .digest("hex");
+
+          signatureIsValid = expectedSignature === razorpaySignature;
+          if (signatureIsValid) verificationMethod = "trimmed-secret";
+        } catch (err) {
+          console.error("Method 3 verification error:", err);
+        }
+      }
+
+      // If none of the methods worked, log detailed info and return error
+      if (!signatureIsValid) {
+        console.error("All signature verification methods failed");
+        console.error(`Secret length: ${decryptedWebhookSecret.length}`);
+        console.error(
+          `Signature received: ${razorpaySignature.substring(0, 10)}...`
+        );
+
+        return NextResponse.json(
+          { error: "Signature verification failed" },
+          { status: 401 }
+        );
+      }
+
+      console.log(
+        `Webhook signature verified successfully using ${verificationMethod} method`
+      );
+
+      // Signature verified, now process the webhook event
+      const webhookData = JSON.parse(rawBody);
+      const event = webhookData.event;
+      const payload =
+        webhookData.payload?.payment?.entity ||
+        webhookData.payload?.subscription?.entity ||
+        webhookData.payload?.payment_link?.entity ||
+        {};
+
+      console.log(`Received webhook event: ${event}`);
+
+      // Extract userId from notes in the payload - this is the key change
+      const notesUserId = payload.notes?.userId;
+
+      // Use the userId from notes if available, otherwise use the URL param
+      const effectiveUserId = notesUserId || urlUserId;
+
+      console.log(
+        `Processing webhook for user: ${effectiveUserId} (from ${notesUserId ? "notes" : "URL"})`
+      );
+
+      // Process different event types
+      switch (event) {
+        // Payment events
+        case "payment.authorized":
+          await updatePaymentStatus(
+            effectiveUserId,
+            payload.id,
+            "authorized",
+            payload
+          );
+          break;
+        case "payment.captured":
+          await updatePaymentStatus(
+            effectiveUserId,
+            payload.id,
+            "paid",
+            payload
+          );
+          if (payload.invoice_id) {
+            // This payment might be for a subscription
+            await updateSubscriptionStatusFromPayment(effectiveUserId, payload);
+          }
+          break;
+        case "payment.failed":
+          await updatePaymentStatus(
+            effectiveUserId,
+            payload.id,
+            "failed",
+            payload
+          );
+          break;
+        case "payment.refunded":
+          await updatePaymentStatus(
+            effectiveUserId,
+            payload.id,
+            "refunded",
+            payload
+          );
+          break;
+
+        // Subscription events
+        case "subscription.authenticated":
+          await updateSubscriptionStatus(
+            effectiveUserId,
+            payload.id,
+            "authenticated",
+            payload
+          );
+          break;
+        case "subscription.activated":
+          await updateSubscriptionStatus(
+            effectiveUserId,
+            payload.id,
+            "active",
+            payload
+          );
+          break;
+        case "subscription.charged":
+          await updateSubscriptionStatus(
+            effectiveUserId,
+            payload.id,
+            "charged",
+            payload
+          );
+          break;
+        case "subscription.halted":
+          await updateSubscriptionStatus(
+            effectiveUserId,
+            payload.id,
+            "halted",
+            payload
+          );
+          break;
+        case "subscription.cancelled":
+          await updateSubscriptionStatus(
+            effectiveUserId,
+            payload.id,
+            "cancelled",
+            payload
+          );
+          break;
+        case "subscription.completed":
+          await updateSubscriptionStatus(
+            effectiveUserId,
+            payload.id,
+            "completed",
+            payload
+          );
+          break;
+
+        // Payment link events
+        case "payment_link.paid":
+          await updatePaymentLinkStatus(
+            effectiveUserId,
+            payload.id,
+            "paid",
+            payload
+          );
+          break;
+        case "payment_link.expired":
+          await updatePaymentLinkStatus(
+            effectiveUserId,
+            payload.id,
+            "expired",
+            payload
+          );
+          break;
+
+        default:
+          console.log("Unhandled event type:", event);
+      }
+
+      // Return a 200 OK response to acknowledge receipt of the webhook
+      return NextResponse.json({ received: true });
+    } catch (decryptionError) {
+      console.error("Error decrypting webhook secret:", decryptionError);
       return NextResponse.json(
-        { error: "Signature verification failed" },
-        { status: 401 }
+        { error: "Failed to decrypt webhook secret" },
+        { status: 500 }
       );
     }
-
-    // Signature verified, now process the webhook event
-    const webhookData = JSON.parse(rawBody);
-    const event = webhookData.event;
-    const payload =
-      webhookData.payload?.payment?.entity ||
-      webhookData.payload?.subscription?.entity ||
-      webhookData.payload?.payment_link?.entity ||
-      {};
-
-    console.log(`Received webhook event: ${event}`);
-
-    // Process different event types
-    switch (event) {
-      // Payment events
-      case "payment.authorized":
-        await updatePaymentStatus(userId, payload.id, "authorized", payload);
-        break;
-      case "payment.captured":
-        await updatePaymentStatus(userId, payload.id, "paid", payload);
-        if (payload.invoice_id) {
-          // This payment might be for a subscription
-          await updateSubscriptionStatusFromPayment(userId, payload);
-        }
-        break;
-      case "payment.failed":
-        await updatePaymentStatus(userId, payload.id, "failed", payload);
-        break;
-      case "payment.refunded":
-        await updatePaymentStatus(userId, payload.id, "refunded", payload);
-        break;
-
-      // Subscription events
-      case "subscription.authenticated":
-        await updateSubscriptionStatus(
-          userId,
-          payload.id,
-          "authenticated",
-          payload
-        );
-        break;
-      case "subscription.activated":
-        await updateSubscriptionStatus(userId, payload.id, "active", payload);
-        break;
-      case "subscription.charged":
-        await updateSubscriptionStatus(userId, payload.id, "charged", payload);
-        break;
-      case "subscription.halted":
-        await updateSubscriptionStatus(userId, payload.id, "halted", payload);
-        break;
-      case "subscription.cancelled":
-        await updateSubscriptionStatus(
-          userId,
-          payload.id,
-          "cancelled",
-          payload
-        );
-        break;
-      case "subscription.completed":
-        await updateSubscriptionStatus(
-          userId,
-          payload.id,
-          "completed",
-          payload
-        );
-        break;
-
-      // Payment link events
-      case "payment_link.paid":
-        await updatePaymentLinkStatus(userId, payload.id, "paid", payload);
-        break;
-      case "payment_link.expired":
-        await updatePaymentLinkStatus(userId, payload.id, "expired", payload);
-        break;
-
-      default:
-        console.log("Unhandled event type:", event);
-    }
-
-    // Return a 200 OK response to acknowledge receipt of the webhook
-    return NextResponse.json({ received: true });
   } catch (error) {
     console.error("Error processing webhook:", error);
     return NextResponse.json(

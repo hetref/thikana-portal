@@ -139,6 +139,45 @@ export default function SettingsTab() {
     toast.success("Webhook URL copied to clipboard");
   };
 
+  const testWebhook = async () => {
+    if (!user) {
+      toast.error("You must be logged in");
+      return;
+    }
+
+    toast.loading("Testing webhook connection...");
+
+    try {
+      const testPayload = {
+        testTimestamp: new Date().toISOString(),
+        testMessage: "This is a test webhook from Thikana",
+      };
+
+      const response = await fetch(`/api/razorpay-webhook-test/${user.uid}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-razorpay-signature": "test-signature-not-valid", // This won't pass verification but helps test the endpoint
+        },
+        body: JSON.stringify(testPayload),
+      });
+
+      const result = await response.json();
+      toast.dismiss();
+
+      if (response.ok) {
+        toast.success("Webhook endpoint is accessible");
+        console.log("Webhook test result:", result);
+      } else {
+        toast.error(`Webhook test failed: ${result.error || "Unknown error"}`);
+      }
+    } catch (error) {
+      toast.dismiss();
+      toast.error(`Error testing webhook: ${error.message}`);
+      console.error("Error testing webhook:", error);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center py-16">
@@ -204,6 +243,9 @@ export default function SettingsTab() {
                 ) : (
                   <Copy className="h-4 w-4" />
                 )}
+              </Button>
+              <Button variant="outline" onClick={testWebhook}>
+                Test Endpoint
               </Button>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -403,6 +445,99 @@ export default function SettingsTab() {
                       Your webhook is now ready to receive events from Razorpay
                     </li>
                   </ol>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </div>
+
+          <Separator className="my-6" />
+
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium">
+              Troubleshooting Webhook Issues
+            </h3>
+
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="issue1">
+                <AccordionTrigger className="text-base font-medium">
+                  "Signature verification failed" error
+                </AccordionTrigger>
+                <AccordionContent className="space-y-3">
+                  <p>This is the most common webhook issue. To fix it:</p>
+                  <ol className="list-decimal pl-6 space-y-2 text-sm">
+                    <li>
+                      Verify that you've entered the exact same webhook secret
+                      in Razorpay and in this application
+                    </li>
+                    <li>
+                      Make sure there are no extra spaces or special characters
+                      in your webhook secret
+                    </li>
+                    <li>
+                      Try regenerating the webhook secret in Razorpay and
+                      updating it here
+                    </li>
+                    <li>
+                      Check that the secret is at least 16 characters long for
+                      security
+                    </li>
+                  </ol>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="issue2">
+                <AccordionTrigger className="text-base font-medium">
+                  Webhooks not being received
+                </AccordionTrigger>
+                <AccordionContent className="space-y-3">
+                  <p>If Razorpay is not sending events to your webhook:</p>
+                  <ol className="list-decimal pl-6 space-y-2 text-sm">
+                    <li>
+                      Verify that your site is accessible from the internet
+                    </li>
+                    <li>
+                      Check if you're using a local development environment -
+                      webhooks need a public URL
+                    </li>
+                    <li>
+                      Make sure you've selected the correct events in Razorpay's
+                      webhook settings
+                    </li>
+                    <li>
+                      Check Razorpay's webhook logs in their dashboard for any
+                      delivery failures
+                    </li>
+                  </ol>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="issue3">
+                <AccordionTrigger className="text-base font-medium">
+                  Testing webhooks locally
+                </AccordionTrigger>
+                <AccordionContent className="space-y-3">
+                  <p>To test webhooks in a local development environment:</p>
+                  <ol className="list-decimal pl-6 space-y-2 text-sm">
+                    <li>
+                      Use a service like ngrok or localtunnel to expose your
+                      local server
+                    </li>
+                    <li>
+                      Set the webhook URL to your ngrok/localtunnel URL in
+                      Razorpay
+                    </li>
+                    <li>
+                      Use Razorpay's test button to send test events to your
+                      webhook
+                    </li>
+                    <li>
+                      Check your server logs for any errors processing the
+                      webhook
+                    </li>
+                  </ol>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Note: For production, always use a proper domain with HTTPS.
+                  </p>
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
