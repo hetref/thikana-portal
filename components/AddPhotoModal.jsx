@@ -9,62 +9,119 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { collection, addDoc } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  updateDoc,
+  arrayUnion,
+  setDoc,
+} from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
-import { Loader2, Upload, ImageIcon, X } from "lucide-react";
-import toast from "react-hot-toast";
+
+// Utility function to format date and create dynamic time display
+function formatDate(isoDateString) {
+  const date = new Date(isoDateString);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now - date) / 1000);
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  const diffInDays = Math.floor(diffInHours / 24);
+
+  // Format as dd/mm/yyyy
+  const formattedDate = date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  });
+
+  // Dynamic time display
+  if (diffInSeconds < 60) {
+    return 'Just now';
+  } else if (diffInMinutes < 60) {
+    return `${diffInMinutes} minute${diffInMinutes !== 1 ? 's' : ''} ago`;
+  } else if (diffInHours < 24) {
+    return `${diffInHours} hour${diffInHours !== 1 ? 's' : ''} ago`;
+  } else if (diffInDays < 7) {
+    return `${diffInDays} day${diffInDays !== 1 ? 's' : ''} ago`;
+  } else if (diffInDays < 30) {
+    const weeks = Math.floor(diffInDays / 7);
+    return `${weeks} week${weeks !== 1 ? 's' : ''} ago`;
+  } else {
+    return formattedDate; // Fallback to formatted date
+  }
+}
 
 export default function AddPhotoModal({ isOpen, onClose, userId }) {
-  const [imageFile, setImageFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(null);
+  const [imageFiles, setImageFiles] = useState([]);
+  const [previewUrls, setPreviewUrls] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
   const handleImageChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewUrl(reader.result);
-      };
-      reader.readAsDataURL(file);
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      setImageFiles(files);
+      
+      // Create preview URLs
+      const previews = files.map(file => {
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            resolve(reader.result);
+          };
+          reader.readAsDataURL(file);
+        });
+      });
+
+      Promise.all(previews).then(setPreviewUrls);
     }
   };
 
-  const handleRemoveImage = () => {
-    setImageFile(null);
-    setPreviewUrl(null);
+  const handleRemoveImage = (indexToRemove) => {
+    setImageFiles(prev => prev.filter((_, index) => index !== indexToRemove));
+    setPreviewUrls(prev => prev.filter((_, index) => index !== indexToRemove));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!imageFile) return;
+    if (imageFiles.length === 0) return;
 
     setIsLoading(true);
     setUploadProgress(0);
 
     try {
-      const imageUrl = await uploadImage(imageFile, (progress) => {
-        setUploadProgress(progress);
-      });
-      await addPhotoToFirestore(userId, {
-        imageUrl,
-      });
-      setUploadProgress(100);
-      toast.success("Photo added successfully!");
+      // Upload images sequentially
+      const uploadedPhotos = [];
+      for (let i = 0; i < imageFiles.length; i++) {
+        const imageUrl = await uploadImage(imageFiles[i], (progress) => {
+          // Calculate overall progress across all files
+          const individualProgress = progress / imageFiles.length;
+          setUploadProgress(prevProgress => prevProgress + individualProgress);
+        });
+
+        const uploadTimestamp = new Date().toISOString();
+        uploadedPhotos.push({
+          photoUrl: imageUrl,
+          title: uploadTimestamp, // Use ISO timestamp
+          addedOn: uploadTimestamp,
+        });
+      }
+
+      // Add all photos to Firestore
+      await addPhotosToFirestore(userId, uploadedPhotos);
+
+      // Reset state after successful upload
       setTimeout(() => {
         onClose();
-        setImageFile(null);
-        setPreviewUrl(null);
+        setImageFiles([]);
+        setPreviewUrls([]);
         setIsLoading(false);
         setUploadProgress(0);
       }, 1000);
     } catch (error) {
-      console.error("Error adding photo:", error);
-      toast.error("Failed to upload photo. Please try again.");
+      console.error("Error adding photos:", error);
       setIsLoading(false);
       setUploadProgress(0);
     }
@@ -98,78 +155,64 @@ export default function AddPhotoModal({ isOpen, onClose, userId }) {
     });
   }
 
-  async function addPhotoToFirestore(userId, photoData) {
-    // Add the photo to the subcollection with a random document ID
-    const userPhotosRef = collection(db, "users", userId, "photos");
+  async function addPhotosToFirestore(userId, photosData) {
+    const userRef = doc(db, "users", userId);
+    const userDoc = await getDoc(userRef);
 
-    // Create photo data with required fields
-    const photoDocData = {
-      photoUrl: photoData.imageUrl,
-      timestamp: new Date().toISOString(),
-    };
-
-    // Add the document to the subcollection
-    await addDoc(userPhotosRef, photoDocData);
+    if (userDoc.exists()) {
+      // Update existing user document with new photos
+      await updateDoc(userRef, {
+        photos: arrayUnion(...photosData),
+      });
+    } else {
+      // Create user document if it doesn't exist
+      await setDoc(userRef, {
+        photos: photosData,
+      });
+    }
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[460px] p-0 overflow-hidden">
-        <DialogHeader className="bg-primary/5 p-6 border-b">
-          <DialogTitle className="text-xl font-semibold">Add Photo</DialogTitle>
+      <DialogContent className="sm:max-w-[425px] max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Add Photos</DialogTitle>
         </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {!previewUrl ? (
-            <div
-              className="border-2 border-dashed rounded-lg p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer"
-              onClick={() => document.getElementById("photo-upload").click()}
-            >
-              <ImageIcon className="h-10 w-10 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-base font-medium mb-1">
-                Click to upload an image
-              </p>
-              <p className="text-sm text-muted-foreground mb-4">
-                PNG, JPG or WEBP (max. 10MB)
-              </p>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="mx-auto"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Choose file
-              </Button>
-              <Input
-                id="photo-upload"
-                type="file"
-                accept="image/*"
-                onChange={handleImageChange}
-                className="hidden"
-              />
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="w-full aspect-video relative bg-black/5 rounded-lg overflow-hidden">
-                <img
-                  src={previewUrl}
-                  alt="Preview"
-                  className="w-full h-full object-contain"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white rounded-full h-8 w-8"
-                  onClick={handleRemoveImage}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Input
+              id="images"
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleImageChange}
+              required
+            />
+          </div>
+          
+          {previewUrls.length > 0 && (
+            <div className="grid grid-cols-3 gap-2">
+              {previewUrls.map((url, index) => (
+                <div key={index} className="relative">
+                  <img
+                    src={url}
+                    alt={`Preview ${index + 1}`}
+                    className="w-full h-24 object-cover rounded-md"
+                  />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    className="absolute top-1 right-1"
+                    onClick={() => handleRemoveImage(index)}
+                  >
+                    X
+                  </Button>
+                </div>
+              ))}
             </div>
           )}
-
+          
           {isLoading && (
             <div className="bg-muted p-3 rounded-md">
               <div className="flex items-center mb-2">
@@ -190,33 +233,19 @@ export default function AddPhotoModal({ isOpen, onClose, userId }) {
               </p>
             </div>
           )}
-
-          <DialogFooter className="flex justify-end gap-2 mt-6 pt-4 border-t">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={isLoading}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              className="bg-primary hover:bg-primary/90"
-              disabled={!imageFile || isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Uploading...
-                </>
-              ) : (
-                "Upload Photo"
-              )}
-            </Button>
-          </DialogFooter>
+          
+          <Button
+            type="submit"
+            className="w-full bg-primary hover:bg-blend-darken"
+            disabled={imageFiles.length === 0 || isLoading}
+          >
+            {isLoading ? "Uploading..." : `Add ${imageFiles.length} Photo(s)`}
+          </Button>
         </form>
       </DialogContent>
     </Dialog>
   );
 }
+
+// Export the formatDate utility function for use in other components
+export { formatDate };
