@@ -309,9 +309,13 @@ export async function POST(req, { params }) {
 // Function to update payment status in Firestore
 async function updatePaymentStatus(userId, paymentId, status, paymentData) {
   try {
+    console.log("USERID", userId);
+    console.log("PAYMENTID", paymentId);
+    console.log("STATUS", status);
+    console.log("PAYMENTDATA", paymentData);
     // Find the payment in the payments collection
-    const paymentsRef = collection(db, "users", userId, "payments");
-    const q = query(paymentsRef, where("paymentId", "==", paymentId));
+    const paymentsRef = collection(db, "users", userId, "paymentLinks");
+    const q = query(paymentsRef, where("linkId", "==", paymentId));
     const querySnapshot = await getDocs(q);
 
     if (querySnapshot.empty) {
