@@ -192,7 +192,11 @@ export default function BasicInfoForm() {
     await setDoc(
       businessRef,
       {
+        businessName: userData.businessName,
         business_categories: businessCategories,
+        businessTags: businessTags,
+        profilePic: userData.profilePic,
+        coverPic: userData.coverPic,
       },
       { merge: true }
     );

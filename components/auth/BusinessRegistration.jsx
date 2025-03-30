@@ -11,6 +11,13 @@ import { Button } from "@/components/ui/button";
 import { Eye, EyeOff } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import toast from "react-hot-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const BusinessRegistration = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -23,12 +30,35 @@ const BusinessRegistration = () => {
   const [password, setPassword] = useState("");
   const [passwordShow, setPasswordShow] = useState(false);
   const [businessType, setBusinessType] = useState("");
+  const [customBusinessType, setCustomBusinessType] = useState("");
   const [businessCategories, setBusinessCategories] = useState([]);
   const [panCard, setPanCard] = useState("");
   const [panVerified, setPanVerified] = useState(false);
   const [panDetails, setPanDetails] = useState(null);
 
   const router = useRouter();
+
+  const businessTypes = [
+    "Retail",
+    "Restaurant",
+    "Salon",
+    "Grocery",
+    "Electronics",
+    "Clothing",
+    "Healthcare",
+    "Education",
+    "Fitness",
+    "Technology",
+    "Professional Services",
+    "Other",
+  ];
+
+  const handleBusinessTypeChange = (value) => {
+    setBusinessType(value);
+    if (value !== "Other") {
+      setCustomBusinessType("");
+    }
+  };
 
   const handlePanCheck = async () => {
     if (!panCard || panCard.length !== 10) {
@@ -116,6 +146,12 @@ const BusinessRegistration = () => {
       return;
     }
 
+    // Determine the final business type to save
+    const finalBusinessType =
+      businessType === "Other" && customBusinessType
+        ? customBusinessType
+        : businessType;
+
     try {
       const userCredential = await createUserWithEmailAndPassword(
         auth,
@@ -130,7 +166,7 @@ const BusinessRegistration = () => {
 
       const businessData = {
         businessName,
-        business_type: businessType,
+        business_type: finalBusinessType,
         business_categories: businessCategories,
         name: firstName + " " + lastName,
         email,
@@ -151,7 +187,7 @@ const BusinessRegistration = () => {
 
       const business = {
         businessName,
-        business_type: businessType,
+        business_type: finalBusinessType,
         business_categories: businessCategories,
         adminName: firstName + " " + lastName,
         email,
@@ -219,7 +255,7 @@ const BusinessRegistration = () => {
               />
             </div>
 
-            {/* Business Type */}
+            {/* Business Type with Dropdown */}
             <div>
               <Label
                 htmlFor="businessType"
@@ -227,15 +263,33 @@ const BusinessRegistration = () => {
               >
                 Business Type
               </Label>
-              <Input
-                id="businessType"
-                type="text"
-                placeholder="Enter business type"
-                required
+              <Select
                 value={businessType}
-                onChange={(e) => setBusinessType(e.target.value)}
-                className="mt-1"
-              />
+                onValueChange={handleBusinessTypeChange}
+              >
+                <SelectTrigger className="w-full mt-1">
+                  <SelectValue placeholder="Select business type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {businessTypes.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {businessType === "Other" && (
+                <Input
+                  id="customBusinessType"
+                  type="text"
+                  placeholder="Specify your business type"
+                  required
+                  value={customBusinessType}
+                  onChange={(e) => setCustomBusinessType(e.target.value)}
+                  className="mt-2"
+                />
+              )}
             </div>
 
             {/* Business Category */}
