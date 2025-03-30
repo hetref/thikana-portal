@@ -27,6 +27,8 @@ export async function POST(req, { params }) {
       );
     }
 
+    console.log("USERID", urlUserId);
+
     // Get the raw body from the request
     const rawBody = await req.text();
 
