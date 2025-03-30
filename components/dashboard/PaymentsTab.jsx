@@ -67,6 +67,7 @@ import {
   Timestamp,
   updateDoc,
   serverTimestamp,
+  onSnapshot,
 } from "firebase/firestore";
 import toast from "react-hot-toast";
 import { useForm } from "react-hook-form";
@@ -88,6 +89,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // Schema for creating a payment link
 const paymentLinkSchema = z.object({
@@ -122,6 +124,11 @@ export default function PaymentsTab() {
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
   const [showCopiedMessage, setShowCopiedMessage] = useState(false);
   const [paymentLinkUrl, setPaymentLinkUrl] = useState("");
+  const [cancelSubscriptionDialogOpen, setCancelSubscriptionDialogOpen] =
+    useState(false);
+  const [selectedSubscription, setSelectedSubscription] = useState(null);
+  const [cancelAtCycleEnd, setCancelAtCycleEnd] = useState(true);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   // Payment link form
   const paymentLinkForm = useForm({
@@ -173,55 +180,55 @@ export default function PaymentsTab() {
   }, []);
 
   // Fetch payment links function (extracted for reuse)
-  const fetchPaymentLinks = async () => {
+  useEffect(() => {
     if (!razorpayConfigured) return;
 
     const user = auth.currentUser;
     if (!user) return;
 
-    try {
-      const linksRef = collection(db, "users", user.uid, "paymentLinks");
-      const q = query(linksRef, orderBy("createdAt", "desc"));
-      const querySnapshot = await getDocs(q);
+    // Set up real-time listener for payment links
+    const linksRef = collection(db, "users", user.uid, "paymentLinks");
+    const q = query(linksRef, orderBy("createdAt", "desc"));
 
-      const links = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAtFormatted: doc.data().createdAt
-          ? new Date(doc.data().createdAt.toDate()).toLocaleString()
-          : "Unknown",
-        expiresAtFormatted: doc.data().expiresAt
-          ? new Date(doc.data().expiresAt.toDate()).toLocaleString()
-          : "Never",
-      }));
+    const unsubscribe = onSnapshot(
+      q,
+      (querySnapshot) => {
+        const links = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+          createdAtFormatted: doc.data().createdAt
+            ? new Date(doc.data().createdAt.toDate()).toLocaleString()
+            : "Unknown",
+          expiresAtFormatted: doc.data().expiresAt
+            ? new Date(doc.data().expiresAt.toDate()).toLocaleString()
+            : "Never",
+        }));
 
-      setPaymentLinks(links);
-    } catch (error) {
-      console.error("Error fetching payment links:", error);
-      toast.error("Failed to fetch payment links");
-    }
-  };
+        setPaymentLinks(links);
+      },
+      (error) => {
+        console.error("Error fetching payment links:", error);
+        toast.error("Failed to fetch payment links");
+      }
+    );
 
-  // Fetch payment links on component mount
-  useEffect(() => {
-    if (razorpayConfigured) {
-      fetchPaymentLinks();
-    }
+    return () => unsubscribe();
   }, [razorpayConfigured]);
 
   // Fetch subscriptions
   useEffect(() => {
-    const fetchSubscriptions = async () => {
-      if (!razorpayConfigured) return;
+    if (!razorpayConfigured) return;
 
-      const user = auth.currentUser;
-      if (!user) return;
+    const user = auth.currentUser;
+    if (!user) return;
 
-      try {
-        const subsRef = collection(db, "users", user.uid, "subscriptions");
-        const q = query(subsRef, orderBy("createdAt", "desc"));
-        const querySnapshot = await getDocs(q);
+    // Set up real-time listener for subscriptions
+    const subsRef = collection(db, "users", user.uid, "subscriptions");
+    const q = query(subsRef, orderBy("createdAt", "desc"));
 
+    const unsubscribe = onSnapshot(
+      q,
+      (querySnapshot) => {
         const subs = querySnapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
@@ -231,13 +238,14 @@ export default function PaymentsTab() {
         }));
 
         setSubscriptions(subs);
-      } catch (error) {
+      },
+      (error) => {
         console.error("Error fetching subscriptions:", error);
         toast.error("Failed to fetch subscriptions");
       }
-    };
+    );
 
-    fetchSubscriptions();
+    return () => unsubscribe();
   }, [razorpayConfigured]);
 
   // Fetch subscription plans
@@ -314,8 +322,8 @@ export default function PaymentsTab() {
       // Show the payment link with copy option
       setPaymentLinkUrl(result.shortUrl);
 
-      // Refresh payment links (use the function we defined)
-      fetchPaymentLinks();
+      // We no longer need to manually refresh as onSnapshot will handle this
+      // fetchPaymentLinks() is removed as onSnapshot will automatically update
     } catch (error) {
       console.error("Error creating payment link:", error);
       toast.error(error.message || "Failed to create payment link");
@@ -507,6 +515,54 @@ export default function PaymentsTab() {
           </Badge>
         );
     }
+  };
+
+  // Add a function to handle subscription cancellation
+  const handleCancelSubscription = async () => {
+    if (!selectedSubscription) return;
+
+    setIsCancelling(true);
+
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("User not authenticated");
+
+      const response = await fetch(
+        `/api/subscriptions/cancel/${selectedSubscription.subscriptionId}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userId: user.uid,
+            cancelAtCycleEnd: cancelAtCycleEnd,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to cancel subscription");
+      }
+
+      const result = await response.json();
+
+      toast.success(result.message);
+      setCancelSubscriptionDialogOpen(false);
+    } catch (error) {
+      console.error("Error cancelling subscription:", error);
+      toast.error(error.message || "Failed to cancel subscription");
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
+  // Add a function to open the cancel subscription dialog
+  const openCancelDialog = (subscription) => {
+    setSelectedSubscription(subscription);
+    setCancelAtCycleEnd(true);
+    setCancelSubscriptionDialogOpen(true);
   };
 
   if (loading) {
@@ -704,7 +760,9 @@ export default function PaymentsTab() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem>View Details</DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => openCancelDialog(subscription)}
+                            >
                               Cancel Subscription
                             </DropdownMenuItem>
                           </DropdownMenuContent>
@@ -1065,6 +1123,111 @@ export default function PaymentsTab() {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Subscription Dialog */}
+      <Dialog
+        open={cancelSubscriptionDialogOpen}
+        onOpenChange={setCancelSubscriptionDialogOpen}
+      >
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Cancel Subscription</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to cancel this subscription?
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            {selectedSubscription && (
+              <div className="space-y-4">
+                <div className="bg-muted p-4 rounded-md">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Customer
+                      </p>
+                      <p className="text-sm">
+                        {selectedSubscription.customerName}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Email
+                      </p>
+                      <p className="text-sm">
+                        {selectedSubscription.customerEmail}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Plan
+                      </p>
+                      <p className="text-sm">{selectedSubscription.planName}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Status
+                      </p>
+                      <p className="text-sm">{selectedSubscription.status}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="cancelAtCycleEnd"
+                    checked={cancelAtCycleEnd}
+                    onCheckedChange={setCancelAtCycleEnd}
+                  />
+                  <label
+                    htmlFor="cancelAtCycleEnd"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Cancel at the end of current billing cycle
+                  </label>
+                </div>
+
+                <Alert className="bg-amber-50 border-amber-200">
+                  <AlertCircle className="h-4 w-4 text-amber-700" />
+                  <AlertTitle className="text-amber-700">
+                    Cancellation Policy
+                  </AlertTitle>
+                  <AlertDescription className="text-amber-700">
+                    {cancelAtCycleEnd
+                      ? "The subscription will continue until the end of the current billing cycle, then it will be cancelled."
+                      : "The subscription will be cancelled immediately, and the customer will no longer be charged."}
+                  </AlertDescription>
+                </Alert>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCancelSubscriptionDialogOpen(false)}
+            >
+              Keep Subscription
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleCancelSubscription}
+              disabled={isCancelling}
+            >
+              {isCancelling ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Cancelling...
+                </>
+              ) : (
+                "Cancel Subscription"
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

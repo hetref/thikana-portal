@@ -59,6 +59,7 @@ import {
   Phone,
   CreditCard,
   ClockIcon,
+  SettingsIcon,
 } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import {
@@ -78,6 +79,7 @@ import Sidebar from "@/components/Sidebar";
 import ContactsTab from "@/components/dashboard/ContactsTab";
 import PaymentsTab from "@/components/dashboard/PaymentsTab";
 import PlansTab from "@/components/dashboard/PlansTab";
+import SettingsTab from "@/components/dashboard/SettingsTab";
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState("contacts");
@@ -159,6 +161,13 @@ export default function DashboardPage() {
                     <ClockIcon className="h-4 w-4" />
                     Plans
                   </TabsTrigger>
+                  <TabsTrigger
+                    value="settings"
+                    className="flex items-center gap-2"
+                  >
+                    <SettingsIcon className="h-4 w-4" />
+                    Settings
+                  </TabsTrigger>
                 </TabsList>
               </div>
 
@@ -172,6 +181,10 @@ export default function DashboardPage() {
 
               <TabsContent value="plans" className="space-y-4">
                 <PlansTab />
+              </TabsContent>
+
+              <TabsContent value="settings" className="space-y-4">
+                <SettingsTab />
               </TabsContent>
             </Tabs>
           </main>
