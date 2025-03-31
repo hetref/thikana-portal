@@ -20,8 +20,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { getUnreadNotificationCount } from "@/lib/notifications";
 import AddPhotoModal from "./AddPhotoModal";
-import { CartProvider } from "@/components/CartContext";
 import { CartIcon } from "@/components/ProductDialog";
+import { CartProvider } from "@/components/CartContext";
 
 const TopNavbar = ({ type = "unauthenticated" }) => {
   const [authUser, setAuthUser] = useState(null);
@@ -110,7 +110,7 @@ const TopNavbar = ({ type = "unauthenticated" }) => {
                 <Search className="h-5 w-5" />
               </Link>
               {type === "authenticated" && userData?.role === "user" && (
-                <CartIcon userId={authUser?.uid} userData={userData} />
+                <CartIcon userData={userData} />
               )}
             </div>
 

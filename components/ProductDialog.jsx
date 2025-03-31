@@ -12,12 +12,46 @@ import { Button } from "@/components/ui/button";
 import { Edit, Minus, Plus, ShoppingCart, Save } from "lucide-react";
 import toast from "react-hot-toast";
 import { recordPurchase, updateProduct } from "@/lib/inventory-operations";
-import { ref, set, get, onValue, update, remove } from "firebase/database";
-import { database } from "@/lib/firebase";
+import { doc, updateDoc, setDoc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCart } from "@/components/CartContext";
+import { auth } from "@/lib/firebase";
+import { usePathname, useSearchParams, useRouter } from "next/navigation";
+
+// Shared function to create a Razorpay order that can be used by both components
+const createRazorpayOrder = async (userId, amount) => {
+  console.log(`Creating Razorpay order for user ${userId} with amount ${amount}`);
+  
+  try {
+    // Use relative URL to ensure it works correctly with Next.js routing
+    const apiUrl = '/api/create-product-order';
+    console.log("Calling API endpoint:", apiUrl);
+    
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ userId, amount }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Error ${response.status}: ${response.statusText}`, errorText);
+      throw new Error(`Failed to create order: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log("Order created successfully:", data);
+    return data;
+  } catch (error) {
+    console.error("Error in createRazorpayOrder:", error);
+    throw error;
+  }
+};
 
 function ProductDialog({ 
   product, 
@@ -34,6 +68,8 @@ function ProductDialog({
   const [editableProduct, setEditableProduct] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   const { addToCart } = useCart();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   // Initialize editable product when product changes or editing mode is toggled
   useEffect(() => {
@@ -47,29 +83,73 @@ function ProductDialog({
   // Calculate total price based on quantity
   const totalPrice = () => (product?.price * quantity).toFixed(2);
 
-  // Create a Razorpay order
-  const createRazorpayOrder = async (userId, amount) => {
-    const response = await fetch("/api/create-product-order", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ userId, amount }),
-    });
+  // Extract business ID from URL path and query parameters
+  const extractBusinessId = () => {
+    // URLs might be like:
+    // 1. /business-profile/[businessId]
+    // 2. /[username]?user=[businessId]  (e.g., /foodsters-83246?user=FBAVPWoEqtaHi27WOSbmBJagPCO2)
+    
+    // First try to extract from query parameters
+    const userParam = searchParams.get('user');
+    if (userParam) {
+      console.log("Extracted business ID from query param:", userParam);
+      return userParam;
+    }
+    
+    // Extract from pathname segments if no query parameter is found
+    if (pathname) {
+      console.log("Current pathname:", pathname);
+      
+      const segments = pathname.split('/');
+      
+      // Check if in business profile path
+      if (pathname.includes('/business-profile/')) {
+        const businessId = segments[segments.length - 1];
+        console.log("Extracted business ID from business profile path:", businessId);
+        return businessId;
+      }
+    }
+    
+    // If nothing found, use product's businessId or default
+    const fallbackId = product?.businessId || "default-business";
+    console.log("Using fallback business ID:", fallbackId);
+    return fallbackId;
+  };
 
-    const order = await response.json();
-    return order;
+  // Fetch business name from Firestore using business ID
+  const fetchBusinessName = async (businessId) => {
+    if (!businessId) return "Store";
+    
+    try {
+      const businessDoc = await getDoc(doc(db, 'users', businessId));
+      if (businessDoc.exists()) {
+        const businessData = businessDoc.data();
+        return businessData.businessName || businessData.name || "Store";
+      }
+      return "Store";
+    } catch (error) {
+      console.error("Error fetching business name:", error);
+      return "Store";
+    }
   };
 
   // Open Razorpay payment gateway
   const openRazorpayPaymentGateway = (order, keyId, amount) => {
+    console.log("Opening Razorpay payment gateway with order:", order);
+    
+    if (typeof window === 'undefined' || !window.Razorpay) {
+      console.error("Razorpay script not loaded");
+      toast.error("Payment gateway is not available. Please try again later.");
+      return;
+    }
+    
     const options = {
       key: keyId,
       amount: amount * 100, // Razorpay expects amount in paise
       currency: "INR",
-      name: userData?.name || "Your Store",
+      name: userData?.name || "Thikana Portal",
       description: `Purchase: ${product?.name}`,
-      order_id: order.id,
+      order_id: order.orderId,
       handler: async function (response) {
         try {
           // Record the purchase in Firebase
@@ -102,8 +182,11 @@ function ProductDialog({
   // Update product quantity in Firebase after purchase
   const updateProductQuantity = async (productId, newQuantity) => {
     try {
-      const productRef = ref(database, `products/${productId}/quantity`);
-      await set(productRef, newQuantity);
+      const productRef = doc(db, 'products', productId);
+      await updateDoc(productRef, {
+        quantity: newQuantity,
+        updatedAt: new Date()
+      });
     } catch (error) {
       console.error("Error updating product quantity:", error);
     }
@@ -118,11 +201,18 @@ function ProductDialog({
     
     setIsLoading(true);
     try {
+      console.log(`Starting buy now for product ${product.id} with price ${totalPrice()}`);
       const order = await createRazorpayOrder(userId, totalPrice());
+      
+      if (!order || !order.orderId) {
+        console.error("Invalid order response:", order);
+        throw new Error("Failed to create order. Please try again.");
+      }
+      
       openRazorpayPaymentGateway(order, order.keyId, totalPrice());
     } catch (error) {
       console.error("Error handling buy now:", error);
-      toast.error("Failed to process payment. Please try again.");
+      toast.error(error.message || "Failed to process payment. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -130,12 +220,12 @@ function ProductDialog({
 
   // Handle "Add to Cart" button click
   const handleAddToCart = async () => {
-    if (!userId) {
+    if (!auth.currentUser) {
       toast.error("Please log in to make a purchase");
       return;
     }
     
-    console.log("Starting handleAddToCart with userId:", userId);
+    console.log("Starting handleAddToCart");
     
     if (product.quantity < quantity) {
       toast.error(`Sorry, only ${product.quantity} items available`);
@@ -143,19 +233,36 @@ function ProductDialog({
     }
     
     try {
-      // Make sure the product has a businessId
-      const businessId = product.businessId || "default-business";
+      // Get business ID from URL or use the one from product
+      const businessId = extractBusinessId();
+      console.log("Business ID for cart:", businessId);
+      
+      // Fetch the business name if not already in the product
+      let businessName = product.businessName;
+      if (!businessName) {
+        console.log("No businessName in product, fetching from Firestore...");
+        businessName = await fetchBusinessName(businessId);
+        console.log("Fetched business name:", businessName);
+      } else {
+        console.log("Using business name from product:", businessName);
+      }
+      
+      // Make sure the product has all required properties
       const productToAdd = {
-        ...product,
-        businessId,
-        businessName: product.businessName || "Store"
+        id: product.id,
+        name: product.name || "Unknown Product",
+        price: product.price || 0,
+        imageUrl: product.imageUrl || null,
+        quantity: quantity,
+        businessId: businessId,
+        businessName: businessName
       };
       
-      console.log("Calling addToCart with:", {
+      console.log("Adding to cart:", {
         product: productToAdd, 
         quantity, 
-        businessId, 
-        userId
+        businessId,
+        businessName
       });
       
       // Check if addToCart function is available
@@ -165,7 +272,8 @@ function ProductDialog({
         return;
       }
       
-      const result = await addToCart(productToAdd, quantity, businessId, userId);
+      // Let the CartContext use auth.currentUser.uid
+      const result = await addToCart(productToAdd, quantity, businessId);
       
       if (result) {
         toast.success("Product added to cart!");
@@ -208,7 +316,7 @@ function ProductDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px]" aria-describedby="product-dialog-description">
         <DialogHeader>
           <DialogTitle className="flex justify-between items-center">
             {!isEditing ? (
@@ -433,7 +541,7 @@ function ProductDialog({
   );
 }
 
-function CartIcon({ userId, userData }) {
+function CartIcon({ userData }) {
   const { 
     cart = {}, 
     isCartOpen = false, 
@@ -442,32 +550,47 @@ function CartIcon({ userId, userData }) {
     removeFromCart = () => false, 
     updateQuantity = () => false,
     getCartTotal = () => 0,
-    getCartTotalItems = () => 0
+    getCartTotalItems = () => 0,
+    getCartItems = () => ({})
   } = useCart();
   
   const [userCart, setUserCart] = useState({});
+  const [isLoadingCart, setIsLoadingCart] = useState(true);
+  const router = useRouter();
   
-  // Get the user-specific cart when cart or userId changes
+  // Get the user-specific cart when cart changes
   useEffect(() => {
-    if (!userId || !cart) {
-      setUserCart({});
-      return;
+    async function fetchUserCart() {
+      if (!auth.currentUser) {
+        setUserCart({});
+        setIsLoadingCart(false);
+        return;
+      }
+    
+      setIsLoadingCart(true);
+      
+      try {
+        // Fetch the cart items - let the getCartItems function use auth.currentUser.uid
+        console.log("Fetching cart items for current user");
+        const userCartItems = await getCartItems();
+        console.log("Fetched user cart items:", userCartItems);
+        setUserCart(userCartItems);
+      } catch (error) {
+        console.error("Error fetching user cart:", error);
+        setUserCart({});
+      } finally {
+        setIsLoadingCart(false);
+      }
     }
     
-    // Check if cart has user-specific data structure
-    if (cart[userId]) {
-      console.log("Found user-specific cart data for:", userId);
-      setUserCart(cart[userId] || {});
-    } else {
-      // Assume cart is already the user's cart
-      console.log("Using general cart data");
-      setUserCart(cart);
-    }
-  }, [cart, userId]);
+    fetchUserCart();
+  }, [cart, getCartItems]);
   
   // Calculate total items in cart
   const calculateTotalItems = () => {
     if (!userCart) return 0;
+    
+    console.log("Calculating total items in cart:", userCart);
     
     return Object.values(userCart).reduce((total, business) => {
       if (!business || !business.products) return total;
@@ -480,40 +603,7 @@ function CartIcon({ userId, userData }) {
   };
   
   const itemCount = calculateTotalItems();
-
-  const handleRemoveItem = async (businessId, productId) => {
-    if (!userId) {
-      toast.error("Please log in to manage your cart");
-      return;
-    }
-    
-    try {
-      await removeFromCart(businessId, productId, userId);
-      toast.success("Item removed from cart");
-    } catch (error) {
-      console.error("Error removing item:", error);
-      toast.error("Failed to remove item");
-    }
-  };
-
-  const handleUpdateQuantity = async (businessId, productId, newQuantity) => {
-    if (!userId) {
-      toast.error("Please log in to manage your cart");
-      return;
-    }
-    
-    if (newQuantity < 1) {
-      handleRemoveItem(businessId, productId);
-      return;
-    }
-    
-    try {
-      await updateQuantity(businessId, productId, newQuantity, userId);
-    } catch (error) {
-      console.error("Error updating quantity:", error);
-      toast.error("Failed to update quantity");
-    }
-  };
+  console.log("Total items in cart:", itemCount);
 
   // Calculate total for a business
   const calculateBusinessTotal = (businessId) => {
@@ -525,16 +615,152 @@ function CartIcon({ userId, userData }) {
     );
   };
 
-  // Function to handle checkout
-  const handleCheckout = () => {
+  // Open Razorpay payment gateway for cart items
+  const openCartRazorpayPaymentGateway = (order, keyId, amount, specificBusinessId = null) => {
+    console.log("Opening Razorpay payment gateway with order:", order);
+    
+    if (typeof window === 'undefined' || !window.Razorpay) {
+      console.error("Razorpay script not loaded");
+      toast.error("Payment gateway is not available. Please try again later.");
+      return;
+    }
+    
+    const options = {
+      key: keyId,
+      amount: amount * 100, // Razorpay expects amount in paise
+      currency: "INR",
+      name: userData?.name || "Thikana Portal",
+      description: specificBusinessId 
+        ? `Purchase from ${userCart[specificBusinessId]?.businessName || "Store"}`
+        : "Purchase from multiple stores",
+      order_id: order.orderId,
+      handler: async function (response) {
+        try {
+          // Close the cart sheet
+          setIsCartOpen(false);
+          
+          // TODO: Process successful payment and clear cart
+          toast.success("Payment successful!");
+          
+          // Redirect based on whether it was a specific business or all items
+          if (specificBusinessId) {
+            router.push(`/order-confirmation?businessId=${specificBusinessId}`);
+          } else {
+            router.push('/order-confirmation');
+          }
+        } catch (error) {
+          console.error("Error processing payment:", error);
+          toast.error("Failed to complete purchase. Please contact support.");
+        }
+      },
+      prefill: {
+        name: userData?.name || "",
+        email: userData?.email || "",
+        contact: userData?.phone || "",
+      },
+      theme: {
+        color: "#3399cc",
+      },
+    };
+
+    const rzp = new window.Razorpay(options);
+    rzp.open();
+  };
+  
+  const handleRemoveItem = async (businessId, productId) => {
+    if (!auth.currentUser) {
+      toast.error("Please log in to manage your cart");
+      return;
+    }
+    
+    try {
+      // Let removeFromCart use auth.currentUser.uid
+      await removeFromCart(businessId, productId);
+      toast.success("Item removed from cart");
+    } catch (error) {
+      console.error("Error removing item:", error);
+      toast.error("Failed to remove item");
+    }
+  };
+
+  const handleUpdateQuantity = async (businessId, productId, newQuantity) => {
+    if (!auth.currentUser) {
+      toast.error("Please log in to manage your cart");
+      return;
+    }
+    
+    if (newQuantity < 1) {
+      handleRemoveItem(businessId, productId);
+      return;
+    }
+    
+    try {
+      // Let updateQuantity use auth.currentUser.uid
+      await updateQuantity(businessId, productId, newQuantity);
+    } catch (error) {
+      console.error("Error updating quantity:", error);
+      toast.error("Failed to update quantity");
+    }
+  };
+
+  // Function to handle checkout for a specific business
+  const handleBusinessCheckout = async (businessId, businessName) => {
+    if (!userCart[businessId] || Object.keys(userCart[businessId]?.products || {}).length === 0) {
+      toast.error("No items in this business cart");
+      return;
+    }
+    
+    if (!auth.currentUser) {
+      toast.error("Please log in to checkout");
+      return;
+    }
+    
+    try {
+      // Calculate the total amount for this business
+      const amount = calculateBusinessTotal(businessId);
+      console.log(`Starting checkout for business ${businessId} with amount ${amount}`);
+      
+      // Create Razorpay order using the shared function
+      const order = await createRazorpayOrder(auth.currentUser.uid, amount);
+      
+      // Open Razorpay payment gateway
+      openCartRazorpayPaymentGateway(order, order.keyId, amount, businessId);
+    } catch (error) {
+      console.error("Error processing checkout:", error);
+      toast.error("Failed to process payment");
+    }
+  };
+
+  // Function to handle checkout for all items
+  const handleCheckoutAll = async () => {
     if (itemCount === 0) {
       toast.error("Your cart is empty");
       return;
     }
     
-    // Redirect to checkout page or open checkout modal
-    toast.success("Redirecting to checkout...");
-    // Implementation would depend on your checkout flow
+    if (!auth.currentUser) {
+      toast.error("Please log in to checkout");
+      return;
+    }
+    
+    try {
+      // Calculate total across all businesses
+      const totalAmount = Object.keys(userCart).reduce(
+        (total, businessId) => total + calculateBusinessTotal(businessId), 
+        0
+      );
+      
+      console.log(`Starting checkout for all items with amount ${totalAmount}`);
+      
+      // Create Razorpay order using the shared function
+      const order = await createRazorpayOrder(auth.currentUser.uid, totalAmount);
+      
+      // Open Razorpay payment gateway
+      openCartRazorpayPaymentGateway(order, order.keyId, totalAmount);
+    } catch (error) {
+      console.error("Error processing checkout:", error);
+      toast.error("Failed to process payment");
+    }
   };
 
   return (
@@ -553,7 +779,7 @@ function CartIcon({ userId, userData }) {
           )}
         </Button>
       </SheetTrigger>
-      <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+      <SheetContent className="w-full sm:max-w-md overflow-y-auto" aria-describedby="cart-sheet-description">
         <div className="flex flex-col gap-6 py-4">
           <SheetHeader>
             <SheetTitle>Your Cart</SheetTitle>
@@ -562,7 +788,58 @@ function CartIcon({ userId, userData }) {
             </SheetDescription>
           </SheetHeader>
           
-          {isLoading ? (
+          {/* Debug buttons section */}
+          <div className="border rounded p-3 bg-gray-50 dark:bg-gray-800 mb-4">
+            <h3 className="text-sm font-bold mb-2">Debug Tools</h3>
+            <div className="flex gap-2">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={() => {
+                  if (window.testDatabaseWrite && auth.currentUser) {
+                    window.testDatabaseWrite(auth.currentUser.uid);
+                    toast.success("Test write initiated - check console");
+                  } else {
+                    toast.error("Test function not available or no current user");
+                  }
+                }}
+              >
+                Test DB Write
+              </Button>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={async () => {
+                  try {
+                    setIsLoadingCart(true);
+                    console.log("Manual cart refresh for current user");
+                    
+                    // Use the getCartItems function from context
+                    const userCartItems = await getCartItems();
+                    console.log("Fetched user cart items:", userCartItems);
+                    
+                    if (Object.keys(userCartItems).length > 0) {
+                      toast.success("Cart data found - check console");
+                      setUserCart(userCartItems);
+                    } else {
+                      console.log("No cart data found for current user:", auth.currentUser.uid);
+                      toast.error("No cart data found");
+                      setUserCart({});
+                    }
+                  } catch (error) {
+                    console.error("Error fetching cart data:", error);
+                    toast.error("Error: " + error.message);
+                  } finally {
+                    setIsLoadingCart(false);
+                  }
+                }}
+              >
+                Refresh Cart
+              </Button>
+            </div>
+          </div>
+          
+          {isLoadingCart ? (
             <div className="flex justify-center py-8">
               <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
             </div>
@@ -580,11 +857,16 @@ function CartIcon({ userId, userData }) {
                   return null;
                 }
                 
+                const businessName = business?.businessName || "Store";
+                
                 return (
                   <div key={businessId} className="border rounded-lg p-4 mb-4">
-                    <h3 className="font-medium text-lg mb-2">
-                      {business?.businessName || "Store"}
+                    <h3 className="font-medium text-lg mb-1">
+                      {businessName}
                     </h3>
+                    <p className="text-sm text-gray-500 mb-3">
+                      Business ID: {businessId}
+                    </p>
                     
                     {/* Render products for this business */}
                     <div className="space-y-4">
@@ -650,10 +932,19 @@ function CartIcon({ userId, userData }) {
                       })}
                     </div>
                     
-                    {/* Business subtotal */}
-                    <div className="flex justify-between mt-3 pt-2 border-t">
-                      <span className="font-medium">Subtotal:</span>
-                      <span className="font-bold">₹{calculateBusinessTotal(businessId).toFixed(2)}</span>
+                    {/* Business subtotal and checkout button */}
+                    <div className="mt-3 pt-2 border-t">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="font-medium">Subtotal:</span>
+                        <span className="font-bold">₹{calculateBusinessTotal(businessId).toFixed(2)}</span>
+                      </div>
+                      <Button 
+                        className="w-full"
+                        size="sm"
+                        onClick={() => handleBusinessCheckout(businessId, businessName)}
+                      >
+                        Checkout {businessName}
+                      </Button>
                     </div>
                   </div>
                 );
@@ -671,13 +962,13 @@ function CartIcon({ userId, userData }) {
                 </div>
               </div>
               
-              {/* Checkout button */}
+              {/* Checkout all button */}
               <Button 
                 className="w-full mt-2"
-                onClick={handleCheckout}
+                onClick={handleCheckoutAll}
                 disabled={itemCount === 0}
               >
-                Proceed to Checkout
+                Checkout All Items
               </Button>
             </>
           )}

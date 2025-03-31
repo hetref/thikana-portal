@@ -8,6 +8,8 @@ import { Blocks } from "lucide-react";
 import { getProducts } from "@/lib/inventory-operations";
 import { CartProvider } from "../CartContext";
 
+
+
 const ShowProductsTabContent = ({
   userId,
   userData,
