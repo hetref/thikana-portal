@@ -71,6 +71,8 @@ export default function ExpenseTab() {
   const [category, setCategory] = useState("");
   const [expenses, setExpenses] = useState([]);
   const [loadingExpenses, setLoadingExpenses] = useState(true);
+  const [date, setDate] = useState(getCurrentDateTime().split(" ")[0]); // Default to current date
+  const [time, setTime] = useState(getCurrentDateTime().split(" ")[1]); // Default to current time
 
   // Fetch expenses
   useEffect(() => {
@@ -120,7 +122,7 @@ export default function ExpenseTab() {
         return;
       }
 
-      if (!expenseName || !amount || !category) {
+      if (!expenseName || !amount || !category || !date || !time) {
         toast.error("Please fill in all fields");
         return;
       }
@@ -139,12 +141,15 @@ export default function ExpenseTab() {
         "user_transactions"
       );
 
+      // Combine date and time into timestamp string
+      const timestamp = `${date} ${time}`;
+
       // Add expense document with string timestamp
       await addDoc(transactionsRef, {
         name: expenseName,
         amount: numericAmount,
         category,
-        timestamp: getCurrentDateTime(),
+        timestamp,
         type: "expense", // To differentiate from income if needed later
       });
 
@@ -152,6 +157,8 @@ export default function ExpenseTab() {
       setExpenseName("");
       setAmount("");
       setCategory("");
+      setDate(getCurrentDateTime().split(" ")[0]);
+      setTime(getCurrentDateTime().split(" ")[1]);
 
       // Refresh expenses list
       fetchExpenses();
@@ -238,6 +245,32 @@ export default function ExpenseTab() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="expense-date" className="text-sm font-medium">
+                  Date
+                </label>
+                <Input
+                  id="expense-date"
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor="expense-time" className="text-sm font-medium">
+                  Time
+                </label>
+                <Input
+                  id="expense-time"
+                  type="time"
+                  value={time}
+                  onChange={(e) => setTime(e.target.value)}
+                  required
+                />
               </div>
             </div>
             <Button type="submit" disabled={loading}>

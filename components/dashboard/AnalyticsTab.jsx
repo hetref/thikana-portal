@@ -17,6 +17,7 @@ import {
   Lightbulb,
   Activity,
   BarChart3,
+  Download,
 } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import {
@@ -34,6 +35,8 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
+import { Button } from "@/components/ui/button";
+import { toast } from "react-hot-toast";
 
 // Colors for pie chart
 const COLORS = [
@@ -66,6 +69,7 @@ export default function AnalyticsTab() {
   const [anomalyData, setAnomalyData] = useState([]);
   const [showDemoData, setShowDemoData] = useState(true);
   const [predictedData, setPredictedData] = useState([]);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   useEffect(() => {
     // Fetch analytics data from API
@@ -263,6 +267,193 @@ export default function AnalyticsTab() {
     { month: "Dec", actual: null, predicted: 6500 },
   ];
 
+  // Generate and download PDF report
+  const generatePdfReport = async () => {
+    setGeneratingPdf(true);
+    try {
+      // Create a new jsPDF instance
+      const { jsPDF } = await import("jspdf");
+      const { autoTable } = await import("jspdf-autotable");
+
+      const doc = new jsPDF();
+
+      // Add title
+      doc.setFontSize(18);
+      doc.text("Expense Analytics Report", 14, 15);
+
+      // Add date
+      doc.setFontSize(10);
+      doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 22);
+
+      if (!showDemoData && analyticsData) {
+        // Add overview section
+        doc.setFontSize(14);
+        doc.text("Overview", 14, 30);
+
+        if (analyticsData.recommendations?.overview) {
+          const overview = analyticsData.recommendations.overview;
+          doc.setFontSize(10);
+          doc.text(
+            `Total Spending: ₹${overview.total_spending?.toFixed(2) || 0}`,
+            14,
+            38
+          );
+          doc.text(
+            `Average Transaction: ₹${overview.average_transaction?.toFixed(2) || 0}`,
+            14,
+            45
+          );
+        }
+
+        // Add anomaly detection
+        doc.setFontSize(14);
+        doc.text("Anomaly Detection", 14, 60);
+
+        if (analyticsData.transaction_analysis?.anomalies?.length > 0) {
+          const anomalies = analyticsData.transaction_analysis.anomalies;
+
+          const anomalyTableData = anomalies.map((anomaly) => [
+            new Date(anomaly.timestamp).toLocaleDateString(),
+            `₹${anomaly.amount.toFixed(2)}`,
+            anomaly.reason || "Unusual spending",
+          ]);
+
+          autoTable(doc, {
+            startY: 65,
+            head: [["Date", "Amount", "Reason"]],
+            body: anomalyTableData,
+          });
+        } else {
+          doc.setFontSize(10);
+          doc.text("No anomalies detected", 14, 65);
+        }
+
+        // Add category breakdown
+        const currentY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 80;
+        doc.setFontSize(14);
+        doc.text("Expense Categories", 14, currentY);
+
+        if (analyticsData.recommendations?.category_analysis) {
+          const categories = analyticsData.recommendations.category_analysis;
+
+          const categoryTableData = Object.entries(categories).map(
+            ([name, details]) => [
+              name,
+              `₹${details.total_spent?.toFixed(2) || 0}`,
+              `${details.percentage_of_total?.toFixed(1) || 0}%`,
+            ]
+          );
+
+          autoTable(doc, {
+            startY: currentY + 5,
+            head: [["Category", "Amount", "% of Total"]],
+            body: categoryTableData,
+          });
+        }
+
+        // Add recommendations
+        const recY = doc.lastAutoTable
+          ? doc.lastAutoTable.finalY + 10
+          : currentY + 30;
+        doc.setFontSize(14);
+        doc.text("Recommendations", 14, recY);
+
+        if (analyticsData.recommendations?.budget_suggestions?.length > 0) {
+          const suggestions = analyticsData.recommendations.budget_suggestions;
+
+          const suggestionsTableData = suggestions.map((suggestion) => [
+            suggestion.category,
+            `₹${suggestion.current_monthly?.toFixed(2) || 0}`,
+            `₹${suggestion.suggested_monthly?.toFixed(2) || 0}`,
+            `₹${suggestion.potential_savings?.toFixed(2) || 0}`,
+          ]);
+
+          autoTable(doc, {
+            startY: recY + 5,
+            head: [
+              ["Category", "Current Monthly", "Suggested", "Potential Savings"],
+            ],
+            body: suggestionsTableData,
+          });
+        } else {
+          doc.setFontSize(10);
+          doc.text("No specific recommendations available", 14, recY + 5);
+        }
+      } else {
+        // Use demo data
+        // Category data
+        doc.setFontSize(14);
+        doc.text("Expense Categories", 14, 30);
+
+        const categoryData = demoCategoryData.map((cat) => [
+          cat.name,
+          `₹${cat.value.toFixed(2)}`,
+          `${((cat.value / demoCategoryData.reduce((sum, c) => sum + c.value, 0)) * 100).toFixed(1)}%`,
+        ]);
+
+        autoTable(doc, {
+          startY: 35,
+          head: [["Category", "Amount", "% of Total"]],
+          body: categoryData,
+        });
+
+        // Monthly data
+        const monthlyY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 80;
+        doc.setFontSize(14);
+        doc.text("Monthly Expenses", 14, monthlyY);
+
+        const monthlyData = demoMonthlyExpenses.map((month) => [
+          month.name,
+          `₹${month.amount.toFixed(2)}`,
+        ]);
+
+        autoTable(doc, {
+          startY: monthlyY + 5,
+          head: [["Month", "Amount"]],
+          body: monthlyData,
+        });
+
+        // Anomaly data
+        const anomalyY = doc.lastAutoTable
+          ? doc.lastAutoTable.finalY + 10
+          : monthlyY + 50;
+        doc.setFontSize(14);
+        doc.text("Expense Anomalies", 14, anomalyY);
+
+        const anomalyData = demoAnomalyData
+          .filter((a) => a.isAnomaly)
+          .map((anomaly) => [
+            anomaly.date,
+            `₹${anomaly.amount.toFixed(2)}`,
+            "Unusual spending pattern",
+          ]);
+
+        if (anomalyData.length > 0) {
+          autoTable(doc, {
+            startY: anomalyY + 5,
+            head: [["Date", "Amount", "Reason"]],
+            body: anomalyData,
+          });
+        } else {
+          doc.setFontSize(10);
+          doc.text("No anomalies detected", 14, anomalyY + 5);
+        }
+      }
+
+      // Footer
+      doc.setFontSize(10);
+      doc.text("Generated by Thikana Portal", 14, 280);
+
+      // Save the PDF
+      doc.save("expense-analytics-report.pdf");
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast.error("Failed to generate PDF report");
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center py-8">
@@ -275,11 +466,25 @@ export default function AnalyticsTab() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Expense Analytics</h2>
-        {showDemoData && (
-          <Badge variant="secondary" className="px-3 py-1">
-            Demo Data
-          </Badge>
-        )}
+        <div className="flex items-center gap-4">
+          {showDemoData && (
+            <Badge variant="secondary" className="px-3 py-1">
+              Demo Data
+            </Badge>
+          )}
+          <Button
+            onClick={generatePdfReport}
+            disabled={generatingPdf}
+            className="flex items-center gap-2"
+          >
+            {generatingPdf ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            {generatingPdf ? "Generating..." : "Download Report"}
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
