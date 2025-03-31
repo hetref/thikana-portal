@@ -10,6 +10,7 @@ import {
   CheckCircle,
   AlertCircle,
   ExternalLink,
+  TicketIcon
 } from "lucide-react";
 import Link from "next/link";
 import { auth, db } from "@/lib/firebase";
@@ -23,6 +24,7 @@ import { userEmailStatus } from "@/utils/userStatus";
 import { getUnreadNotificationCount } from "@/lib/notifications";
 import FollowingDialog from "@/components/profile/FollowingDialog";
 import FollowerDialog from "@/components/profile/FollowerDialog";
+import BusinessQueryDialog from "@/components/profile/BusinessQueryDialog";
 
 // Guest sidebar component when user is not logged in
 function DefaultSidebar() {
@@ -64,6 +66,7 @@ export default function Sidebar() {
   const [followingCount, setFollowingCount] = useState(0);
   const [notificationCount, setNotificationCount] = useState(0);
   const { isBusinessUser, loading } = useIsBusinessUser(userId);
+  const [showQueryDialog, setShowQueryDialog] = useState(false);
 
   // Get follower and following counts
   useEffect(() => {
@@ -294,9 +297,27 @@ export default function Sidebar() {
                 </Button>
               </Link>
             </div>
+            <div className="w-full mt-4">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full"
+                onClick={() => setShowQueryDialog(true)}
+              >
+                <TicketIcon className="h-4 w-4 mr-2" />
+                Business query
+              </Button>
+            </div>
+
           </div>
         </CardContent>
       </Card>
+      
+      {/* Business Query Dialog */}
+      <BusinessQueryDialog 
+        open={showQueryDialog} 
+        onOpenChange={setShowQueryDialog} 
+      />
     </div>
   );
 }
