@@ -20,6 +20,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { getUnreadNotificationCount } from "@/lib/notifications";
 import AddPhotoModal from "./AddPhotoModal";
+import { CartProvider } from "@/components/CartContext";
+import { CartIcon } from "@/components/ProductDialog";
 
 const TopNavbar = ({ type = "unauthenticated" }) => {
   const [authUser, setAuthUser] = useState(null);
@@ -70,162 +72,168 @@ const TopNavbar = ({ type = "unauthenticated" }) => {
   };
 
   return (
-    <header className="fixed top-0 w-full z-50 bg-white/80 dark:bg-black/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 transition-colors duration-300">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
-        <Link href="/" className="flex items-center gap-2 font-semibold">
-          <Image
-            src="/logo/black-logo.png"
-            alt="Thikana Logo"
-            width={150}
-            height={64}
-            className="h-16 object-contain"
-          />
-        </Link>
+    <CartProvider>
+      <header className="fixed top-0 w-full z-50 bg-white/80 dark:bg-black/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 transition-colors duration-300">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
+          <Link href="/" className="flex items-center gap-2 font-semibold">
+            <Image
+              src="/logo/black-logo.png"
+              alt="Thikana Logo"
+              width={150}
+              height={64}
+              className="h-16 object-contain"
+              priority
+            />
+          </Link>
 
-        <button
-          className="flex items-center sm:hidden"
-          onClick={() => setIsMenuOpen(!isMenuOpen)}
-        >
-          {isMenuOpen ? (
-            <X className="h-6 w-6" />
-          ) : (
-            <Menu className="h-6 w-6" />
-          )}
-        </button>
-
-        <div
-          className={`${
-            isMenuOpen ? "flex" : "hidden"
-          } flex-col sm:flex sm:flex-row sm:items-center gap-4 bg-background sm:bg-transparent 
-          sm:gap-6 fixed sm:relative top-14 sm:top-auto right-0 sm:right-auto w-full sm:w-auto p-6`}
-        >
-          <ThemeToggle />
-
-          <div className="flex items-center gap-2">
-            <Link href="/search">
-              <Search className="h-5 w-5" />
-            </Link>
-          </div>
-
-          {authUser &&
-            type === "authenticated" &&
-            authenticatedItems.map((item) => (
-              <Link
-                key={item.title}
-                href={item.href}
-                className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary"
-              >
-                {item.icon && <item.icon className="h-5 w-5" />}
-                <span className="block">{item.title}</span>
-                {item.title === "Notifications" && notificationCount > 0 && (
-                  <Badge
-                    variant="destructive"
-                    className="text-[10px] h-5 min-w-5 flex items-center justify-center px-1"
-                  >
-                    {notificationCount > 99 ? "99+" : notificationCount}
-                  </Badge>
-                )}
-              </Link>
-            ))}
-
-          {authUser && userData && type === "authenticated" && (
-            <>
-              {/* Only show Create dropdown if user role is not "user" */}
-              {userData.role !== "user" && (
-                <>
-                  <Link
-                    key="Map"
-                    href="/map"
-                    className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary"
-                  >
-                    <MapPin /> Set Location
-                  </Link>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary">
-                        <Plus className="h-5 w-5" />
-                        <span className="block">Create</span>
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem asChild>
-                        <Link
-                          href="/create-post"
-                          className="flex items-center gap-2"
-                        >
-                          <span>Create Post</span>
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onSelect={() => setIsAddPhotoModalOpen(true)}
-                      >
-                        <span>Add Photos</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link
-                          href="/add-product"
-                          className="flex items-center gap-2"
-                        >
-                          <span>Add Product</span>
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link
-                          href="/add-bulk-products"
-                          className="flex items-center gap-2"
-                        >
-                          <span>Add Bulk Product</span>
-                        </Link>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </>
-              )}
-              {authUser && (
-                <AddPhotoModal
-                  isOpen={isAddPhotoModalOpen}
-                  onClose={() => setIsAddPhotoModalOpen(false)}
-                  userId={authUser.uid}
-                />
-              )}
-            </>
-          )}
-
-          {type === "unauthenticated" &&
-            unauthenticatedItems.map((item) => (
-              <Link
-                key={item.title}
-                href={item.href}
-                className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary"
-              >
-                {item.icon && <item.icon className="h-5 w-5" />}
-                <span className="block">{item.title}</span>
-              </Link>
-            ))}
-
-          {/* Auth Buttons */}
-          <div className="flex items-center gap-2">
-            {authUser && type === "authenticated" ? (
-              <Button
-                size="sm"
-                onClick={logoutHandler}
-                className="bg-primary hover:bg-primary-dark"
-              >
-                Sign out
-              </Button>
+          <button
+            className="flex items-center sm:hidden"
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+          >
+            {isMenuOpen ? (
+              <X className="h-6 w-6" />
             ) : (
-              <Button
-                size="sm"
-                asChild
-                className="bg-primary hover:bg-primary-dark"
-              >
-                <Link href={authUser ? "/feed" : "/login"}>Get Started</Link>
-              </Button>
+              <Menu className="h-6 w-6" />
             )}
+          </button>
+
+          <div
+            className={`${
+              isMenuOpen ? "flex" : "hidden"
+            } flex-col sm:flex sm:flex-row sm:items-center gap-4 bg-background sm:bg-transparent 
+            sm:gap-6 fixed sm:relative top-14 sm:top-auto right-0 sm:right-auto w-full sm:w-auto p-6`}
+          >
+            <ThemeToggle />
+
+            <div className="flex items-center gap-2">
+              <Link href="/search">
+                <Search className="h-5 w-5" />
+              </Link>
+              {type === "authenticated" && userData?.role === "user" && (
+                <CartIcon userId={authUser?.uid} userData={userData} />
+              )}
+            </div>
+
+            {authUser &&
+              type === "authenticated" &&
+              authenticatedItems.map((item) => (
+                <Link
+                  key={item.title}
+                  href={item.href}
+                  className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary"
+                >
+                  {item.icon && <item.icon className="h-5 w-5" />}
+                  <span className="block">{item.title}</span>
+                  {item.title === "Notifications" && notificationCount > 0 && (
+                    <Badge
+                      variant="destructive"
+                      className="text-[10px] h-5 min-w-5 flex items-center justify-center px-1"
+                    >
+                      {notificationCount > 99 ? "99+" : notificationCount}
+                    </Badge>
+                  )}
+                </Link>
+              ))}
+
+            {authUser && userData && type === "authenticated" && (
+              <>
+                {/* Only show Create dropdown if user role is not "user" */}
+                {userData.role !== "user" && (
+                  <>
+                    <Link
+                      key="Map"
+                      href="/map"
+                      className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary"
+                    >
+                      <MapPin /> Set Location
+                    </Link>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary">
+                          <Plus className="h-5 w-5" />
+                          <span className="block">Create</span>
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem asChild>
+                          <Link
+                            href="/create-post"
+                            className="flex items-center gap-2"
+                          >
+                            <span>Create Post</span>
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={() => setIsAddPhotoModalOpen(true)}
+                        >
+                          <span>Add Photos</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link
+                            href="/add-product"
+                            className="flex items-center gap-2"
+                          >
+                            <span>Add Product</span>
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link
+                            href="/add-bulk-products"
+                            className="flex items-center gap-2"
+                          >
+                            <span>Add Bulk Product</span>
+                          </Link>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </>
+                )}
+                {authUser && (
+                  <AddPhotoModal
+                    isOpen={isAddPhotoModalOpen}
+                    onClose={() => setIsAddPhotoModalOpen(false)}
+                    userId={authUser.uid}
+                  />
+                )}
+              </>
+            )}
+
+            {type === "unauthenticated" &&
+              unauthenticatedItems.map((item) => (
+                <Link
+                  key={item.title}
+                  href={item.href}
+                  className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary"
+                >
+                  {item.icon && <item.icon className="h-5 w-5" />}
+                  <span className="block">{item.title}</span>
+                </Link>
+              ))}
+
+            {/* Auth Buttons */}
+            <div className="flex items-center gap-2">
+              {authUser && type === "authenticated" ? (
+                <Button
+                  size="sm"
+                  onClick={logoutHandler}
+                  className="bg-primary hover:bg-primary-dark"
+                >
+                  Sign out
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  asChild
+                  className="bg-primary hover:bg-primary-dark"
+                >
+                  <Link href={authUser ? "/feed" : "/login"}>Get Started</Link>
+                </Button>
+              )}
+            </div>
           </div>
         </div>
-      </div>
-    </header>
+      </header>
+    </CartProvider>
   );
 };
 
