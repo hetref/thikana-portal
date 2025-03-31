@@ -32,9 +32,6 @@ import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import toast from "react-hot-toast";
 import { Separator } from "@/components/ui/separator";
-import CryptoJS from "crypto-js";
-
-const ENCRYPTION_KEY = process.env.NEXT_PUBLIC_ENCRYPTION_KEY || "";
 
 export default function SettingsTab() {
   const [user, setUser] = useState(null);
@@ -79,17 +76,16 @@ export default function SettingsTab() {
           userData.razorpayInfo && userData.razorpayInfo.webhookSecret;
         setHasWebhook(hasSecret ? true : false);
 
-        // If there's a webhook secret, fetch and decrypt it
+        // If there's a webhook secret, get it directly
         if (hasSecret) {
           setIsDecrypting(true);
           try {
-            const encryptedSecret = userData.razorpayInfo.webhookSecret;
-            const bytes = CryptoJS.AES.decrypt(encryptedSecret, ENCRYPTION_KEY);
-            const decryptedValue = bytes.toString(CryptoJS.enc.Utf8);
-            setDecryptedSecret(decryptedValue);
-          } catch (decryptError) {
-            console.error("Error decrypting webhook secret:", decryptError);
-            toast.error("Failed to decrypt the webhook secret");
+            // Store the secret directly (no decryption needed)
+            const secretValue = userData.razorpayInfo.webhookSecret;
+            setDecryptedSecret(secretValue);
+          } catch (error) {
+            console.error("Error retrieving webhook secret:", error);
+            toast.error("Failed to retrieve the webhook secret");
           } finally {
             setIsDecrypting(false);
           }
@@ -114,14 +110,7 @@ export default function SettingsTab() {
     setIsSaving(true);
 
     try {
-      console.log("ENCRYPTION_KEY", ENCRYPTION_KEY);
-      console.log("webhookSecret", webhookSecret);
-      // Encrypt the webhook secret
-      const encryptedSecret = CryptoJS.AES.encrypt(
-        webhookSecret,
-        ENCRYPTION_KEY
-      ).toString();
-
+      // Store the webhook secret directly without encryption
       const userDocRef = doc(db, "users", user.uid);
       const userDocSnap = await getDoc(userDocRef);
 
@@ -129,16 +118,17 @@ export default function SettingsTab() {
         const userData = userDocSnap.data();
         const razorpayInfo = userData.razorpayInfo || {};
 
-        // Update the user document with the encrypted webhook secret
+        // Update the user document with the webhook secret
         await updateDoc(userDocRef, {
           razorpayInfo: {
             ...razorpayInfo,
-            webhookSecret: encryptedSecret,
+            webhookSecret: webhookSecret, // Store directly without encryption
           },
         });
 
         toast.success("Webhook secret saved successfully");
         setHasWebhook(true);
+        setDecryptedSecret(webhookSecret); // Store for display
         setWebhookSecret("");
       } else {
         toast.error("User document not found");

@@ -129,6 +129,9 @@ export default function PaymentsTab() {
   const [selectedSubscription, setSelectedSubscription] = useState(null);
   const [cancelAtCycleEnd, setCancelAtCycleEnd] = useState(true);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [subscriptionDetailsOpen, setSubscriptionDetailsOpen] = useState(false);
+  const [subscriptionDetails, setSubscriptionDetails] = useState(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   // Payment link form
   const paymentLinkForm = useForm({
@@ -360,6 +363,7 @@ export default function PaymentsTab() {
         body: JSON.stringify({
           userId: user.uid,
           planId: selectedPlan.id,
+          planName: selectedPlan.name,
           customerEmail: data.customerEmail,
           customerName: data.customerName,
           customerPhone: data.customerPhone,
@@ -377,20 +381,20 @@ export default function PaymentsTab() {
       }
 
       // Save to Firestore
-      await addDoc(collection(db, "users", user.uid, "subscriptions"), {
-        planId: data.planId,
-        planName: selectedPlan.name,
-        customerEmail: data.customerEmail,
-        customerName: data.customerName,
-        customerPhone: data.customerPhone,
-        notes: {
-          userId: user.uid,
-          ...(data.notes ? { customNote: data.notes } : {}),
-        },
-        subscriptionId: result.id,
-        status: "created",
-        createdAt: serverTimestamp(),
-      });
+      // await addDoc(collection(db, "users", user.uid, "subscriptions"), {
+      //   planId: data.planId,
+      //   planName: selectedPlan.name,
+      //   customerEmail: data.customerEmail,
+      //   customerName: data.customerName,
+      //   customerPhone: data.customerPhone,
+      //   notes: {
+      //     userId: user.uid,
+      //     ...(data.notes ? { customNote: data.notes } : {}),
+      //   },
+      //   subscriptionId: result.id,
+      //   status: "created",
+      //   createdAt: serverTimestamp(),
+      // });
 
       toast.success("Subscription created successfully");
 
@@ -573,6 +577,44 @@ export default function PaymentsTab() {
     setSelectedSubscription(subscription);
     setCancelAtCycleEnd(true);
     setCancelSubscriptionDialogOpen(true);
+  };
+
+  // Add a function to open subscription details dialog
+  const openSubscriptionDetails = async (subscription) => {
+    setSelectedSubscription(subscription);
+    setSubscriptionDetailsOpen(true);
+    setLoadingDetails(true);
+
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("User not authenticated");
+
+      // Fetch detailed subscription information from Razorpay
+      const response = await fetch(
+        `/api/subscriptions/details/${subscription.subscriptionId}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to fetch subscription details");
+      }
+
+      const result = await response.json();
+      setSubscriptionDetails(result);
+    } catch (error) {
+      console.error("Error fetching subscription details:", error);
+      toast.error("Failed to fetch complete subscription details");
+      // Still show the dialog with the basic information we have
+      setSubscriptionDetails(null);
+    } finally {
+      setLoadingDetails(false);
+    }
   };
 
   if (loading) {
@@ -769,7 +811,13 @@ export default function PaymentsTab() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>View Details</DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                openSubscriptionDetails(subscription)
+                              }
+                            >
+                              View Details
+                            </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => openCancelDialog(subscription)}
                             >
@@ -1133,6 +1181,252 @@ export default function PaymentsTab() {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Subscription Details Dialog */}
+      <Dialog
+        open={subscriptionDetailsOpen}
+        onOpenChange={setSubscriptionDetailsOpen}
+      >
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader>
+            <DialogTitle>Subscription Details</DialogTitle>
+            <DialogDescription>
+              Complete information about this subscription
+            </DialogDescription>
+          </DialogHeader>
+
+          {loadingDetails ? (
+            <div className="py-8 flex justify-center">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          ) : (
+            <div className="py-4 space-y-6">
+              {/* Customer Information */}
+              <div>
+                <h3 className="text-lg font-medium mb-2">
+                  Customer Information
+                </h3>
+                <div className="bg-muted rounded-md p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Name
+                    </p>
+                    <p>
+                      {selectedSubscription?.customerName || "Not specified"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Email
+                    </p>
+                    <p>
+                      {selectedSubscription?.customerEmail || "Not specified"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Phone
+                    </p>
+                    <p>
+                      {selectedSubscription?.customerPhone || "Not specified"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Plan Details */}
+              <div>
+                <h3 className="text-lg font-medium mb-2">Plan Information</h3>
+                <div className="bg-muted rounded-md p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Plan Name
+                    </p>
+                    <p>{selectedSubscription?.planName || "Not specified"}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Plan ID
+                    </p>
+                    <p className="font-mono text-sm">
+                      {selectedSubscription?.planId || "Not specified"}
+                    </p>
+                  </div>
+                  {subscriptionDetails?.planDetails && (
+                    <>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">
+                          Amount
+                        </p>
+                        <p>
+                          ₹
+                          {(
+                            (subscriptionDetails.planDetails.amount || 0) / 100
+                          ).toFixed(2)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">
+                          Interval
+                        </p>
+                        <p>
+                          {subscriptionDetails.planDetails.interval ||
+                            "Not specified"}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Subscription Status */}
+              <div>
+                <h3 className="text-lg font-medium mb-2">
+                  Subscription Status
+                </h3>
+                <div className="bg-muted rounded-md p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Status
+                    </p>
+                    <div className="mt-1">
+                      {getSubscriptionStatusBadge(selectedSubscription?.status)}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Created On
+                    </p>
+                    <p>
+                      {selectedSubscription?.createdAtFormatted ||
+                        "Not specified"}
+                    </p>
+                  </div>
+                  {subscriptionDetails && (
+                    <>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">
+                          Subscription ID
+                        </p>
+                        <p className="font-mono text-sm">
+                          {selectedSubscription?.subscriptionId}
+                        </p>
+                      </div>
+                      {subscriptionDetails.currentPeriod && (
+                        <>
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">
+                              Current Period Start
+                            </p>
+                            <p>
+                              {new Date(
+                                subscriptionDetails.currentPeriod.start * 1000
+                              ).toLocaleString()}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">
+                              Current Period End
+                            </p>
+                            <p>
+                              {new Date(
+                                subscriptionDetails.currentPeriod.end * 1000
+                              ).toLocaleString()}
+                            </p>
+                          </div>
+                        </>
+                      )}
+                      {/* {subscriptionDetails.total_count !== undefined && (
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">
+                            Total Payments
+                          </p>
+                          <p>{subscriptionDetails.total_count}</p>
+                        </div>
+                      )} */}
+                      {subscriptionDetails.paid_count !== undefined && (
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">
+                            Successful Payments
+                          </p>
+                          <p>{subscriptionDetails.paid_count}</p>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Additional Notes */}
+              {selectedSubscription?.notes && (
+                <div>
+                  <h3 className="text-lg font-medium mb-2">Notes</h3>
+                  <div className="bg-muted rounded-md p-4">
+                    <p>
+                      {selectedSubscription.notes.customNote ||
+                        "No additional notes"}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Payment History */}
+              {/* {subscriptionDetails?.payments &&
+                subscriptionDetails.payments.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-medium mb-2">
+                      Payment History
+                    </h3>
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Amount</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {subscriptionDetails.payments.map((payment) => (
+                            <TableRow key={payment.id}>
+                              <TableCell>
+                                {new Date(
+                                  payment.created_at * 1000
+                                ).toLocaleString()}
+                              </TableCell>
+                              <TableCell>
+                                ₹{(payment.amount / 100).toFixed(2)}
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant="outline"
+                                  className={`
+                                  ${payment.status === "captured" ? "bg-green-50 text-green-700 border-green-200" : ""}
+                                  ${payment.status === "failed" ? "bg-red-50 text-red-700 border-red-200" : ""}
+                                  ${payment.status === "pending" ? "bg-amber-50 text-amber-700 border-amber-200" : ""}
+                                `}
+                                >
+                                  {payment.status.charAt(0).toUpperCase() +
+                                    payment.status.slice(1)}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )} */}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button onClick={() => setSubscriptionDetailsOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
