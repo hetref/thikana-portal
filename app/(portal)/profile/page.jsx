@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -46,6 +46,14 @@ import {
   Phone,
   Settings,
   LayoutDashboard,
+  Package,
+  Truck,
+  Clock,
+  CheckCircle2,
+  FileText,
+  BookText,
+  InfoIcon,
+  ShoppingCart,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import WhoToFollow from "@/components/WhoToFollow";
@@ -77,6 +85,17 @@ import AddPhotoModal from "@/components/AddPhotoModal";
 import ShareBusinessDialog from "@/components/profile/ShareBusinessDialog";
 import { cn } from "@/lib/utils";
 import ShowServicesTabContent from "@/components/profile/ShowServicesTabContent";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { format } from "date-fns";
 
 // Add a style element to hide scrollbars
 const scrollbarHideStyles = `
@@ -107,6 +126,8 @@ export default function Profile() {
   const [loadingSavedPosts, setLoadingSavedPosts] = useState(false);
   const [postToUnsave, setPostToUnsave] = useState(null);
   const [isUnsaveDialogOpen, setIsUnsaveDialogOpen] = useState(false);
+  const [orders, setOrders] = useState([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
 
   // Authentication listener
   useEffect(() => {
@@ -262,6 +283,43 @@ export default function Profile() {
       toast.error("Failed to load saved posts");
       setLoadingSavedPosts(false);
     }
+  }, [user?.uid]);
+
+  // Orders listener
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    setLoadingOrders(true);
+    const fetchOrders = async () => {
+      try {
+        // Fetch user's orders
+        const ordersRef = collection(db, "users", user.uid, "orders");
+        const ordersQuery = query(ordersRef, orderBy("timestamp", "desc"));
+        const orderDocs = await getDocs(ordersQuery);
+
+        if (orderDocs.empty) {
+          setOrders([]);
+          setLoadingOrders(false);
+          return;
+        }
+
+        // Process each order
+        const ordersData = orderDocs.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+          timestamp: doc.data().timestamp?.toDate() || new Date(),
+        }));
+
+        setOrders(ordersData);
+      } catch (error) {
+        console.error("Error fetching orders:", error);
+        toast.error("Failed to load orders");
+      } finally {
+        setLoadingOrders(false);
+      }
+    };
+
+    fetchOrders();
   }, [user?.uid]);
 
   // Memoized handlers
@@ -786,6 +844,17 @@ export default function Profile() {
                         <Bookmark className="w-4 h-4 mr-2" />
                         Saved
                       </TabsTrigger>
+                      <TabsTrigger
+                        value="orders"
+                        className={cn(
+                          "rounded-none border-b-2 border-transparent",
+                          "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
+                          "px-6 py-3 font-medium text-sm transition-all duration-200"
+                        )}
+                      >
+                        <ShoppingCart className="w-4 h-4 mr-2" />
+                        Orders
+                      </TabsTrigger>
                     </TabsList>
                   </div>
 
@@ -886,6 +955,127 @@ export default function Profile() {
                           : savedPosts.map(renderSavedPostCard)}
                     </div>
                   </TabsContent>
+
+                  <TabsContent
+                    value="orders"
+                    className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                  >
+                    {loadingOrders ? (
+                      renderLoading()
+                    ) : orders.length === 0 ? (
+                      renderEmptyState(ShoppingCart, "No orders yet")
+                    ) : (
+                      <div className="space-y-6">
+                        <div className="flex justify-between items-center mb-4">
+                          <h2 className="text-lg font-semibold">Your Orders</h2>
+                        </div>
+
+                        {orders.map((order) => (
+                          <Card key={order.id} className="overflow-hidden">
+                            <CardHeader className="bg-gray-50 py-3">
+                              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                                <div>
+                                  <div className="flex items-center">
+                                    <h3 className="font-medium text-sm sm:text-base">
+                                      Order #{order.orderId.substring(0, 8)}...
+                                    </h3>
+                                    <Badge
+                                      variant={
+                                        order.status === "completed"
+                                          ? "success"
+                                          : "outline"
+                                      }
+                                      className="ml-2"
+                                    >
+                                      {order.status === "completed"
+                                        ? "Completed"
+                                        : order.status}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-xs sm:text-sm text-muted-foreground">
+                                    {format(
+                                      new Date(order.timestamp),
+                                      "MMM d, yyyy · h:mm a"
+                                    )}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-semibold text-sm sm:text-base">
+                                    ₹{order.amount?.toFixed(2)}
+                                  </p>
+                                  <p className="text-xs sm:text-sm text-muted-foreground">
+                                    {order.businessName}
+                                  </p>
+                                </div>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="p-0">
+                              <div className="px-4 py-3 border-b">
+                                <div className="flex justify-between items-center">
+                                  <h4 className="text-sm font-medium">Items</h4>
+                                  <span className="text-xs text-muted-foreground">
+                                    {order.products?.length || 0} item(s)
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="divide-y">
+                                {order.products?.map((product, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="p-4 flex items-center gap-3"
+                                  >
+                                    <div className="relative w-12 h-12 bg-gray-100 rounded overflow-hidden flex-shrink-0">
+                                      {product.imageUrl ? (
+                                        <Image
+                                          src={product.imageUrl}
+                                          alt={product.productName}
+                                          fill
+                                          className="object-cover"
+                                        />
+                                      ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                          <Package className="w-6 h-6" />
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="flex-grow">
+                                      <h5 className="font-medium text-sm">
+                                        {product.productName}
+                                      </h5>
+                                      <div className="flex items-center text-sm text-muted-foreground">
+                                        <span>
+                                          ₹{product.amount?.toFixed(2)} ×{" "}
+                                          {product.quantity}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <p className="font-medium">
+                                        ₹
+                                        {(
+                                          product.amount * product.quantity
+                                        ).toFixed(2)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="border-t p-4 bg-gray-50">
+                                <div className="flex justify-between">
+                                  <span className="text-sm font-medium">
+                                    Total
+                                  </span>
+                                  <span className="font-semibold">
+                                    ₹{order.amount?.toFixed(2)}
+                                  </span>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </TabsContent>
                 </Tabs>
               </Card>
             )}
@@ -907,6 +1097,17 @@ export default function Profile() {
                         <Bookmark className="w-4 h-4 mr-2" />
                         Saved Posts
                       </TabsTrigger>
+                      <TabsTrigger
+                        value="orders"
+                        className={cn(
+                          "rounded-none border-b-2 border-transparent",
+                          "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
+                          "px-6 py-3 font-medium text-sm transition-all duration-200"
+                        )}
+                      >
+                        <ShoppingCart className="w-4 h-4 mr-2" />
+                        Orders
+                      </TabsTrigger>
                     </TabsList>
                   </div>
 
@@ -921,6 +1122,127 @@ export default function Profile() {
                           ? renderEmptyState(Bookmark, "No saved posts yet")
                           : savedPosts.map(renderSavedPostCard)}
                     </div>
+                  </TabsContent>
+
+                  <TabsContent
+                    value="orders"
+                    className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                  >
+                    {loadingOrders ? (
+                      renderLoading()
+                    ) : orders.length === 0 ? (
+                      renderEmptyState(ShoppingCart, "No orders yet")
+                    ) : (
+                      <div className="space-y-6">
+                        <div className="flex justify-between items-center mb-4">
+                          <h2 className="text-lg font-semibold">Your Orders</h2>
+                        </div>
+
+                        {orders.map((order) => (
+                          <Card key={order.id} className="overflow-hidden">
+                            <CardHeader className="bg-gray-50 py-3">
+                              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                                <div>
+                                  <div className="flex items-center">
+                                    <h3 className="font-medium text-sm sm:text-base">
+                                      Order #{order.orderId.substring(0, 8)}...
+                                    </h3>
+                                    <Badge
+                                      variant={
+                                        order.status === "completed"
+                                          ? "success"
+                                          : "outline"
+                                      }
+                                      className="ml-2"
+                                    >
+                                      {order.status === "completed"
+                                        ? "Completed"
+                                        : order.status}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-xs sm:text-sm text-muted-foreground">
+                                    {format(
+                                      new Date(order.timestamp),
+                                      "MMM d, yyyy · h:mm a"
+                                    )}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-semibold text-sm sm:text-base">
+                                    ₹{order.amount?.toFixed(2)}
+                                  </p>
+                                  <p className="text-xs sm:text-sm text-muted-foreground">
+                                    {order.businessName}
+                                  </p>
+                                </div>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="p-0">
+                              <div className="px-4 py-3 border-b">
+                                <div className="flex justify-between items-center">
+                                  <h4 className="text-sm font-medium">Items</h4>
+                                  <span className="text-xs text-muted-foreground">
+                                    {order.products?.length || 0} item(s)
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="divide-y">
+                                {order.products?.map((product, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="p-4 flex items-center gap-3"
+                                  >
+                                    <div className="relative w-12 h-12 bg-gray-100 rounded overflow-hidden flex-shrink-0">
+                                      {product.imageUrl ? (
+                                        <Image
+                                          src={product.imageUrl}
+                                          alt={product.productName}
+                                          fill
+                                          className="object-cover"
+                                        />
+                                      ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                          <Package className="w-6 h-6" />
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="flex-grow">
+                                      <h5 className="font-medium text-sm">
+                                        {product.productName}
+                                      </h5>
+                                      <div className="flex items-center text-sm text-muted-foreground">
+                                        <span>
+                                          ₹{product.amount?.toFixed(2)} ×{" "}
+                                          {product.quantity}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <p className="font-medium">
+                                        ₹
+                                        {(
+                                          product.amount * product.quantity
+                                        ).toFixed(2)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="border-t p-4 bg-gray-50">
+                                <div className="flex justify-between">
+                                  <span className="text-sm font-medium">
+                                    Total
+                                  </span>
+                                  <span className="font-semibold">
+                                    ₹{order.amount?.toFixed(2)}
+                                  </span>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
                   </TabsContent>
                 </Tabs>
               </Card>
