@@ -60,6 +60,7 @@ import {
   CreditCard,
   ClockIcon,
   SettingsIcon,
+  BarChart,
 } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import {
@@ -80,9 +81,11 @@ import ContactsTab from "@/components/dashboard/ContactsTab";
 import PaymentsTab from "@/components/dashboard/PaymentsTab";
 import PlansTab from "@/components/dashboard/PlansTab";
 import SettingsTab from "@/components/dashboard/SettingsTab";
+import ExpenseTab from "@/components/dashboard/ExpenseTab";
+import AnalyticsTab from "@/components/dashboard/AnalyticsTab";
 
 export default function DashboardPage() {
-  const [activeTab, setActiveTab] = useState("contacts");
+  const [activeTab, setActiveTab] = useState("expenses");
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState(null);
 
@@ -162,6 +165,20 @@ export default function DashboardPage() {
                     Plans
                   </TabsTrigger>
                   <TabsTrigger
+                    value="expenses"
+                    className="flex items-center gap-2"
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    Expenses
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="analytics"
+                    className="flex items-center gap-2"
+                  >
+                    <BarChart className="h-4 w-4" />
+                    Analytics
+                  </TabsTrigger>
+                  <TabsTrigger
                     value="settings"
                     className="flex items-center gap-2"
                   >
@@ -181,6 +198,14 @@ export default function DashboardPage() {
 
               <TabsContent value="plans" className="space-y-4">
                 <PlansTab />
+              </TabsContent>
+
+              <TabsContent value="expenses" className="space-y-4">
+                <ExpenseTab />
+              </TabsContent>
+
+              <TabsContent value="analytics" className="space-y-4">
+                <AnalyticsTab />
               </TabsContent>
 
               <TabsContent value="settings" className="space-y-4">
