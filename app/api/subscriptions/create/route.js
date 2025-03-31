@@ -2,15 +2,41 @@ import { NextResponse } from "next/server";
 import Razorpay from "razorpay";
 import CryptoJS from "crypto-js";
 import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  collection,
+  setDoc,
+  serverTimestamp,
+} from "firebase/firestore";
 
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
+
+// Function to generate a unique ID without external dependencies
+function generateUniqueId(length = 20) {
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let result = "";
+  const timestamp = new Date().getTime().toString(36);
+
+  // Add timestamp as prefix for additional uniqueness
+  result += timestamp;
+
+  // Add random characters until we reach desired length
+  const randomLength = Math.max(0, length - result.length);
+  for (let i = 0; i < randomLength; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+
+  return result;
+}
 
 export async function POST(req) {
   try {
     const {
       userId,
       planId,
+      planName,
       customerEmail,
       customerName,
       customerPhone,
@@ -33,6 +59,9 @@ export async function POST(req) {
         { status: 400 }
       );
     }
+
+    // Generate a unique ID for this subscription
+    const uniqueId = generateUniqueId();
 
     // Get Razorpay credentials from users collection
     const userDocRef = doc(db, "users", userId);
@@ -124,19 +153,76 @@ export async function POST(req) {
     if (notes) {
       // Format notes as a dictionary as required by Razorpay
       if (typeof notes === "object" && !Array.isArray(notes)) {
-        // If notes is already an object, use it directly
-        subscriptionData.notes = notes;
+        // If notes is already an object, ensure it includes userId
+        subscriptionData.notes = {
+          ...notes,
+          userId: userId, // Ensure userId is always present
+          uniqueId: uniqueId, // Add the uniqueId to notes
+        };
       } else {
-        // Otherwise, create an object with a 'note' property
-        subscriptionData.notes = { note: notes };
+        // Otherwise, create an object with a 'note' property and userId
+        subscriptionData.notes = {
+          customNote: notes,
+          userId: userId,
+          uniqueId: uniqueId, // Add the uniqueId to notes
+        };
       }
+    } else {
+      // Always include userId in notes even if no other notes provided
+      subscriptionData.notes = {
+        userId: userId,
+        uniqueId: uniqueId, // Add the uniqueId to notes
+      };
     }
 
     // Create subscription with Razorpay
     const subscription = await razorpay.subscriptions.create(subscriptionData);
 
+    // Prepare the subscription data to save in Firestore
+    const subscriptionToSave = {
+      uniqueId: uniqueId,
+      subscriptionId: subscription.id,
+      planId: subscription.plan_id,
+      planName: planName,
+      status: subscription.status,
+      customerEmail: customerEmail,
+      customerName: customerName || null,
+      customerPhone: customerPhone || null,
+      totalCount: subscription.total_count || null,
+      paidCount: subscription.paid_count || 0,
+      notes: subscriptionData.notes,
+      shortUrl: subscription.short_url || null,
+      paymentLinkUrl: subscription.payment_link_url || null,
+      remainingCount: subscription.remaining_count || null,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    // Add dates if available
+    if (subscription.current_start) {
+      subscriptionToSave.currentStart = new Date(
+        subscription.current_start * 1000
+      );
+    }
+    if (subscription.current_end) {
+      subscriptionToSave.currentEnd = new Date(subscription.current_end * 1000);
+    }
+    if (subscription.end_at) {
+      subscriptionToSave.endDate = new Date(subscription.end_at * 1000);
+    }
+
+    // Reference to the document with our custom uniqueId
+    const subscriptionDocRef = doc(
+      collection(db, "users", userId, "subscriptions"),
+      uniqueId
+    );
+
+    // Save to Firestore with the uniqueId as the document ID
+    await setDoc(subscriptionDocRef, subscriptionToSave);
+
     return NextResponse.json({
       id: subscription.id,
+      uniqueId: uniqueId, // Return the uniqueId to the client
       planId: subscription.plan_id,
       status: subscription.status,
       customerEmail: subscription.customer_notify ? customerEmail : null,

@@ -8,9 +8,29 @@ import {
   collection,
   addDoc,
   serverTimestamp,
+  setDoc,
 } from "firebase/firestore";
 
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
+
+// Function to generate a unique ID without external dependencies
+function generateUniqueId(length = 20) {
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let result = "";
+  const timestamp = new Date().getTime().toString(36);
+
+  // Add timestamp as prefix for additional uniqueness
+  result += timestamp;
+
+  // Add random characters until we reach desired length
+  const randomLength = Math.max(0, length - result.length);
+  for (let i = 0; i < randomLength; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+
+  return result;
+}
 
 export async function POST(req) {
   try {
@@ -23,6 +43,7 @@ export async function POST(req) {
       customerName,
       customerPhone,
       expiresAt,
+      notes,
     } = await req.json();
 
     if (!userId || !amount || !description) {
@@ -31,6 +52,9 @@ export async function POST(req) {
         { status: 400 }
       );
     }
+
+    // Generate a unique ID for this payment link
+    const uniqueId = generateUniqueId();
 
     // Get Razorpay credentials from users collection using client Firebase SDK
     const userDocRef = doc(db, "users", userId);
@@ -86,6 +110,11 @@ export async function POST(req) {
         sms: Boolean(customerPhone),
       },
       reminder_enable: true,
+      notes: {
+        userId: userId,
+        uniqueId: uniqueId,
+        ...notes,
+      },
     };
 
     // Add expiry if provided
@@ -98,18 +127,9 @@ export async function POST(req) {
     // Create payment link with Razorpay
     const paymentLink = await razorpay.paymentLink.create(paymentLinkData);
 
-    // Save payment link details to Firestore
-    const paymentLinksCollectionRef = collection(
-      db,
-      "users",
-      userId,
-      "paymentLinks"
-    );
-
-    console.log("PAYMENTLIBNK", paymentLink);
-
     // Prepare data to save
     const paymentLinkToSave = {
+      uniqueId: uniqueId,
       linkId: paymentLink.id,
       amount: parseInt(amount),
       currency: currency || "INR",
@@ -119,6 +139,7 @@ export async function POST(req) {
       customerPhone: customerPhone || null,
       shortUrl: paymentLink.short_url,
       status: paymentLink.status,
+      notes: paymentLinkData.notes,
       createdAt: serverTimestamp(),
     };
 
@@ -127,11 +148,18 @@ export async function POST(req) {
       paymentLinkToSave.expiresAt = new Date(expiresAt);
     }
 
-    // Save to Firestore
-    await addDoc(paymentLinksCollectionRef, paymentLinkToSave);
+    // Reference to the document with our custom uniqueId
+    const paymentLinkDocRef = doc(
+      collection(db, "users", userId, "paymentLinks"),
+      uniqueId
+    );
+
+    // Save to Firestore with the uniqueId as the document ID
+    await setDoc(paymentLinkDocRef, paymentLinkToSave);
 
     return NextResponse.json({
       id: paymentLink.id,
+      uniqueId: uniqueId,
       shortUrl: paymentLink.short_url,
       longUrl: paymentLink.long_url,
       status: paymentLink.status,

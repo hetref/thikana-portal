@@ -67,6 +67,7 @@ import {
   Timestamp,
   updateDoc,
   serverTimestamp,
+  onSnapshot,
 } from "firebase/firestore";
 import toast from "react-hot-toast";
 import { useForm } from "react-hook-form";
@@ -88,6 +89,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // Schema for creating a payment link
 const paymentLinkSchema = z.object({
@@ -122,6 +124,14 @@ export default function PaymentsTab() {
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
   const [showCopiedMessage, setShowCopiedMessage] = useState(false);
   const [paymentLinkUrl, setPaymentLinkUrl] = useState("");
+  const [cancelSubscriptionDialogOpen, setCancelSubscriptionDialogOpen] =
+    useState(false);
+  const [selectedSubscription, setSelectedSubscription] = useState(null);
+  const [cancelAtCycleEnd, setCancelAtCycleEnd] = useState(true);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [subscriptionDetailsOpen, setSubscriptionDetailsOpen] = useState(false);
+  const [subscriptionDetails, setSubscriptionDetails] = useState(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   // Payment link form
   const paymentLinkForm = useForm({
@@ -173,55 +183,55 @@ export default function PaymentsTab() {
   }, []);
 
   // Fetch payment links function (extracted for reuse)
-  const fetchPaymentLinks = async () => {
+  useEffect(() => {
     if (!razorpayConfigured) return;
 
     const user = auth.currentUser;
     if (!user) return;
 
-    try {
-      const linksRef = collection(db, "users", user.uid, "paymentLinks");
-      const q = query(linksRef, orderBy("createdAt", "desc"));
-      const querySnapshot = await getDocs(q);
+    // Set up real-time listener for payment links
+    const linksRef = collection(db, "users", user.uid, "paymentLinks");
+    const q = query(linksRef, orderBy("createdAt", "desc"));
 
-      const links = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAtFormatted: doc.data().createdAt
-          ? new Date(doc.data().createdAt.toDate()).toLocaleString()
-          : "Unknown",
-        expiresAtFormatted: doc.data().expiresAt
-          ? new Date(doc.data().expiresAt.toDate()).toLocaleString()
-          : "Never",
-      }));
+    const unsubscribe = onSnapshot(
+      q,
+      (querySnapshot) => {
+        const links = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+          createdAtFormatted: doc.data().createdAt
+            ? new Date(doc.data().createdAt.toDate()).toLocaleString()
+            : "Unknown",
+          expiresAtFormatted: doc.data().expiresAt
+            ? new Date(doc.data().expiresAt.toDate()).toLocaleString()
+            : "Never",
+        }));
 
-      setPaymentLinks(links);
-    } catch (error) {
-      console.error("Error fetching payment links:", error);
-      toast.error("Failed to fetch payment links");
-    }
-  };
+        setPaymentLinks(links);
+      },
+      (error) => {
+        console.error("Error fetching payment links:", error);
+        toast.error("Failed to fetch payment links");
+      }
+    );
 
-  // Fetch payment links on component mount
-  useEffect(() => {
-    if (razorpayConfigured) {
-      fetchPaymentLinks();
-    }
+    return () => unsubscribe();
   }, [razorpayConfigured]);
 
   // Fetch subscriptions
   useEffect(() => {
-    const fetchSubscriptions = async () => {
-      if (!razorpayConfigured) return;
+    if (!razorpayConfigured) return;
 
-      const user = auth.currentUser;
-      if (!user) return;
+    const user = auth.currentUser;
+    if (!user) return;
 
-      try {
-        const subsRef = collection(db, "users", user.uid, "subscriptions");
-        const q = query(subsRef, orderBy("createdAt", "desc"));
-        const querySnapshot = await getDocs(q);
+    // Set up real-time listener for subscriptions
+    const subsRef = collection(db, "users", user.uid, "subscriptions");
+    const q = query(subsRef, orderBy("createdAt", "desc"));
 
+    const unsubscribe = onSnapshot(
+      q,
+      (querySnapshot) => {
         const subs = querySnapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
@@ -231,13 +241,14 @@ export default function PaymentsTab() {
         }));
 
         setSubscriptions(subs);
-      } catch (error) {
+      },
+      (error) => {
         console.error("Error fetching subscriptions:", error);
         toast.error("Failed to fetch subscriptions");
       }
-    };
+    );
 
-    fetchSubscriptions();
+    return () => unsubscribe();
   }, [razorpayConfigured]);
 
   // Fetch subscription plans
@@ -289,6 +300,10 @@ export default function PaymentsTab() {
       const paymentData = {
         ...data,
         amount: Number(data.amount) * 100, // Convert to paise
+        notes: {
+          userId: user.uid, // Add userId to notes
+          ...(data.notes ? { customNote: data.notes } : {}), // If user provided notes, add them as customNote
+        },
       };
 
       // Create payment link via API
@@ -314,8 +329,8 @@ export default function PaymentsTab() {
       // Show the payment link with copy option
       setPaymentLinkUrl(result.shortUrl);
 
-      // Refresh payment links (use the function we defined)
-      fetchPaymentLinks();
+      // We no longer need to manually refresh as onSnapshot will handle this
+      // fetchPaymentLinks() is removed as onSnapshot will automatically update
     } catch (error) {
       console.error("Error creating payment link:", error);
       toast.error(error.message || "Failed to create payment link");
@@ -348,10 +363,14 @@ export default function PaymentsTab() {
         body: JSON.stringify({
           userId: user.uid,
           planId: selectedPlan.id,
+          planName: selectedPlan.name,
           customerEmail: data.customerEmail,
           customerName: data.customerName,
           customerPhone: data.customerPhone,
-          notes: data.notes,
+          notes: {
+            userId: user.uid, // Add userId to notes
+            ...(data.notes ? { customNote: data.notes } : {}), // If user provided notes, add them as customNote
+          },
         }),
       });
 
@@ -362,17 +381,20 @@ export default function PaymentsTab() {
       }
 
       // Save to Firestore
-      await addDoc(collection(db, "users", user.uid, "subscriptions"), {
-        planId: data.planId,
-        planName: selectedPlan.name,
-        customerEmail: data.customerEmail,
-        customerName: data.customerName,
-        customerPhone: data.customerPhone,
-        notes: data.notes,
-        subscriptionId: result.id,
-        status: "created",
-        createdAt: serverTimestamp(),
-      });
+      // await addDoc(collection(db, "users", user.uid, "subscriptions"), {
+      //   planId: data.planId,
+      //   planName: selectedPlan.name,
+      //   customerEmail: data.customerEmail,
+      //   customerName: data.customerName,
+      //   customerPhone: data.customerPhone,
+      //   notes: {
+      //     userId: user.uid,
+      //     ...(data.notes ? { customNote: data.notes } : {}),
+      //   },
+      //   subscriptionId: result.id,
+      //   status: "created",
+      //   createdAt: serverTimestamp(),
+      // });
 
       toast.success("Subscription created successfully");
 
@@ -506,6 +528,92 @@ export default function PaymentsTab() {
             {status || "Unknown"}
           </Badge>
         );
+    }
+  };
+
+  // Add a function to handle subscription cancellation
+  const handleCancelSubscription = async () => {
+    if (!selectedSubscription) return;
+
+    setIsCancelling(true);
+
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("User not authenticated");
+
+      const response = await fetch(
+        `/api/subscriptions/cancel/${selectedSubscription.subscriptionId}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userId: user.uid,
+            cancelAtCycleEnd: cancelAtCycleEnd,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to cancel subscription");
+      }
+
+      const result = await response.json();
+
+      toast.success(result.message);
+      setCancelSubscriptionDialogOpen(false);
+    } catch (error) {
+      console.error("Error cancelling subscription:", error);
+      toast.error(error.message || "Failed to cancel subscription");
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
+  // Add a function to open the cancel subscription dialog
+  const openCancelDialog = (subscription) => {
+    setSelectedSubscription(subscription);
+    setCancelAtCycleEnd(true);
+    setCancelSubscriptionDialogOpen(true);
+  };
+
+  // Add a function to open subscription details dialog
+  const openSubscriptionDetails = async (subscription) => {
+    setSelectedSubscription(subscription);
+    setSubscriptionDetailsOpen(true);
+    setLoadingDetails(true);
+
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("User not authenticated");
+
+      // Fetch detailed subscription information from Razorpay
+      const response = await fetch(
+        `/api/subscriptions/details/${subscription.subscriptionId}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to fetch subscription details");
+      }
+
+      const result = await response.json();
+      setSubscriptionDetails(result);
+    } catch (error) {
+      console.error("Error fetching subscription details:", error);
+      toast.error("Failed to fetch complete subscription details");
+      // Still show the dialog with the basic information we have
+      setSubscriptionDetails(null);
+    } finally {
+      setLoadingDetails(false);
     }
   };
 
@@ -703,8 +811,16 @@ export default function PaymentsTab() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>View Details</DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                openSubscriptionDetails(subscription)
+                              }
+                            >
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => openCancelDialog(subscription)}
+                            >
                               Cancel Subscription
                             </DropdownMenuItem>
                           </DropdownMenuContent>
@@ -1065,6 +1181,357 @@ export default function PaymentsTab() {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Subscription Details Dialog */}
+      <Dialog
+        open={subscriptionDetailsOpen}
+        onOpenChange={setSubscriptionDetailsOpen}
+      >
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader>
+            <DialogTitle>Subscription Details</DialogTitle>
+            <DialogDescription>
+              Complete information about this subscription
+            </DialogDescription>
+          </DialogHeader>
+
+          {loadingDetails ? (
+            <div className="py-8 flex justify-center">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          ) : (
+            <div className="py-4 space-y-6">
+              {/* Customer Information */}
+              <div>
+                <h3 className="text-lg font-medium mb-2">
+                  Customer Information
+                </h3>
+                <div className="bg-muted rounded-md p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Name
+                    </p>
+                    <p>
+                      {selectedSubscription?.customerName || "Not specified"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Email
+                    </p>
+                    <p>
+                      {selectedSubscription?.customerEmail || "Not specified"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Phone
+                    </p>
+                    <p>
+                      {selectedSubscription?.customerPhone || "Not specified"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Plan Details */}
+              <div>
+                <h3 className="text-lg font-medium mb-2">Plan Information</h3>
+                <div className="bg-muted rounded-md p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Plan Name
+                    </p>
+                    <p>{selectedSubscription?.planName || "Not specified"}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Plan ID
+                    </p>
+                    <p className="font-mono text-sm">
+                      {selectedSubscription?.planId || "Not specified"}
+                    </p>
+                  </div>
+                  {subscriptionDetails?.planDetails && (
+                    <>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">
+                          Amount
+                        </p>
+                        <p>
+                          ₹
+                          {(
+                            (subscriptionDetails.planDetails.amount || 0) / 100
+                          ).toFixed(2)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">
+                          Interval
+                        </p>
+                        <p>
+                          {subscriptionDetails.planDetails.interval ||
+                            "Not specified"}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Subscription Status */}
+              <div>
+                <h3 className="text-lg font-medium mb-2">
+                  Subscription Status
+                </h3>
+                <div className="bg-muted rounded-md p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Status
+                    </p>
+                    <div className="mt-1">
+                      {getSubscriptionStatusBadge(selectedSubscription?.status)}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Created On
+                    </p>
+                    <p>
+                      {selectedSubscription?.createdAtFormatted ||
+                        "Not specified"}
+                    </p>
+                  </div>
+                  {subscriptionDetails && (
+                    <>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">
+                          Subscription ID
+                        </p>
+                        <p className="font-mono text-sm">
+                          {selectedSubscription?.subscriptionId}
+                        </p>
+                      </div>
+                      {subscriptionDetails.currentPeriod && (
+                        <>
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">
+                              Current Period Start
+                            </p>
+                            <p>
+                              {new Date(
+                                subscriptionDetails.currentPeriod.start * 1000
+                              ).toLocaleString()}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">
+                              Current Period End
+                            </p>
+                            <p>
+                              {new Date(
+                                subscriptionDetails.currentPeriod.end * 1000
+                              ).toLocaleString()}
+                            </p>
+                          </div>
+                        </>
+                      )}
+                      {/* {subscriptionDetails.total_count !== undefined && (
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">
+                            Total Payments
+                          </p>
+                          <p>{subscriptionDetails.total_count}</p>
+                        </div>
+                      )} */}
+                      {subscriptionDetails.paid_count !== undefined && (
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">
+                            Successful Payments
+                          </p>
+                          <p>{subscriptionDetails.paid_count}</p>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Additional Notes */}
+              {selectedSubscription?.notes && (
+                <div>
+                  <h3 className="text-lg font-medium mb-2">Notes</h3>
+                  <div className="bg-muted rounded-md p-4">
+                    <p>
+                      {selectedSubscription.notes.customNote ||
+                        "No additional notes"}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Payment History */}
+              {/* {subscriptionDetails?.payments &&
+                subscriptionDetails.payments.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-medium mb-2">
+                      Payment History
+                    </h3>
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Amount</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {subscriptionDetails.payments.map((payment) => (
+                            <TableRow key={payment.id}>
+                              <TableCell>
+                                {new Date(
+                                  payment.created_at * 1000
+                                ).toLocaleString()}
+                              </TableCell>
+                              <TableCell>
+                                ₹{(payment.amount / 100).toFixed(2)}
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant="outline"
+                                  className={`
+                                  ${payment.status === "captured" ? "bg-green-50 text-green-700 border-green-200" : ""}
+                                  ${payment.status === "failed" ? "bg-red-50 text-red-700 border-red-200" : ""}
+                                  ${payment.status === "pending" ? "bg-amber-50 text-amber-700 border-amber-200" : ""}
+                                `}
+                                >
+                                  {payment.status.charAt(0).toUpperCase() +
+                                    payment.status.slice(1)}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )} */}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button onClick={() => setSubscriptionDetailsOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Subscription Dialog */}
+      <Dialog
+        open={cancelSubscriptionDialogOpen}
+        onOpenChange={setCancelSubscriptionDialogOpen}
+      >
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Cancel Subscription</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to cancel this subscription?
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            {selectedSubscription && (
+              <div className="space-y-4">
+                <div className="bg-muted p-4 rounded-md">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Customer
+                      </p>
+                      <p className="text-sm">
+                        {selectedSubscription.customerName}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Email
+                      </p>
+                      <p className="text-sm">
+                        {selectedSubscription.customerEmail}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Plan
+                      </p>
+                      <p className="text-sm">{selectedSubscription.planName}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Status
+                      </p>
+                      <p className="text-sm">{selectedSubscription.status}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="cancelAtCycleEnd"
+                    checked={cancelAtCycleEnd}
+                    onCheckedChange={setCancelAtCycleEnd}
+                  />
+                  <label
+                    htmlFor="cancelAtCycleEnd"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Cancel at the end of current billing cycle
+                  </label>
+                </div>
+
+                <Alert className="bg-amber-50 border-amber-200">
+                  <AlertCircle className="h-4 w-4 text-amber-700" />
+                  <AlertTitle className="text-amber-700">
+                    Cancellation Policy
+                  </AlertTitle>
+                  <AlertDescription className="text-amber-700">
+                    {cancelAtCycleEnd
+                      ? "The subscription will continue until the end of the current billing cycle, then it will be cancelled."
+                      : "The subscription will be cancelled immediately, and the customer will no longer be charged."}
+                  </AlertDescription>
+                </Alert>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCancelSubscriptionDialogOpen(false)}
+            >
+              Keep Subscription
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleCancelSubscription}
+              disabled={isCancelling}
+            >
+              {isCancelling ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Cancelling...
+                </>
+              ) : (
+                "Cancel Subscription"
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
