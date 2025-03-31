@@ -49,16 +49,14 @@ import Image from "next/image";
 export default function OrdersTab() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedOrder, setSelectedOrder] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
   const [timeFilter, setTimeFilter] = useState("all");
   const [hasMore, setHasMore] = useState(true);
   const [lastOrder, setLastOrder] = useState(null);
 
   useEffect(() => {
     fetchOrders();
-  }, [statusFilter, timeFilter]);
+  }, [timeFilter]);
 
   const fetchOrders = async (isLoadMore = false) => {
     if (!auth.currentUser) return;
@@ -69,11 +67,6 @@ export default function OrdersTab() {
         collection(db, "businesses", auth.currentUser.uid, "orders"),
         orderBy("timestamp", "desc")
       );
-
-      // Apply status filter
-      if (statusFilter !== "all") {
-        ordersQuery = query(ordersQuery, where("status", "==", statusFilter));
-      }
 
       // Apply time filter
       if (timeFilter !== "all") {
@@ -206,16 +199,6 @@ export default function OrdersTab() {
             className="pl-10"
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filter by status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-          </SelectContent>
-        </Select>
         <Select value={timeFilter} onValueChange={setTimeFilter}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Filter by time" />
