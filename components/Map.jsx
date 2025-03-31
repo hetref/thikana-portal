@@ -7,6 +7,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { GoogleMap, LoadScript, Marker } from "@react-google-maps/api";
 
@@ -51,6 +52,7 @@ export default function Map() {
         <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Location Map</DialogTitle>
+            <DialogDescription id="map-dialog-description">View the business location on the map</DialogDescription>
           </DialogHeader>
           {/* <LoadScript googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}>
             <GoogleMap
