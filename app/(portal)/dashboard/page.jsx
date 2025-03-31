@@ -83,9 +83,14 @@ import PlansTab from "@/components/dashboard/PlansTab";
 import SettingsTab from "@/components/dashboard/SettingsTab";
 import ExpenseTab from "@/components/dashboard/ExpenseTab";
 import AnalyticsTab from "@/components/dashboard/AnalyticsTab";
+import IncomeTab from "@/components/dashboard/IncomeTab";
+import IncomeAnalyticsTab from "@/components/dashboard/IncomeAnalyticsTab";
 
 export default function DashboardPage() {
-  const [activeTab, setActiveTab] = useState("expenses");
+  const [activeTab, setActiveTab] = useState("transactions");
+  const [activeTransactionTab, setActiveTransactionTab] = useState("expenses");
+  const [activeAnalyticsTab, setActiveAnalyticsTab] =
+    useState("expense-analytics");
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState(null);
 
@@ -142,7 +147,7 @@ export default function DashboardPage() {
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <div className="flex justify-between items-center mb-6">
-                <TabsList>
+                <TabsList className="grid grid-cols-3 lg:grid-cols-6">
                   <TabsTrigger
                     value="contacts"
                     className="flex items-center gap-2"
@@ -165,11 +170,11 @@ export default function DashboardPage() {
                     Plans
                   </TabsTrigger>
                   <TabsTrigger
-                    value="expenses"
+                    value="transactions"
                     className="flex items-center gap-2"
                   >
                     <CreditCard className="h-4 w-4" />
-                    Expenses
+                    Transactions
                   </TabsTrigger>
                   <TabsTrigger
                     value="analytics"
@@ -200,12 +205,52 @@ export default function DashboardPage() {
                 <PlansTab />
               </TabsContent>
 
-              <TabsContent value="expenses" className="space-y-4">
-                <ExpenseTab />
+              <TabsContent value="transactions" className="space-y-4">
+                <Tabs
+                  value={activeTransactionTab}
+                  onValueChange={setActiveTransactionTab}
+                >
+                  <TabsList className="w-full mb-6">
+                    <TabsTrigger value="expenses" className="flex-1">
+                      Expenses
+                    </TabsTrigger>
+                    <TabsTrigger value="income" className="flex-1">
+                      Income
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="expenses">
+                    <ExpenseTab />
+                  </TabsContent>
+
+                  <TabsContent value="income">
+                    <IncomeTab />
+                  </TabsContent>
+                </Tabs>
               </TabsContent>
 
               <TabsContent value="analytics" className="space-y-4">
-                <AnalyticsTab />
+                <Tabs
+                  value={activeAnalyticsTab}
+                  onValueChange={setActiveAnalyticsTab}
+                >
+                  <TabsList className="w-full mb-6">
+                    <TabsTrigger value="expense-analytics" className="flex-1">
+                      Expense Analytics
+                    </TabsTrigger>
+                    <TabsTrigger value="income-analytics" className="flex-1">
+                      Income Analytics
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="expense-analytics">
+                    <AnalyticsTab />
+                  </TabsContent>
+
+                  <TabsContent value="income-analytics">
+                    <IncomeAnalyticsTab />
+                  </TabsContent>
+                </Tabs>
               </TabsContent>
 
               <TabsContent value="settings" className="space-y-4">
