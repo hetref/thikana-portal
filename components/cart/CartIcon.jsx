@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
  * CartIcon - A component that displays a shopping cart icon with item count
  * and navigates to the cart page when clicked
  */
-export function CartIcon() {
+export default function CartIcon() {
   const { isLoading = false, getCartTotalItems = () => 0 } = useCart();
 
   const [itemCount, setItemCount] = useState(0);
