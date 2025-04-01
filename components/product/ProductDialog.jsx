@@ -32,7 +32,7 @@ import { createRazorpayOrder } from "@/lib/payment/razorpay";
  * @param {string} props.userType - The type of user (customer or business)
  * @param {Function} props.onEditProduct - Function to call when editing a product
  */
-export function ProductDialog({
+export default function ProductDialog({
   product,
   isOpen,
   onClose,

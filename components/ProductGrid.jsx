@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { ProductDialog } from "@/components/ProductDialog";
+import ProductDialog from "@/components/product/ProductDialog";
 import { getProduct } from "@/lib/inventory-operations";
 import { Card, CardContent } from "./ui/card";
 import Image from "next/image";

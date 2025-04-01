@@ -20,7 +20,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { getUnreadNotificationCount } from "@/lib/notifications";
 import AddPhotoModal from "./AddPhotoModal";
-import { CartIcon } from "@/components/ProductDialog";
+import CartIcon from "@/components/cart/CartIcon";
 import { CartProvider } from "@/components/CartContext";
 
 const TopNavbar = ({ type = "unauthenticated" }) => {
