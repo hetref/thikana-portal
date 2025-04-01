@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { format } from "date-fns";
 import {
   Card,
@@ -31,9 +31,10 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Package, Search, ShoppingBag, User } from "lucide-react";
+import { Package, Search, ShoppingBag, User, Printer, FileText } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import {
   collection,
@@ -45,6 +46,7 @@ import {
   limit,
 } from "firebase/firestore";
 import Image from "next/image";
+import { useReactToPrint } from "react-to-print";
 
 export default function OrdersTab() {
   const [orders, setOrders] = useState([]);
@@ -53,6 +55,16 @@ export default function OrdersTab() {
   const [timeFilter, setTimeFilter] = useState("all");
   const [hasMore, setHasMore] = useState(true);
   const [lastOrder, setLastOrder] = useState(null);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [billDialogOpen, setBillDialogOpen] = useState(false);
+  
+  const billRef = useRef();
+  
+  // Handle printing functionality
+  const handlePrint = useReactToPrint({
+    content: () => billRef.current,
+    documentTitle: `Invoice_${selectedOrder?.orderId || 'order'}`,
+  });
 
   useEffect(() => {
     fetchOrders();
@@ -126,6 +138,12 @@ export default function OrdersTab() {
     return products.reduce((total, product) => {
       return total + product.amount * product.quantity;
     }, 0);
+  };
+
+  // Function to handle bill generation
+  const handleGenerateBill = (order) => {
+    setSelectedOrder(order);
+    setBillDialogOpen(true);
   };
 
   return (
@@ -323,11 +341,22 @@ export default function OrdersTab() {
                       ))}
                     </div>
                     <div className="border-t p-4 bg-gray-50">
-                      <div className="flex justify-between">
-                        <span className="text-sm font-medium">Total</span>
-                        <span className="font-semibold">
-                          ₹{order.amount?.toFixed(2)}
-                        </span>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium">Total</span>
+                          <span className="font-semibold">
+                            ₹{order.amount?.toFixed(2)}
+                          </span>
+                        </div>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex items-center gap-1 mt-2 w-full"
+                          onClick={() => handleGenerateBill(order)}
+                        >
+                          <FileText className="h-4 w-4" />
+                          <span>Generate Bill</span>
+                        </Button>
                       </div>
                     </div>
                   </CardContent>
@@ -349,6 +378,104 @@ export default function OrdersTab() {
           )}
         </CardContent>
       </Card>
+      
+      {/* Bill Generation Dialog */}
+      <Dialog open={billDialogOpen} onOpenChange={setBillDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Invoice</DialogTitle>
+            <DialogDescription>
+              Order #{selectedOrder?.orderId?.substring(0, 8)} details
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div ref={billRef} className="p-4 bg-white">
+            {/* Bill Header */}
+            <div className="text-center mb-6">
+              <h1 className="text-2xl font-bold">INVOICE</h1>
+              <p className="text-muted-foreground">Thikana Portal</p>
+            </div>
+            
+            {/* Bill Info */}
+            <div className="flex justify-between mb-6">
+              <div>
+                <h3 className="font-medium">Invoice To:</h3>
+                <p>Customer ID: {selectedOrder?.userId?.substring(0, 8)}</p>
+                <p>Order Date: {selectedOrder && format(new Date(selectedOrder?.timestamp), "MMM d, yyyy")}</p>
+              </div>
+              <div className="text-right">
+                <h3 className="font-medium">Invoice Details:</h3>
+                <p>Invoice #: INV-{selectedOrder?.orderId?.substring(0, 8)}</p>
+                <p>Order #: {selectedOrder?.orderId?.substring(0, 8)}</p>
+              </div>
+            </div>
+            
+            {/* Bill Items */}
+            <table className="w-full mb-6">
+              <thead className="border-b-2 border-gray-300">
+                <tr>
+                  <th className="py-2 text-left">Item</th>
+                  <th className="py-2 text-right">Qty</th>
+                  <th className="py-2 text-right">Price</th>
+                  <th className="py-2 text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {selectedOrder?.products?.map((product, idx) => (
+                  <tr key={idx}>
+                    <td className="py-2">{product.productName}</td>
+                    <td className="py-2 text-right">{product.quantity}</td>
+                    <td className="py-2 text-right">₹{product.amount?.toFixed(2)}</td>
+                    <td className="py-2 text-right">₹{(product.amount * product.quantity).toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="border-t-2 border-gray-300 font-medium">
+                <tr>
+                  <td colSpan={3} className="py-2 text-right">Subtotal:</td>
+                  <td className="py-2 text-right">₹{selectedOrder?.amount?.toFixed(2)}</td>
+                </tr>
+                <tr>
+                  <td colSpan={3} className="py-2 text-right">Tax:</td>
+                  <td className="py-2 text-right">₹0.00</td>
+                </tr>
+                <tr className="font-bold">
+                  <td colSpan={3} className="py-2 text-right">Total:</td>
+                  <td className="py-2 text-right">₹{selectedOrder?.amount?.toFixed(2)}</td>
+                </tr>
+              </tfoot>
+            </table>
+            
+            {/* Payment info */}
+            <div className="border-t pt-4 mb-6">
+              <h3 className="font-medium mb-2">Payment Information</h3>
+              <p>Status: {selectedOrder?.paymentStatus || "Paid"}</p>
+              <p>Method: {selectedOrder?.paymentMethod || "Online Payment"}</p>
+            </div>
+            
+            {/* Thank You */}
+            <div className="text-center mt-8">
+              <p className="font-medium">Thank you for your business!</p>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setBillDialogOpen(false)}
+            >
+              Close
+            </Button>
+            <Button 
+              onClick={handlePrint}
+              className="flex items-center gap-1"
+            >
+              <Printer className="h-4 w-4" />
+              <span>Print / Save PDF</span>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
