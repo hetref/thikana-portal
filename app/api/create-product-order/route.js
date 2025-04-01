@@ -1,32 +1,41 @@
-import { getDoc, doc } from 'firebase/firestore';
-import { db } from '@/lib/firebase'; // Ensure you have your Firebase setup in firebase.js
-import CryptoJS from 'crypto-js';
-import Razorpay from 'razorpay';
+import { getDoc, doc } from "firebase/firestore";
+import { db } from "@/lib/firebase"; // Ensure you have your Firebase setup in firebase.js
+import CryptoJS from "crypto-js";
+import Razorpay from "razorpay";
 
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'default-key'; // Use your actual encryption key
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "default-key"; // Use your actual encryption key
 
 export async function POST(req) {
   try {
-    const { amount, userId } = await req.json();
-    
+    console.log("Create product order API called");
+    const body = await req.json();
+    console.log("Request body:", body);
+
+    const { userId, amount } = body;
+
     if (!userId) {
-      return new Response(JSON.stringify({ error: 'User ID is required' }), { 
+      console.error("Missing userId in request");
+      return new Response(JSON.stringify({ error: "User ID is required" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
       });
     }
-    
+
     if (!amount || isNaN(amount) || amount <= 0) {
-      return new Response(JSON.stringify({ error: 'Valid amount is required' }), { 
-        status: 400,
-        headers: { "Content-Type": "application/json" }
-      });
+      console.error("Invalid amount in request:", amount);
+      return new Response(
+        JSON.stringify({ error: "Valid amount is required" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
     }
 
     console.log(`Creating order for user ${userId} with amount ${amount}`);
 
     // Fetch and decrypt Razorpay keys
-    const userDocRef = doc(db, 'users', userId);
+    const userDocRef = doc(db, "users", userId);
     const userDocSnap = await getDoc(userDocRef);
     if (userDocSnap.exists()) {
       const userData = userDocSnap.data();
@@ -36,7 +45,7 @@ export async function POST(req) {
             userData.razorpayInfo.razorpayKeyId,
             ENCRYPTION_KEY
           ).toString(CryptoJS.enc.Utf8);
-          
+
           const decryptedKeySecret = CryptoJS.AES.decrypt(
             userData.razorpayInfo.razorpayKeySecret,
             ENCRYPTION_KEY
@@ -60,40 +69,55 @@ export async function POST(req) {
           });
 
           console.log("Order created:", order);
-          return new Response(JSON.stringify({ 
-            orderId: order.id, 
-            amount: order.amount, 
-            keyId: decryptedKeyId 
-          }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          });
+          return new Response(
+            JSON.stringify({
+              orderId: order.id,
+              amount: order.amount,
+              keyId: decryptedKeyId,
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
         } catch (decryptError) {
-          console.error('Error decrypting Razorpay keys:', decryptError);
-          return new Response(JSON.stringify({ error: 'Failed to decrypt Razorpay keys' }), { 
-            status: 500,
-            headers: { "Content-Type": "application/json" }
-          });
+          console.error("Error decrypting Razorpay keys:", decryptError);
+          return new Response(
+            JSON.stringify({ error: "Failed to decrypt Razorpay keys" }),
+            {
+              status: 500,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
         }
       } else {
-        console.error('Razorpay info not found for user:', userId);
-        return new Response(JSON.stringify({ error: 'Razorpay info not found. Please set up your payment account.' }), { 
-          status: 404,
-          headers: { "Content-Type": "application/json" }
-        });
+        console.error("Razorpay info not found for user:", userId);
+        return new Response(
+          JSON.stringify({
+            error:
+              "Razorpay info not found. Please set up your payment account.",
+          }),
+          {
+            status: 404,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
       }
     } else {
-      console.error('User not found:', userId);
-      return new Response(JSON.stringify({ error: 'User not found' }), { 
+      console.error("User not found:", userId);
+      return new Response(JSON.stringify({ error: "User not found" }), {
         status: 404,
-        headers: { "Content-Type": "application/json" }
-      }); 
+        headers: { "Content-Type": "application/json" },
+      });
     }
   } catch (error) {
-    console.error('Error creating Razorpay order:', error);
-    return new Response(JSON.stringify({ error: error.message || 'Internal server error' }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    console.error("Error creating Razorpay order:", error);
+    return new Response(
+      JSON.stringify({ error: error.message || "Internal server error" }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   }
 }

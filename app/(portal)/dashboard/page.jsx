@@ -61,6 +61,8 @@ import {
   ClockIcon,
   SettingsIcon,
   BarChart,
+  Package,
+  ShoppingBag,
 } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import {
@@ -86,6 +88,7 @@ import AnalyticsTab from "@/components/dashboard/AnalyticsTab";
 import IncomeTab from "@/components/dashboard/IncomeTab";
 import IncomeAnalyticsTab from "@/components/dashboard/IncomeAnalyticsTab";
 import TicketsTab from "@/components/dashboard/TicketsTab";
+import OrdersTab from "@/components/dashboard/OrdersTab";
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState("tickets");
@@ -148,7 +151,7 @@ export default function DashboardPage() {
 
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <div className="flex justify-between items-center mb-6">
-                <TabsList className="grid grid-cols-4 lg:grid-cols-7">
+                <TabsList className="grid grid-cols-3 lg:grid-cols-7">
                   <TabsTrigger
                     value="contacts"
                     className="flex items-center gap-2"
@@ -183,6 +186,13 @@ export default function DashboardPage() {
                   >
                     <CreditCard className="h-4 w-4" />
                     Transactions
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="orders"
+                    className="flex items-center gap-2"
+                  >
+                    <ShoppingBag className="h-4 w-4" />
+                    Orders
                   </TabsTrigger>
                   <TabsTrigger
                     value="analytics"
@@ -239,6 +249,10 @@ export default function DashboardPage() {
                     <IncomeTab />
                   </TabsContent>
                 </Tabs>
+              </TabsContent>
+
+              <TabsContent value="orders" className="space-y-4">
+                <OrdersTab />
               </TabsContent>
 
               <TabsContent value="analytics" className="space-y-4">
