@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
+import { useState, useEffect, useCallback, useMemo, Suspense, useRef } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -58,6 +58,8 @@ import {
   ShoppingCart,
   ArrowLeftIcon,
   HomeIcon,
+  Printer,
+  Star,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import WhoToFollow from "@/components/WhoToFollow";
@@ -73,6 +75,10 @@ import {
   query,
   orderBy,
   deleteDoc,
+  updateDoc,
+  where,
+  addDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 import ProfilePosts from "@/components/ProfilePosts";
 import Link from "next/link";
@@ -126,6 +132,10 @@ const FranchiseModal = dynamic(
     ),
   }
 );
+import { useReactToPrint } from "react-to-print";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
+import { Textarea } from "@/components/ui/textarea";
 
 // Add a style element to hide scrollbars
 const scrollbarHideStyles = `
@@ -174,7 +184,17 @@ export default function Profile() {
   const [isUnsaveDialogOpen, setIsUnsaveDialogOpen] = useState(false);
   const [orders, setOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
-  const [isFranchiseModalOpen, setIsFranchiseModalOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [billDialogOpen, setBillDialogOpen] = useState(false);
+  const [selectedProductForRating, setSelectedProductForRating] = useState(null);
+  const [ratingDialogOpen, setRatingDialogOpen] = useState(false);
+  const [ratingValue, setRatingValue] = useState(0);
+  const [ratingFeedback, setRatingFeedback] = useState("");
+  const [isSubmittingRating, setIsSubmittingRating] = useState(false);
+  const [productRatings, setProductRatings] = useState({});
+  
+  const billRef = useRef();
+    const [isFranchiseModalOpen, setIsFranchiseModalOpen] = useState(false);
 
   const franchiseFormSchema = z.object({
     adminName: z.string().min(2, { message: "Admin name is required" }),
@@ -642,6 +662,226 @@ export default function Profile() {
     ),
     [prepareUnsave, router]
   );
+
+  // Handle printing functionality
+  const handlePrint = useReactToPrint({
+    content: () => billRef.current,
+    documentTitle: `Invoice_${selectedOrder?.orderId || 'order'}`,
+    onBeforeGetContent: () => {
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve();
+        }, 200);
+      });
+    },
+    onAfterPrint: () => {
+      toast.success("Invoice ready for printing/saving");
+    },
+    removeAfterPrint: false,
+    print: async (printIframe) => {
+      const document = printIframe.contentDocument;
+      if (document) {
+        const html = document.getElementsByTagName("html")[0];
+        
+        // Try to force PDF to be an option
+        document.body.style.width = "210mm";
+        document.body.style.height = "297mm"; // A4 dimensions
+        
+        html.style.width = "210mm";
+        html.style.height = "297mm";
+        
+        setTimeout(() => {
+          window.print();
+        }, 500);
+      }
+    }
+  });
+  
+  // Function to download PDF directly
+  const handleDownloadPDF = async () => {
+    if (!billRef.current) return;
+    
+    try {
+      toast.loading("Generating PDF...");
+      
+      const content = billRef.current;
+      const canvas = await html2canvas(content, {
+        scale: 2,
+        useCORS: true,
+        logging: false
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+      
+      const imgWidth = 210; // A4 width in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      pdf.save(`Invoice_${selectedOrder?.orderId || 'order'}.pdf`);
+      
+      toast.dismiss();
+      toast.success("PDF downloaded successfully");
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast.dismiss();
+      toast.error("Failed to generate PDF");
+    }
+  };
+  
+  // Function to handle bill generation
+  const handleGenerateBill = (order) => {
+    setSelectedOrder(order);
+    setBillDialogOpen(true);
+  };
+  
+  // Add the fetch ratings effect
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const fetchProductRatings = async () => {
+      try {
+        const ratingsRef = collection(db, "users", user.uid, "ratings");
+        const ratingsSnapshot = await getDocs(ratingsRef);
+        
+        const ratingsData = {};
+        ratingsSnapshot.docs.forEach(doc => {
+          const data = doc.data();
+          ratingsData[data.productId] = {
+            id: doc.id,
+            ...data
+          };
+        });
+        
+        setProductRatings(ratingsData);
+      } catch (error) {
+        console.error("Error fetching product ratings:", error);
+      }
+    };
+    
+    fetchProductRatings();
+  }, [user?.uid]);
+  
+  // Handle rating submission
+  const handleSubmitRating = async () => {
+    if (!selectedProductForRating || !user?.uid || ratingValue === 0) return;
+    
+    setIsSubmittingRating(true);
+    
+    try {
+      const ratingData = {
+        productId: selectedProductForRating.productId,
+        productName: selectedProductForRating.productName,
+        rating: ratingValue,
+        feedback: ratingFeedback,
+        userId: user.uid,
+        userName: user.displayName || user.email,
+        timestamp: serverTimestamp(),
+        orderId: selectedProductForRating.orderId
+      };
+      
+      // Add rating to user's ratings collection
+      const userRatingRef = collection(db, "users", user.uid, "ratings");
+      const newRatingDoc = await addDoc(userRatingRef, ratingData);
+      
+      // Also add rating to product's ratings collection
+      const productRatingRef = collection(db, "products", selectedProductForRating.productId, "ratings");
+      await addDoc(productRatingRef, ratingData);
+      
+      // Update product's average rating in products collection
+      const productRef = doc(db, "products", selectedProductForRating.productId);
+      const productDoc = await getDoc(productRef);
+      
+      if (productDoc.exists()) {
+        const productData = productDoc.data();
+        const currentRatingCount = productData.ratingCount || 0;
+        const currentRatingSum = productData.ratingSum || 0;
+        
+        const newRatingCount = currentRatingCount + 1;
+        const newRatingSum = currentRatingSum + ratingValue;
+        const newAverageRating = newRatingSum / newRatingCount;
+        
+        await updateDoc(productRef, {
+          ratingCount: newRatingCount,
+          ratingSum: newRatingSum,
+          averageRating: newAverageRating
+        });
+      }
+      
+      // Update local state
+      setProductRatings(prev => ({
+        ...prev,
+        [selectedProductForRating.productId]: {
+          id: newRatingDoc.id,
+          ...ratingData
+        }
+      }));
+      
+      toast.success("Rating submitted successfully");
+      setRatingDialogOpen(false);
+      
+      // Reset rating form
+      setRatingValue(0);
+      setRatingFeedback("");
+      setSelectedProductForRating(null);
+    } catch (error) {
+      console.error("Error submitting rating:", error);
+      toast.error("Failed to submit rating");
+    } finally {
+      setIsSubmittingRating(false);
+    }
+  };
+  
+  // Handle opening the rating dialog
+  const handleOpenRatingDialog = (product, order) => {
+    const productWithOrderInfo = {
+      ...product,
+      orderId: order.id,
+      businessId: order.businessId,
+      businessName: order.businessName
+    };
+    setSelectedProductForRating(productWithOrderInfo);
+    
+    // If product has already been rated, pre-fill the form
+    if (productRatings[product.productId]) {
+      setRatingValue(productRatings[product.productId].rating);
+      setRatingFeedback(productRatings[product.productId].feedback);
+    } else {
+      setRatingValue(0);
+      setRatingFeedback("");
+    }
+    
+    setRatingDialogOpen(true);
+  };
+  
+  // Render star rating component for selection
+  const renderStarRating = (currentRating, isSelectable = false) => {
+    return (
+      <div className="flex items-center">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            type="button"
+            className={`${isSelectable ? 'cursor-pointer hover:scale-110 transition-transform' : ''}`}
+            onClick={() => isSelectable && setRatingValue(star)}
+            disabled={!isSelectable}
+          >
+            <Star
+              className={`h-6 w-6 ${
+                star <= currentRating 
+                  ? 'fill-yellow-400 text-yellow-400' 
+                  : 'text-gray-300'
+              } ${isSelectable && star <= currentRating ? 'text-yellow-400' : ''}`}
+            />
+          </button>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen">
@@ -1257,105 +1497,123 @@ export default function Profile() {
                                 </h2>
                               </div>
 
-                              {orders.map((order) => (
-                                <Card
-                                  key={order.id}
-                                  className="overflow-hidden"
-                                >
-                                  <CardHeader className="bg-gray-50 py-3">
-                                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-                                      <div>
-                                        <div className="flex items-center">
-                                          <h3 className="font-medium text-sm sm:text-base">
-                                            Order #
-                                            {order.orderId.substring(0, 8)}
-                                            ...
-                                          </h3>
-                                          <Badge
-                                            variant={
-                                              order.status === "completed"
-                                                ? "success"
-                                                : "outline"
-                                            }
-                                            className="ml-2"
-                                          >
-                                            {order.status === "completed"
-                                              ? "Completed"
-                                              : order.status}
-                                          </Badge>
-                                        </div>
-                                        <p className="text-xs sm:text-sm text-muted-foreground">
-                                          {format(
-                                            new Date(order.timestamp),
-                                            "MMM d, yyyy · h:mm a"
-                                          )}
-                                        </p>
-                                      </div>
-                                      <div className="text-right">
-                                        <p className="font-semibold text-sm sm:text-base">
-                                          ₹{order.amount?.toFixed(2)}
-                                        </p>
-                                        <p className="text-xs sm:text-sm text-muted-foreground">
-                                          {order.businessName}
-                                        </p>
-                                      </div>
-                                    </div>
-                                  </CardHeader>
-                                  <CardContent className="p-0">
-                                    <div className="px-4 py-3 border-b">
-                                      <div className="flex justify-between items-center">
-                                        <h4 className="text-sm font-medium">
-                                          Items
-                                        </h4>
-                                        <span className="text-xs text-muted-foreground">
-                                          {order.products?.length || 0} item(s)
-                                        </span>
-                                      </div>
-                                    </div>
-                                    <div className="divide-y">
-                                      {order.products?.map((product, idx) => (
-                                        <div
-                                          key={idx}
-                                          className="p-4 flex items-center gap-3"
+                            {orders.map((order) => (
+                              <Card key={order.id} className="overflow-hidden">
+                                <CardHeader className="bg-gray-50 py-3">
+                                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                                    <div>
+                                      <div className="flex items-center">
+                                        <h3 className="font-medium text-sm sm:text-base">
+                                          Order #{order.orderId.substring(0, 8)}
+                                          ...
+                                        </h3>
+                                        <Badge
+                                          variant={
+                                            order.status === "completed"
+                                              ? "success"
+                                              : "outline"
+                                          }
+                                          className="ml-2"
                                         >
-                                          <div className="relative w-12 h-12 bg-gray-100 rounded overflow-hidden flex-shrink-0">
-                                            {product.imageUrl ? (
-                                              <Image
-                                                src={product.imageUrl}
-                                                alt={product.productName}
-                                                fill
-                                                className="object-cover"
-                                              />
-                                            ) : (
-                                              <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                                <Package className="w-6 h-6" />
-                                              </div>
-                                            )}
-                                          </div>
-                                          <div className="flex-grow">
-                                            <h5 className="font-medium text-sm">
-                                              {product.productName}
-                                            </h5>
-                                            <div className="flex items-center text-sm text-muted-foreground">
-                                              <span>
-                                                ₹{product.amount?.toFixed(2)} ×{" "}
-                                                {product.quantity}
-                                              </span>
-                                            </div>
-                                          </div>
-                                          <div className="text-right">
-                                            <p className="font-medium">
-                                              ₹
-                                              {(
-                                                product.amount *
-                                                product.quantity
-                                              ).toFixed(2)}
-                                            </p>
-                                          </div>
-                                        </div>
-                                      ))}
+                                          {order.status === "completed"
+                                            ? "Completed"
+                                            : order.status}
+                                        </Badge>
+                                      </div>
+                                      <p className="text-xs sm:text-sm text-muted-foreground">
+                                        {format(
+                                          new Date(order.timestamp),
+                                          "MMM d, yyyy · h:mm a"
+                                        )}
+                                      </p>
                                     </div>
-                                    <div className="border-t p-4 bg-gray-50">
+                                    <div className="text-right">
+                                      <p className="font-semibold text-sm sm:text-base">
+                                        ₹{order.amount?.toFixed(2)}
+                                      </p>
+                                      <p className="text-xs sm:text-sm text-muted-foreground">
+                                        {order.businessName}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </CardHeader>
+                                <CardContent className="p-0">
+                                  <div className="px-4 py-3 border-b">
+                                    <div className="flex justify-between items-center">
+                                      <h4 className="text-sm font-medium">
+                                        Items
+                                      </h4>
+                                      <span className="text-xs text-muted-foreground">
+                                        {order.products?.length || 0} item(s)
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="divide-y">
+                                    {order.products?.map((product, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="p-4 flex items-center gap-3"
+                                      >
+                                        <div className="relative w-12 h-12 bg-gray-100 rounded overflow-hidden flex-shrink-0">
+                                          {product.imageUrl ? (
+                                            <Image
+                                              src={product.imageUrl}
+                                              alt={product.productName}
+                                              fill
+                                              className="object-cover"
+                                            />
+                                          ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                              <Package className="w-6 h-6" />
+                                            </div>
+                                          )}
+                                        </div>
+                                        <div className="flex-grow">
+                                          <h5 className="font-medium text-sm">
+                                            {product.productName}
+                                          </h5>
+                                          <div className="flex items-center text-sm text-muted-foreground">
+                                            <span>
+                                              ₹{product.amount?.toFixed(2)} ×{" "}
+                                              {product.quantity}
+                                            </span>
+                                          </div>
+                                          {order.status === "completed" && (
+                                            <div className="mt-2">
+                                              {productRatings[product.productId] ? (
+                                                <div className="flex flex-col gap-1">
+                                                  {renderStarRating(productRatings[product.productId].rating)}
+                                                  <span className="text-xs text-green-600">You rated this product</span>
+                                                </div>
+                                              ) : (
+                                                <Button 
+                                                  variant="outline" 
+                                                  size="sm"
+                                                  className="text-xs"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleOpenRatingDialog(product, order);
+                                                  }}
+                                                >
+                                                  Rate & Review
+                                                </Button>
+                                              )}
+                                            </div>
+                                          )}
+                                        </div>
+                                        <div className="text-right">
+                                          <p className="font-medium">
+                                            ₹
+                                            {(
+                                              product.amount * product.quantity
+                                            ).toFixed(2)}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <div className="border-t p-4 bg-gray-50">
+                                    <div className="flex flex-col gap-2">
                                       <div className="flex justify-between">
                                         <span className="text-sm font-medium">
                                           Total
@@ -1364,16 +1622,28 @@ export default function Profile() {
                                           ₹{order.amount?.toFixed(2)}
                                         </span>
                                       </div>
+                                      <Button 
+                                        variant="outline" 
+                                        size="sm" 
+                                        className="flex items-center gap-1 mt-2 w-full"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleGenerateBill(order);
+                                        }}
+                                      >
+                                        <FileText className="h-4 w-4" />
+                                        <span>Generate Bill</span>
+                                      </Button>
                                     </div>
-                                  </CardContent>
-                                </Card>
-                              ))}
-                            </div>
-                          )}
-                        </TabsContent>
-                      </Tabs>
-                    </Card>
-                  </Suspense>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        )}
+                      </TabsContent>
+                    </Tabs>
+                  </Card>
                 )}
               </>
             )}
@@ -1414,6 +1684,173 @@ export default function Profile() {
           onOpenChange={setIsFranchiseModalOpen}
         />
       </Suspense>
+
+      {/* Rating Dialog */}
+      <Dialog open={ratingDialogOpen} onOpenChange={setRatingDialogOpen}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle>Rate Product</DialogTitle>
+            <DialogDescription>
+              Share your experience with {selectedProductForRating?.productName}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="flex flex-col items-center gap-3">
+              <span className="text-sm font-medium">How would you rate this product?</span>
+              {renderStarRating(ratingValue, true)}
+              <span className="text-sm text-muted-foreground mt-1">
+                {ratingValue === 0 && "Select a rating"}
+                {ratingValue === 1 && "Poor"}
+                {ratingValue === 2 && "Fair"}
+                {ratingValue === 3 && "Good"}
+                {ratingValue === 4 && "Very Good"}
+                {ratingValue === 5 && "Excellent"}
+              </span>
+            </div>
+            
+            <div className="space-y-2">
+              <label htmlFor="feedback" className="text-sm font-medium">
+                Your Review (Optional)
+              </label>
+              <Textarea
+                id="feedback"
+                placeholder="Share your experience with this product..."
+                value={ratingFeedback}
+                onChange={(e) => setRatingFeedback(e.target.value)}
+                rows={4}
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRatingDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSubmitRating} 
+              disabled={ratingValue === 0 || isSubmittingRating}
+            >
+              {isSubmittingRating ? (
+                <>
+                  <Loader2Icon className="h-4 w-4 animate-spin mr-2" />
+                  Submitting...
+                </>
+              ) : productRatings[selectedProductForRating?.productId] ? (
+                "Update Rating"
+              ) : (
+                "Submit Rating"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Bill Generation Dialog */}
+      <Dialog open={billDialogOpen} onOpenChange={setBillDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Invoice</DialogTitle>
+            <DialogDescription>
+              Order #{selectedOrder?.orderId?.substring(0, 8)} details
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div ref={billRef} className="p-4 bg-white">
+            {/* Bill Header */}
+            <div className="text-center mb-6">
+              <h1 className="text-2xl font-bold">INVOICE</h1>
+              <p className="text-muted-foreground">Thikana Portal</p>
+            </div>
+            
+            {/* Bill Info */}
+            <div className="flex justify-between mb-6">
+              <div>
+                <h3 className="font-medium">Invoice To:</h3>
+                <p>Customer: {user?.displayName || user?.email || "Customer"}</p>
+                <p>Order Date: {selectedOrder && format(new Date(selectedOrder?.timestamp), "MMM d, yyyy")}</p>
+              </div>
+              <div className="text-right">
+                <h3 className="font-medium">Invoice Details:</h3>
+                <p>Invoice #: INV-{selectedOrder?.orderId?.substring(0, 8)}</p>
+                <p>Order #: {selectedOrder?.orderId?.substring(0, 8)}</p>
+              </div>
+            </div>
+            
+            {/* Bill Items */}
+            <table className="w-full mb-6">
+              <thead className="border-b-2 border-gray-300">
+                <tr>
+                  <th className="py-2 text-left">Item</th>
+                  <th className="py-2 text-right">Qty</th>
+                  <th className="py-2 text-right">Price</th>
+                  <th className="py-2 text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {selectedOrder?.products?.map((product, idx) => (
+                  <tr key={idx}>
+                    <td className="py-2">{product.productName}</td>
+                    <td className="py-2 text-right">{product.quantity}</td>
+                    <td className="py-2 text-right">₹{product.amount?.toFixed(2)}</td>
+                    <td className="py-2 text-right">₹{(product.amount * product.quantity).toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="border-t-2 border-gray-300 font-medium">
+                <tr>
+                  <td colSpan={3} className="py-2 text-right">Subtotal:</td>
+                  <td className="py-2 text-right">₹{selectedOrder?.amount?.toFixed(2)}</td>
+                </tr>
+                <tr>
+                  <td colSpan={3} className="py-2 text-right">Tax:</td>
+                  <td className="py-2 text-right">₹0.00</td>
+                </tr>
+                <tr className="font-bold">
+                  <td colSpan={3} className="py-2 text-right">Total:</td>
+                  <td className="py-2 text-right">₹{selectedOrder?.amount?.toFixed(2)}</td>
+                </tr>
+              </tfoot>
+            </table>
+            
+            {/* Payment info */}
+            <div className="border-t pt-4 mb-6">
+              <h3 className="font-medium mb-2">Payment Information</h3>
+              <p>Status: {selectedOrder?.paymentStatus || "Paid"}</p>
+              <p>Method: {selectedOrder?.paymentMethod || "Online Payment"}</p>
+            </div>
+            
+            {/* Thank You */}
+            <div className="text-center mt-8">
+              <p className="font-medium">Thank you for your business!</p>
+            </div>
+          </div>
+          
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setBillDialogOpen(false)}
+            >
+              Close
+            </Button>
+            <Button 
+              onClick={handlePrint}
+              className="flex items-center gap-1"
+            >
+              <Printer className="h-4 w-4" />
+              <span>Print</span>
+            </Button>
+            <Button 
+              onClick={handleDownloadPDF}
+              variant="default"
+              className="flex items-center gap-1"
+            >
+              <FileText className="h-4 w-4" />
+              <span>Download PDF</span>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

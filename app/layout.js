@@ -1,4 +1,3 @@
-import { ThemeProvider } from "@/components/theme-provider";
 import { geistSans } from "@/lib/fonts";
 import "@/app/globals.css";
 import Chatbot from "@/components/Chatbot";
@@ -16,15 +15,13 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={geistSans.variable} suppressHydrationWarning>
       <body className="min-h-screen bg-background font-sans antialiased">
-        <ThemeProvider defaultTheme="light">
-          <AuthProvider>
-            <div className="relative flex min-h-screen flex-col">
-              <main className="flex-1">{children}</main>
-            </div>
-            <Chatbot />
-            <Toaster />
-          </AuthProvider>
-        </ThemeProvider>
+        <AuthProvider>
+          <div className="relative flex min-h-screen flex-col">
+            <main className="flex-1">{children}</main>
+          </div>
+          <Chatbot />
+          <Toaster />
+        </AuthProvider>
         <Analytics />
         <Script
           src="https://checkout.razorpay.com/v1/checkout.js"

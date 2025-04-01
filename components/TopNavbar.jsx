@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/theme-toggle";
 import useGetUser from "@/hooks/useGetUser";
 import { auth } from "@/lib/firebase";
 import { authenticatedItems, unauthenticatedItems } from "@/constants/navLinks";
@@ -73,7 +72,7 @@ const TopNavbar = ({ type = "unauthenticated" }) => {
 
   return (
     <CartProvider>
-      <header className="fixed top-0 w-full z-50 bg-white/80 dark:bg-black/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 transition-colors duration-300">
+      <header className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-sm border-b border-gray-200 transition-colors duration-300">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
           <Link href="/" className="flex items-center gap-2 font-semibold">
             <Image
@@ -103,8 +102,6 @@ const TopNavbar = ({ type = "unauthenticated" }) => {
             } flex-col sm:flex sm:flex-row sm:items-center gap-4 bg-background sm:bg-transparent 
             sm:gap-6 fixed sm:relative top-14 sm:top-auto right-0 sm:right-auto w-full sm:w-auto p-6`}
           >
-            <ThemeToggle />
-
             <div className="flex items-center gap-2">
               <Link href="/search">
                 <Search className="h-5 w-5" />

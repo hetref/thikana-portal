@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { ModeToggle } from "@/components/wb/mode-toggle"
 import { Laptop, Smartphone, Tablet, Save, Eye, Upload, Check, AlertCircle, Link } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -191,7 +190,6 @@ export function Header({ device, setDevice, onSave, isSaving, saveStatus }) {
         </div>
 
         <div className="flex items-center space-x-2">
-          <ModeToggle />
           <Button 
             variant="default" 
             size="sm" 

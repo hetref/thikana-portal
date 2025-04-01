@@ -87,10 +87,11 @@ import ExpenseTab from "@/components/dashboard/ExpenseTab";
 import AnalyticsTab from "@/components/dashboard/AnalyticsTab";
 import IncomeTab from "@/components/dashboard/IncomeTab";
 import IncomeAnalyticsTab from "@/components/dashboard/IncomeAnalyticsTab";
+import TicketsTab from "@/components/dashboard/TicketsTab";
 import OrdersTab from "@/components/dashboard/OrdersTab";
 
 export default function DashboardPage() {
-  const [activeTab, setActiveTab] = useState("transactions");
+  const [activeTab, setActiveTab] = useState("tickets");
   const [activeTransactionTab, setActiveTransactionTab] = useState("expenses");
   const [activeAnalyticsTab, setActiveAnalyticsTab] =
     useState("expense-analytics");
@@ -159,6 +160,13 @@ export default function DashboardPage() {
                     Contacts
                   </TabsTrigger>
                   <TabsTrigger
+                    value="tickets"
+                    className="flex items-center gap-2"
+                  >
+                    <Inbox className="h-4 w-4" />
+                    Tickets
+                  </TabsTrigger>
+                  <TabsTrigger
                     value="payments"
                     className="flex items-center gap-2"
                   >
@@ -205,6 +213,10 @@ export default function DashboardPage() {
 
               <TabsContent value="contacts" className="space-y-4">
                 <ContactsTab />
+              </TabsContent>
+
+              <TabsContent value="tickets" className="space-y-4">
+                <TicketsTab />
               </TabsContent>
 
               <TabsContent value="payments" className="space-y-4">
