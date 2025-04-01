@@ -5,6 +5,7 @@ import Chatbot from "@/components/Chatbot";
 import { Toaster } from "react-hot-toast";
 import Script from "next/script";
 import { Analytics } from "@vercel/analytics/react";
+import { AuthProvider } from "@/hooks/useAuth";
 
 export const metadata = {
   title: "Thikana",
@@ -16,11 +17,13 @@ export default function RootLayout({ children }) {
     <html lang="en" className={geistSans.variable} suppressHydrationWarning>
       <body className="min-h-screen bg-background font-sans antialiased">
         <ThemeProvider defaultTheme="light">
-          <div className="relative flex min-h-screen flex-col">
-            <main className="flex-1">{children}</main>
-          </div>
-          <Chatbot />
-          <Toaster />
+          <AuthProvider>
+            <div className="relative flex min-h-screen flex-col">
+              <main className="flex-1">{children}</main>
+            </div>
+            <Chatbot />
+            <Toaster />
+          </AuthProvider>
         </ThemeProvider>
         <Analytics />
         <Script

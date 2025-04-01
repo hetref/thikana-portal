@@ -1,6 +1,7 @@
 "use client";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import {
   DialogClose,
   DialogTrigger,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -54,6 +56,8 @@ import {
   BookText,
   InfoIcon,
   ShoppingCart,
+  ArrowLeftIcon,
+  HomeIcon,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import WhoToFollow from "@/components/WhoToFollow";
@@ -96,6 +100,32 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { format } from "date-fns";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import FranchiseSelector from "@/components/profile/FranchiseSelector";
+
+// Dynamically import heavy components
+const FranchiseModal = dynamic(
+  () => import("@/components/profile/FranchiseModal"),
+  {
+    loading: () => (
+      <div className="flex justify-center items-center h-[400px]">
+        <Loader2Icon className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    ),
+  }
+);
 
 // Add a style element to hide scrollbars
 const scrollbarHideStyles = `
@@ -108,13 +138,28 @@ const scrollbarHideStyles = `
   }
 `;
 
+// Memoized components
+const LoadingSpinner = () => (
+  <div className="flex justify-center items-center h-[400px]">
+    <Loader2Icon className="w-10 h-10 animate-spin text-primary" />
+  </div>
+);
+
+const EmptyState = ({ icon: Icon, message }) => (
+  <div className="text-center py-12">
+    <Icon className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+    <p className="text-muted-foreground">{message}</p>
+  </div>
+);
+
 export default function Profile() {
   const router = useRouter();
   const [user, setUser] = useState(null);
+  const [selectedFranchiseId, setSelectedFranchiseId] = useState(null);
   const [likedPosts, setLikedPosts] = useState([]);
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
-  const userId = user?.uid;
+  const userId = selectedFranchiseId || user?.uid;
   const [userData, setUserData] = useState(null);
   const [loadingUserData, setLoadingUserData] = useState(true);
   const { posts, loading, fetchMorePosts, hasMore, error } =
@@ -129,9 +174,118 @@ export default function Profile() {
   const [isUnsaveDialogOpen, setIsUnsaveDialogOpen] = useState(false);
   const [orders, setOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
+  const [isFranchiseModalOpen, setIsFranchiseModalOpen] = useState(false);
 
-  // Authentication listener
+  const franchiseFormSchema = z.object({
+    adminName: z.string().min(2, { message: "Admin name is required" }),
+    email: z.string().email({ message: "Please enter a valid email" }),
+    phone: z.string().min(10, { message: "Please enter a valid phone number" }),
+  });
+
+  const franchiseForm = useForm({
+    resolver: zodResolver(franchiseFormSchema),
+    defaultValues: {
+      adminName: "",
+      email: "",
+      phone: "",
+    },
+  });
+
+  const handleAddFranchise = async (data) => {
+    try {
+      // Implementation for adding franchise will go here
+      // For now, just show a success message
+      toast.success("Franchise invitation sent successfully!");
+      setIsFranchiseModalOpen(false);
+      franchiseForm.reset();
+    } catch (error) {
+      console.error("Error adding franchise:", error);
+      toast.error("Failed to add franchise");
+    }
+  };
+
+  // Memoized values
+  const isBusinessUser = useMemo(() => {
+    if (!userData) return null;
+    return userData?.role === "business";
+  }, [userData]);
+
+  const isCurrentUser = useMemo(() => {
+    return userId === user?.uid;
+  }, [userId, user?.uid]);
+
+  const isEmailVerified = useMemo(() => {
+    return userEmailStatus() === true;
+  }, []);
+
+  // Optimized handlers
+  const handleLoadMore = useCallback(() => {
+    if (hasMore && !loading) {
+      fetchMorePosts();
+    }
+  }, [hasMore, loading, fetchMorePosts]);
+
+  const toggleLocationIFrame = useCallback(() => {
+    setShowLocationIFrame((prev) => !prev);
+  }, []);
+
+  const openAddPhotoModal = useCallback(() => {
+    setIsAddPhotoModalOpen(true);
+  }, []);
+
+  const closeAddPhotoModal = useCallback(() => {
+    setIsAddPhotoModalOpen(false);
+  }, []);
+
+  const handleUnsavePost = useCallback(
+    async (postId) => {
+      if (!user?.uid) return;
+
+      try {
+        const savedPostRef = doc(db, "users", user.uid, "savedPosts", postId);
+        await deleteDoc(savedPostRef);
+        toast.success("Post unsaved successfully");
+      } catch (error) {
+        console.error("Error unsaving post:", error);
+        toast.error("Failed to unsave post");
+      }
+    },
+    [user?.uid]
+  );
+
+  const prepareUnsave = useCallback((postId) => {
+    setPostToUnsave(postId);
+    setIsUnsaveDialogOpen(true);
+  }, []);
+
+  const confirmUnsave = useCallback(() => {
+    if (postToUnsave) {
+      handleUnsavePost(postToUnsave);
+      setPostToUnsave(null);
+    }
+  }, [postToUnsave, handleUnsavePost]);
+
+  const verifyEmailHandler = useCallback(() => {
+    if (user) {
+      sendEmailVerification(user)
+        .then(() => {
+          toast.success("Email Verification Link Sent Successfully!");
+        })
+        .catch((error) => {
+          console.error("Error sending email verification:", error);
+          toast.error("Failed to send verification email");
+        });
+    }
+  }, [user]);
+
+  // Optimized effects
   useEffect(() => {
+    // Check sessionStorage for selected franchise
+    const storedFranchiseId = sessionStorage.getItem("selectedFranchiseId");
+    if (storedFranchiseId) {
+      setSelectedFranchiseId(storedFranchiseId);
+    }
+
     const unsubscribe = auth.onAuthStateChanged((authUser) => {
       if (authUser) {
         setUser(authUser);
@@ -142,7 +296,6 @@ export default function Profile() {
     return () => unsubscribe();
   }, [router]);
 
-  // Followers and following count listeners
   useEffect(() => {
     if (!userId) return;
 
@@ -163,7 +316,6 @@ export default function Profile() {
     };
   }, [userId]);
 
-  // User data listener
   useEffect(() => {
     if (!userId) {
       setLoadingUserData(false);
@@ -335,88 +487,6 @@ export default function Profile() {
     fetchOrders();
   }, [user?.uid]);
 
-  // Memoized handlers
-  const handleLoadMore = useCallback(() => {
-    if (hasMore && !loading) {
-      fetchMorePosts();
-    }
-  }, [hasMore, loading, fetchMorePosts]);
-
-  const toggleLocationIFrame = useCallback(() => {
-    setShowLocationIFrame((prev) => !prev);
-  }, []);
-
-  const openAddPhotoModal = useCallback(() => {
-    setIsAddPhotoModalOpen(true);
-  }, []);
-
-  const closeAddPhotoModal = useCallback(() => {
-    setIsAddPhotoModalOpen(false);
-  }, []);
-
-  const handleUnsavePost = useCallback(
-    async (postId) => {
-      if (!user?.uid) return;
-
-      try {
-        const savedPostRef = doc(db, "users", user.uid, "savedPosts", postId);
-        await deleteDoc(savedPostRef);
-        toast.success("Post unsaved successfully");
-      } catch (error) {
-        console.error("Error unsaving post:", error);
-        toast.error("Failed to unsave post");
-      }
-    },
-    [user?.uid]
-  );
-
-  const prepareUnsave = useCallback((postId) => {
-    setPostToUnsave(postId);
-    setIsUnsaveDialogOpen(true);
-  }, []);
-
-  const confirmUnsave = useCallback(() => {
-    if (postToUnsave) {
-      handleUnsavePost(postToUnsave);
-      setPostToUnsave(null);
-    }
-  }, [postToUnsave, handleUnsavePost]);
-
-  const verifyEmailHandler = useCallback(() => {
-    if (user) {
-      sendEmailVerification(user)
-        .then(() => {
-          toast.success("Email Verification Link Sent Successfully!");
-        })
-        .catch((error) => {
-          console.error("Error sending email verification:", error);
-          toast.error("Failed to send verification email");
-        });
-    }
-  }, [user]);
-
-  // Memoized values
-  const formattedDate = useMemo(() => {
-    if (!user?.metadata?.creationTime) return "";
-    return new Date(user.metadata.creationTime).toLocaleDateString("en-US", {
-      month: "long",
-      year: "numeric",
-    });
-  }, [user?.metadata?.creationTime]);
-
-  const isBusinessUser = useMemo(() => {
-    if (!userData) return null;
-    return userData?.role === "business";
-  }, [userData]);
-
-  const isCurrentUser = useMemo(() => {
-    return userId === user?.uid;
-  }, [userId, user?.uid]);
-
-  const isEmailVerified = useMemo(() => {
-    return userEmailStatus() === true;
-  }, []);
-
   // Memoized UI components
   const renderPosts = useMemo(() => {
     if (loading && !posts.length) {
@@ -585,9 +655,7 @@ export default function Profile() {
           {/* Main content */}
           <main className="flex-1 space-y-6">
             {loadingUserData || isBusinessUser === null ? (
-              <div className="flex justify-center items-center h-[400px]">
-                <Loader2Icon className="w-10 h-10 animate-spin text-primary" />
-              </div>
+              <LoadingSpinner />
             ) : (
               <>
                 {/* Profile Card */}
@@ -663,10 +731,26 @@ export default function Profile() {
                   >
                     <div className="flex flex-col md:items-start md:justify-between gap-4">
                       <div className="flex-1 space-y-2">
-                        <h1 className="text-2xl font-bold text-gray-900">
+                        <h1 className="text-2xl font-bold text-gray-900 flex items-center">
                           {isBusinessUser
                             ? userData?.businessName
                             : userData?.name}
+                          {isBusinessUser &&
+                            (userData?.isFranchise ? (
+                              <Badge
+                                variant="outline"
+                                className="ml-2 bg-blue-50 text-blue-600 border-blue-200 text-xs"
+                              >
+                                Franchise
+                              </Badge>
+                            ) : (
+                              <Badge
+                                variant="outline"
+                                className="ml-2 bg-primary/10 text-primary border-primary/20 text-xs"
+                              >
+                                Headquarters
+                              </Badge>
+                            ))}
                         </h1>
                         <div className="flex items-center text-gray-600 gap-1">
                           <User className="w-4 h-4" />
@@ -680,12 +764,12 @@ export default function Profile() {
                       </div>
 
                       {/* Action buttons */}
-                      <div className="flex w-full gap-2 mt-3 md:mt-0">
+                      <div className="flex flex-wrap w-full gap-2 mt-3 md:mt-0">
                         {isCurrentUser && (
                           <Button
                             asChild
                             variant="default"
-                            className="bg-black hover:bg-black/90 px-4 w-full"
+                            className="bg-black hover:bg-black/90 px-4 w-full md:w-auto"
                           >
                             <Link
                               href={
@@ -701,16 +785,68 @@ export default function Profile() {
                         )}
 
                         {isCurrentUser && isBusinessUser && (
-                          <Button
-                            asChild
-                            variant="default"
-                            className="bg-primary hover:bg-primary/90 px-4 w-full"
-                          >
-                            <Link href="/dashboard">
-                              <LayoutDashboard className="w-4 h-4 mr-2" />
-                              Dashboard
-                            </Link>
-                          </Button>
+                          <>
+                            <Button
+                              asChild
+                              variant="default"
+                              className="bg-primary hover:bg-primary/90 px-4 w-full md:w-auto"
+                            >
+                              <Link href="/dashboard">
+                                <LayoutDashboard className="w-4 h-4 mr-2" />
+                                Dashboard
+                              </Link>
+                            </Button>
+
+                            {/* Exit Franchise Mode button - shown when in franchise mode */}
+                            {selectedFranchiseId && (
+                              <Button
+                                variant="outline"
+                                className="gap-2 w-full md:w-auto"
+                                onClick={() => {
+                                  sessionStorage.removeItem(
+                                    "selectedFranchiseId"
+                                  );
+                                  toast.success(
+                                    userData?.franchiseOwner
+                                      ? "Returned to Business View"
+                                      : "Returned to Headquarters"
+                                  );
+                                  window.location.reload();
+                                }}
+                              >
+                                {userData?.franchiseOwner ? (
+                                  <>
+                                    <ArrowLeftIcon className="w-4 h-4" />
+                                    Return to Business
+                                  </>
+                                ) : (
+                                  <>
+                                    <HomeIcon className="w-4 h-4" />
+                                    Return to HQ
+                                  </>
+                                )}
+                              </Button>
+                            )}
+
+                            {/* Add Franchise button - only shown for business HQ, not for franchises or when in franchise mode */}
+                            {!selectedFranchiseId &&
+                              !userData?.franchiseOwner && (
+                                <Button
+                                  variant="outline"
+                                  className="text-primary border-primary hover:bg-primary/10 px-4 w-full md:w-auto"
+                                  onClick={() => setIsFranchiseModalOpen(true)}
+                                >
+                                  <Globe className="w-4 h-4 mr-2" />
+                                  Add a Franchise
+                                </Button>
+                              )}
+
+                            {/* Show FranchiseSelector only when not in franchise mode and when at headquarters */}
+                            {!selectedFranchiseId &&
+                              !userData?.franchiseOwner && (
+                                <FranchiseSelector />
+                              )}
+                          </>
                         )}
 
                         {isBusinessUser && (
@@ -718,6 +854,7 @@ export default function Profile() {
                             <Button
                               variant="outline"
                               onClick={toggleLocationIFrame}
+                              className="w-full md:w-auto"
                             >
                               <MapPinIcon className="w-4 h-4 mr-1" />
                               Location
@@ -821,407 +958,422 @@ export default function Profile() {
 
                 {/* Content tabs for business users */}
                 {isEmailVerified && isBusinessUser && (
-                  <Card className="border-0 shadow-sm overflow-hidden bg-white">
-                    <Tabs defaultValue="posts" className="w-full">
-                      <div className="border-b">
-                        <TabsList className="justify-start h-auto p-0 bg-transparent overflow-x-auto scrollbar-hide whitespace-nowrap">
-                          <TabsTrigger
-                            value="posts"
-                            className={cn(
-                              "rounded-none border-b-2 border-transparent",
-                              "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                              "px-6 py-3 font-medium text-sm transition-all duration-200"
-                            )}
-                          >
-                            <FileTextIcon className="w-4 h-4 mr-2" />
-                            Posts
-                          </TabsTrigger>
-                          <TabsTrigger
-                            value="likes"
-                            className={cn(
-                              "rounded-none border-b-2 border-transparent",
-                              "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                              "px-6 py-3 font-medium text-sm transition-all duration-200"
-                            )}
-                          >
-                            <HeartIcon className="w-4 h-4 mr-2" />
-                            Likes
-                          </TabsTrigger>
-                          <TabsTrigger
-                            value="photos"
-                            className={cn(
-                              "rounded-none border-b-2 border-transparent",
-                              "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                              "px-6 py-3 font-medium text-sm transition-all duration-200"
-                            )}
-                          >
-                            <Images className="w-4 h-4 mr-2" />
-                            Photos
-                          </TabsTrigger>
-                          {userData?.business_categories?.includes(
-                            "product"
-                          ) && (
+                  <Suspense fallback={<LoadingSpinner />}>
+                    <Card className="border-0 shadow-sm overflow-hidden bg-white">
+                      <Tabs defaultValue="posts" className="w-full">
+                        <div className="border-b">
+                          <TabsList className="justify-start h-auto p-0 bg-transparent overflow-x-auto scrollbar-hide whitespace-nowrap">
                             <TabsTrigger
-                              value="products"
+                              value="posts"
                               className={cn(
                                 "rounded-none border-b-2 border-transparent",
                                 "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
                                 "px-6 py-3 font-medium text-sm transition-all duration-200"
                               )}
                             >
-                              <SquareChartGantt className="w-4 h-4 mr-2" />
-                              Products
+                              <FileTextIcon className="w-4 h-4 mr-2" />
+                              Posts
                             </TabsTrigger>
-                          )}
-                          {userData?.business_categories?.includes(
-                            "service"
-                          ) && (
                             <TabsTrigger
-                              value="services"
+                              value="likes"
                               className={cn(
                                 "rounded-none border-b-2 border-transparent",
                                 "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
                                 "px-6 py-3 font-medium text-sm transition-all duration-200"
                               )}
                             >
-                              <Settings className="w-4 h-4 mr-2" />
-                              Services
+                              <HeartIcon className="w-4 h-4 mr-2" />
+                              Likes
                             </TabsTrigger>
-                          )}
-                          <TabsTrigger
-                            value="saved"
-                            className={cn(
-                              "rounded-none border-b-2 border-transparent",
-                              "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                              "px-6 py-3 font-medium text-sm transition-all duration-200"
-                            )}
-                          >
-                            <Bookmark className="w-4 h-4 mr-2" />
-                            Saved
-                          </TabsTrigger>
-                          <TabsTrigger
-                            value="orders"
-                            className={cn(
-                              "rounded-none border-b-2 border-transparent",
-                              "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                              "px-6 py-3 font-medium text-sm transition-all duration-200"
-                            )}
-                          >
-                            <ShoppingCart className="w-4 h-4 mr-2" />
-                            Orders
-                          </TabsTrigger>
-                        </TabsList>
-                      </div>
-
-                      <TabsContent
-                        value="posts"
-                        className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
-                      >
-                        {renderPosts}
-                      </TabsContent>
-
-                      <TabsContent
-                        value="likes"
-                        className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
-                      >
-                        <div className="space-y-4">
-                          {likedPosts.length === 0
-                            ? renderEmptyState(Heart, "No liked posts yet")
-                            : likedPosts.map((post, index) => (
-                                <Card
-                                  key={index}
-                                  className="cursor-pointer hover:shadow-md transition-shadow border border-gray-100"
-                                >
-                                  <CardContent className="pt-6">
-                                    <ProfilePosts
-                                      post={post}
-                                      userData={userData}
-                                    />
-                                  </CardContent>
-                                </Card>
-                              ))}
-                        </div>
-                      </TabsContent>
-
-                      <TabsContent
-                        value="photos"
-                        className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
-                      >
-                        {userData && (
-                          <>
-                            {loadingPhotos ? (
-                              renderLoading()
-                            ) : (
-                              <>
-                                <PhotosGrid
-                                  photos={userPhotos}
-                                  userId={userData.uid}
-                                  onPhotoDeleted={() => {}}
-                                  onAddPhoto={openAddPhotoModal}
-                                />
-                                {auth.currentUser && (
-                                  <AddPhotoModal
-                                    isOpen={isAddPhotoModalOpen}
-                                    onClose={closeAddPhotoModal}
-                                    userId={auth.currentUser.uid}
-                                  />
+                            <TabsTrigger
+                              value="photos"
+                              className={cn(
+                                "rounded-none border-b-2 border-transparent",
+                                "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
+                                "px-6 py-3 font-medium text-sm transition-all duration-200"
+                              )}
+                            >
+                              <Images className="w-4 h-4 mr-2" />
+                              Photos
+                            </TabsTrigger>
+                            {userData?.business_categories?.includes(
+                              "product"
+                            ) && (
+                              <TabsTrigger
+                                value="products"
+                                className={cn(
+                                  "rounded-none border-b-2 border-transparent",
+                                  "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
+                                  "px-6 py-3 font-medium text-sm transition-all duration-200"
                                 )}
-                              </>
+                              >
+                                <SquareChartGantt className="w-4 h-4 mr-2" />
+                                Products
+                              </TabsTrigger>
                             )}
-                          </>
-                        )}
-                      </TabsContent>
-
-                      {userData?.business_categories?.includes("product") && (
-                        <TabsContent
-                          value="products"
-                          className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
-                        >
-                          {userData && user && (
-                            <ShowProductsTabContent
-                              userId={userId}
-                              userData={userData}
-                              currentUserView={true}
-                            />
-                          )}
-                        </TabsContent>
-                      )}
-
-                      {userData?.business_categories?.includes("service") && (
-                        <TabsContent
-                          value="services"
-                          className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
-                        >
-                          {userData && user && (
-                            <ShowServicesTabContent
-                              userId={userId}
-                              userData={userData}
-                            />
-                          )}
-                        </TabsContent>
-                      )}
-
-                      <TabsContent
-                        value="saved"
-                        className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
-                      >
-                        <div className="space-y-4">
-                          {loadingSavedPosts
-                            ? renderLoading()
-                            : savedPosts.length === 0
-                              ? renderEmptyState(Bookmark, "No saved posts yet")
-                              : savedPosts.map(renderSavedPostCard)}
+                            {userData?.business_categories?.includes(
+                              "service"
+                            ) && (
+                              <TabsTrigger
+                                value="services"
+                                className={cn(
+                                  "rounded-none border-b-2 border-transparent",
+                                  "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
+                                  "px-6 py-3 font-medium text-sm transition-all duration-200"
+                                )}
+                              >
+                                <Settings className="w-4 h-4 mr-2" />
+                                Services
+                              </TabsTrigger>
+                            )}
+                            <TabsTrigger
+                              value="saved"
+                              className={cn(
+                                "rounded-none border-b-2 border-transparent",
+                                "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
+                                "px-6 py-3 font-medium text-sm transition-all duration-200"
+                              )}
+                            >
+                              <Bookmark className="w-4 h-4 mr-2" />
+                              Saved
+                            </TabsTrigger>
+                            <TabsTrigger
+                              value="orders"
+                              className={cn(
+                                "rounded-none border-b-2 border-transparent",
+                                "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
+                                "px-6 py-3 font-medium text-sm transition-all duration-200"
+                              )}
+                            >
+                              <ShoppingCart className="w-4 h-4 mr-2" />
+                              Orders
+                            </TabsTrigger>
+                          </TabsList>
                         </div>
-                      </TabsContent>
-                    </Tabs>
-                  </Card>
+
+                        <TabsContent
+                          value="posts"
+                          className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                        >
+                          {renderPosts}
+                        </TabsContent>
+
+                        <TabsContent
+                          value="likes"
+                          className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                        >
+                          <div className="space-y-4">
+                            {likedPosts.length === 0
+                              ? renderEmptyState(Heart, "No liked posts yet")
+                              : likedPosts.map((post, index) => (
+                                  <Card
+                                    key={index}
+                                    className="cursor-pointer hover:shadow-md transition-shadow border border-gray-100"
+                                  >
+                                    <CardContent className="pt-6">
+                                      <ProfilePosts
+                                        post={post}
+                                        userData={userData}
+                                      />
+                                    </CardContent>
+                                  </Card>
+                                ))}
+                          </div>
+                        </TabsContent>
+
+                        <TabsContent
+                          value="photos"
+                          className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                        >
+                          {userData && (
+                            <>
+                              {loadingPhotos ? (
+                                renderLoading()
+                              ) : (
+                                <>
+                                  <PhotosGrid
+                                    photos={userPhotos}
+                                    userId={userData.uid}
+                                    onPhotoDeleted={() => {}}
+                                    onAddPhoto={openAddPhotoModal}
+                                  />
+                                  {auth.currentUser && (
+                                    <AddPhotoModal
+                                      isOpen={isAddPhotoModalOpen}
+                                      onClose={closeAddPhotoModal}
+                                      userId={auth.currentUser.uid}
+                                    />
+                                  )}
+                                </>
+                              )}
+                            </>
+                          )}
+                        </TabsContent>
+
+                        {userData?.business_categories?.includes("product") && (
+                          <TabsContent
+                            value="products"
+                            className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                          >
+                            {userData && user && (
+                              <ShowProductsTabContent
+                                userId={userId}
+                                userData={userData}
+                                currentUserView={true}
+                              />
+                            )}
+                          </TabsContent>
+                        )}
+
+                        {userData?.business_categories?.includes("service") && (
+                          <TabsContent
+                            value="services"
+                            className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                          >
+                            {userData && user && (
+                              <ShowServicesTabContent
+                                userId={userId}
+                                userData={userData}
+                              />
+                            )}
+                          </TabsContent>
+                        )}
+
+                        <TabsContent
+                          value="saved"
+                          className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                        >
+                          <div className="space-y-4">
+                            {loadingSavedPosts
+                              ? renderLoading()
+                              : savedPosts.length === 0
+                                ? renderEmptyState(
+                                    Bookmark,
+                                    "No saved posts yet"
+                                  )
+                                : savedPosts.map(renderSavedPostCard)}
+                          </div>
+                        </TabsContent>
+                      </Tabs>
+                    </Card>
+                  </Suspense>
                 )}
 
                 {/* Saved Posts tab for regular users */}
                 {isEmailVerified && !isBusinessUser && (
-                  <Card className="border-0 shadow-sm overflow-hidden bg-white">
-                    <Tabs defaultValue="saved" className="w-full">
-                      <div className="border-b">
-                        <TabsList className="justify-start h-auto p-0 bg-transparent overflow-x-auto scrollbar-hide whitespace-nowrap">
-                          <TabsTrigger
-                            value="saved"
-                            className={cn(
-                              "rounded-none border-b-2 border-transparent",
-                              "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                              "px-6 py-3 font-medium text-sm transition-all duration-200"
-                            )}
-                          >
-                            <Bookmark className="w-4 h-4 mr-2" />
-                            Saved Posts
-                          </TabsTrigger>
-                          <TabsTrigger
-                            value="likes"
-                            className={cn(
-                              "rounded-none border-b-2 border-transparent",
-                              "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                              "px-6 py-3 font-medium text-sm transition-all duration-200"
-                            )}
-                          >
-                            <HeartIcon className="w-4 h-4 mr-2" />
-                            Likes
-                          </TabsTrigger>
-                          <TabsTrigger
-                            value="orders"
-                            className={cn(
-                              "rounded-none border-b-2 border-transparent",
-                              "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                              "px-6 py-3 font-medium text-sm transition-all duration-200"
-                            )}
-                          >
-                            <ShoppingCart className="w-4 h-4 mr-2" />
-                            Orders
-                          </TabsTrigger>
-                        </TabsList>
-                      </div>
-
-                      <TabsContent
-                        value="saved"
-                        className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
-                      >
-                        <div className="space-y-4">
-                          {loadingSavedPosts
-                            ? renderLoading()
-                            : savedPosts.length === 0
-                              ? renderEmptyState(Bookmark, "No saved posts yet")
-                              : savedPosts.map(renderSavedPostCard)}
+                  <Suspense fallback={<LoadingSpinner />}>
+                    <Card className="border-0 shadow-sm overflow-hidden bg-white">
+                      <Tabs defaultValue="saved" className="w-full">
+                        <div className="border-b">
+                          <TabsList className="justify-start h-auto p-0 bg-transparent overflow-x-auto scrollbar-hide whitespace-nowrap">
+                            <TabsTrigger
+                              value="saved"
+                              className={cn(
+                                "rounded-none border-b-2 border-transparent",
+                                "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
+                                "px-6 py-3 font-medium text-sm transition-all duration-200"
+                              )}
+                            >
+                              <Bookmark className="w-4 h-4 mr-2" />
+                              Saved Posts
+                            </TabsTrigger>
+                            <TabsTrigger
+                              value="likes"
+                              className={cn(
+                                "rounded-none border-b-2 border-transparent",
+                                "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
+                                "px-6 py-3 font-medium text-sm transition-all duration-200"
+                              )}
+                            >
+                              <HeartIcon className="w-4 h-4 mr-2" />
+                              Likes
+                            </TabsTrigger>
+                            <TabsTrigger
+                              value="orders"
+                              className={cn(
+                                "rounded-none border-b-2 border-transparent",
+                                "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
+                                "px-6 py-3 font-medium text-sm transition-all duration-200"
+                              )}
+                            >
+                              <ShoppingCart className="w-4 h-4 mr-2" />
+                              Orders
+                            </TabsTrigger>
+                          </TabsList>
                         </div>
-                      </TabsContent>
 
-                      <TabsContent
-                        value="likes"
-                        className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
-                      >
-                        <div className="space-y-4">
-                          {likedPosts.length === 0
-                            ? renderEmptyState(Heart, "No liked posts yet")
-                            : likedPosts.map((post, index) => (
+                        <TabsContent
+                          value="saved"
+                          className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                        >
+                          <div className="space-y-4">
+                            {loadingSavedPosts
+                              ? renderLoading()
+                              : savedPosts.length === 0
+                                ? renderEmptyState(
+                                    Bookmark,
+                                    "No saved posts yet"
+                                  )
+                                : savedPosts.map(renderSavedPostCard)}
+                          </div>
+                        </TabsContent>
+
+                        <TabsContent
+                          value="likes"
+                          className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                        >
+                          <div className="space-y-4">
+                            {likedPosts.length === 0
+                              ? renderEmptyState(Heart, "No liked posts yet")
+                              : likedPosts.map((post, index) => (
+                                  <Card
+                                    key={index}
+                                    className="cursor-pointer hover:shadow-md transition-shadow border border-gray-100"
+                                  >
+                                    <CardContent className="pt-6">
+                                      <ProfilePosts
+                                        post={post}
+                                        userData={userData}
+                                      />
+                                    </CardContent>
+                                  </Card>
+                                ))}
+                          </div>
+                        </TabsContent>
+
+                        <TabsContent
+                          value="orders"
+                          className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                        >
+                          {loadingOrders ? (
+                            renderLoading()
+                          ) : orders.length === 0 ? (
+                            renderEmptyState(ShoppingCart, "No orders yet")
+                          ) : (
+                            <div className="space-y-6">
+                              <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-lg font-semibold">
+                                  Your Orders
+                                </h2>
+                              </div>
+
+                              {orders.map((order) => (
                                 <Card
-                                  key={index}
-                                  className="cursor-pointer hover:shadow-md transition-shadow border border-gray-100"
+                                  key={order.id}
+                                  className="overflow-hidden"
                                 >
-                                  <CardContent className="pt-6">
-                                    <ProfilePosts
-                                      post={post}
-                                      userData={userData}
-                                    />
+                                  <CardHeader className="bg-gray-50 py-3">
+                                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                                      <div>
+                                        <div className="flex items-center">
+                                          <h3 className="font-medium text-sm sm:text-base">
+                                            Order #
+                                            {order.orderId.substring(0, 8)}
+                                            ...
+                                          </h3>
+                                          <Badge
+                                            variant={
+                                              order.status === "completed"
+                                                ? "success"
+                                                : "outline"
+                                            }
+                                            className="ml-2"
+                                          >
+                                            {order.status === "completed"
+                                              ? "Completed"
+                                              : order.status}
+                                          </Badge>
+                                        </div>
+                                        <p className="text-xs sm:text-sm text-muted-foreground">
+                                          {format(
+                                            new Date(order.timestamp),
+                                            "MMM d, yyyy · h:mm a"
+                                          )}
+                                        </p>
+                                      </div>
+                                      <div className="text-right">
+                                        <p className="font-semibold text-sm sm:text-base">
+                                          ₹{order.amount?.toFixed(2)}
+                                        </p>
+                                        <p className="text-xs sm:text-sm text-muted-foreground">
+                                          {order.businessName}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </CardHeader>
+                                  <CardContent className="p-0">
+                                    <div className="px-4 py-3 border-b">
+                                      <div className="flex justify-between items-center">
+                                        <h4 className="text-sm font-medium">
+                                          Items
+                                        </h4>
+                                        <span className="text-xs text-muted-foreground">
+                                          {order.products?.length || 0} item(s)
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <div className="divide-y">
+                                      {order.products?.map((product, idx) => (
+                                        <div
+                                          key={idx}
+                                          className="p-4 flex items-center gap-3"
+                                        >
+                                          <div className="relative w-12 h-12 bg-gray-100 rounded overflow-hidden flex-shrink-0">
+                                            {product.imageUrl ? (
+                                              <Image
+                                                src={product.imageUrl}
+                                                alt={product.productName}
+                                                fill
+                                                className="object-cover"
+                                              />
+                                            ) : (
+                                              <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                                <Package className="w-6 h-6" />
+                                              </div>
+                                            )}
+                                          </div>
+                                          <div className="flex-grow">
+                                            <h5 className="font-medium text-sm">
+                                              {product.productName}
+                                            </h5>
+                                            <div className="flex items-center text-sm text-muted-foreground">
+                                              <span>
+                                                ₹{product.amount?.toFixed(2)} ×{" "}
+                                                {product.quantity}
+                                              </span>
+                                            </div>
+                                          </div>
+                                          <div className="text-right">
+                                            <p className="font-medium">
+                                              ₹
+                                              {(
+                                                product.amount *
+                                                product.quantity
+                                              ).toFixed(2)}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                    <div className="border-t p-4 bg-gray-50">
+                                      <div className="flex justify-between">
+                                        <span className="text-sm font-medium">
+                                          Total
+                                        </span>
+                                        <span className="font-semibold">
+                                          ₹{order.amount?.toFixed(2)}
+                                        </span>
+                                      </div>
+                                    </div>
                                   </CardContent>
                                 </Card>
                               ))}
-                        </div>
-                      </TabsContent>
-
-                      <TabsContent
-                        value="orders"
-                        className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
-                      >
-                        {loadingOrders ? (
-                          renderLoading()
-                        ) : orders.length === 0 ? (
-                          renderEmptyState(ShoppingCart, "No orders yet")
-                        ) : (
-                          <div className="space-y-6">
-                            <div className="flex justify-between items-center mb-4">
-                              <h2 className="text-lg font-semibold">
-                                Your Orders
-                              </h2>
                             </div>
-
-                            {orders.map((order) => (
-                              <Card key={order.id} className="overflow-hidden">
-                                <CardHeader className="bg-gray-50 py-3">
-                                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-                                    <div>
-                                      <div className="flex items-center">
-                                        <h3 className="font-medium text-sm sm:text-base">
-                                          Order #{order.orderId.substring(0, 8)}
-                                          ...
-                                        </h3>
-                                        <Badge
-                                          variant={
-                                            order.status === "completed"
-                                              ? "success"
-                                              : "outline"
-                                          }
-                                          className="ml-2"
-                                        >
-                                          {order.status === "completed"
-                                            ? "Completed"
-                                            : order.status}
-                                        </Badge>
-                                      </div>
-                                      <p className="text-xs sm:text-sm text-muted-foreground">
-                                        {format(
-                                          new Date(order.timestamp),
-                                          "MMM d, yyyy · h:mm a"
-                                        )}
-                                      </p>
-                                    </div>
-                                    <div className="text-right">
-                                      <p className="font-semibold text-sm sm:text-base">
-                                        ₹{order.amount?.toFixed(2)}
-                                      </p>
-                                      <p className="text-xs sm:text-sm text-muted-foreground">
-                                        {order.businessName}
-                                      </p>
-                                    </div>
-                                  </div>
-                                </CardHeader>
-                                <CardContent className="p-0">
-                                  <div className="px-4 py-3 border-b">
-                                    <div className="flex justify-between items-center">
-                                      <h4 className="text-sm font-medium">
-                                        Items
-                                      </h4>
-                                      <span className="text-xs text-muted-foreground">
-                                        {order.products?.length || 0} item(s)
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <div className="divide-y">
-                                    {order.products?.map((product, idx) => (
-                                      <div
-                                        key={idx}
-                                        className="p-4 flex items-center gap-3"
-                                      >
-                                        <div className="relative w-12 h-12 bg-gray-100 rounded overflow-hidden flex-shrink-0">
-                                          {product.imageUrl ? (
-                                            <Image
-                                              src={product.imageUrl}
-                                              alt={product.productName}
-                                              fill
-                                              className="object-cover"
-                                            />
-                                          ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                              <Package className="w-6 h-6" />
-                                            </div>
-                                          )}
-                                        </div>
-                                        <div className="flex-grow">
-                                          <h5 className="font-medium text-sm">
-                                            {product.productName}
-                                          </h5>
-                                          <div className="flex items-center text-sm text-muted-foreground">
-                                            <span>
-                                              ₹{product.amount?.toFixed(2)} ×{" "}
-                                              {product.quantity}
-                                            </span>
-                                          </div>
-                                        </div>
-                                        <div className="text-right">
-                                          <p className="font-medium">
-                                            ₹
-                                            {(
-                                              product.amount * product.quantity
-                                            ).toFixed(2)}
-                                          </p>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                  <div className="border-t p-4 bg-gray-50">
-                                    <div className="flex justify-between">
-                                      <span className="text-sm font-medium">
-                                        Total
-                                      </span>
-                                      <span className="font-semibold">
-                                        ₹{order.amount?.toFixed(2)}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            ))}
-                          </div>
-                        )}
-                      </TabsContent>
-                    </Tabs>
-                  </Card>
+                          )}
+                        </TabsContent>
+                      </Tabs>
+                    </Card>
+                  </Suspense>
                 )}
               </>
             )}
@@ -1254,6 +1406,14 @@ export default function Profile() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Franchise Modal */}
+      <Suspense fallback={<LoadingSpinner />}>
+        <FranchiseModal
+          isOpen={isFranchiseModalOpen}
+          onOpenChange={setIsFranchiseModalOpen}
+        />
+      </Suspense>
     </div>
   );
 }
