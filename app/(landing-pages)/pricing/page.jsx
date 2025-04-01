@@ -312,7 +312,7 @@ export default function PricingPage() {
 
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-      <div className="min-h-screen transition-colors duration-300 bg-white dark:bg-black">
+      <div className="min-h-screen transition-colors duration-300 bg-white">
         <div className="mx-auto max-w-7xl px-6 lg:px-8 py-24">
           <motion.div
             className="mx-auto max-w-4xl text-center"
@@ -321,32 +321,30 @@ export default function PricingPage() {
             variants={fadeIn}
           >
             <motion.button
-              className="relative inline-flex h-9 w-48 overflow-hidden rounded-lg p-[2px] focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2 focus:ring-offset-slate-50 dark:focus:ring-offset-black"
+              className="relative inline-flex h-9 w-48 overflow-hidden rounded-lg p-[2px] focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2 focus:ring-offset-slate-50"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
               <span className="absolute inset-[-1000%] animate-[spin_2s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,#E2CBFF_0%,#393BB2_50%,#E2CBFF_100%)] opacity-100" />
-              <span className="inline-flex h-full w-full cursor-pointer items-center justify-center rounded-lg bg-white dark:bg-black px-3 py-1 text-sm font-medium text-black dark:text-white backdrop-blur-3xl">
+              <span className="inline-flex h-full w-full cursor-pointer items-center justify-center rounded-lg bg-white px-3 py-1 text-sm font-medium text-black backdrop-blur-3xl">
                 PRICING
               </span>
             </motion.button>
-            <h1 className="mt-8 text-4xl font-bold tracking-tight text-black dark:text-white sm:text-6xl">
+            <h1 className="mt-8 text-4xl font-bold tracking-tight text-black sm:text-6xl">
               Simple, transparent pricing
             </h1>
-            <p className="mt-6 text-lg leading-8 text-gray-600 dark:text-gray-300">
+            <p className="mt-6 text-lg leading-8 text-gray-600">
               Choose the plan that's right for you
             </p>
             <div className="mt-10 flex items-center justify-center gap-x-6">
               <motion.div
-                className="flex items-center gap-4 rounded-lg p-1 bg-gray-100 dark:bg-black/40 ring-1 ring-purple-500/20"
+                className="flex items-center gap-4 rounded-lg p-1 bg-gray-100/40 ring-1 ring-purple-500/20"
                 whileHover={{ scale: 1.02 }}
               >
                 <button
                   onClick={() => setIsMonthly(true)}
                   className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
-                    isMonthly
-                      ? "bg-white dark:bg-black text-black dark:text-white"
-                      : "text-gray-600 dark:text-gray-300"
+                    isMonthly ? "bg-white text-black" : "text-gray-600"
                   }`}
                 >
                   Monthly
@@ -354,9 +352,7 @@ export default function PricingPage() {
                 <button
                   onClick={() => setIsMonthly(false)}
                   className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
-                    !isMonthly
-                      ? "bg-white dark:bg-black text-black dark:text-white"
-                      : "text-gray-600 dark:text-gray-300"
+                    !isMonthly ? "bg-white text-black" : "text-gray-600"
                   }`}
                 >
                   Yearly
@@ -377,8 +373,8 @@ export default function PricingPage() {
                 whileHover={{ scale: 1.02 }}
                 className={`rounded-xl p-8 ring-1 h-fit transition-colors duration-300 ${
                   tier.highlight
-                    ? "ring-2 ring-purple-500 bg-white dark:bg-black relative"
-                    : "ring-gray-200 dark:ring-gray-800 bg-white dark:bg-black hover:bg-gray-50 dark:hover:bg-black/80"
+                    ? "ring-2 ring-purple-500 bg-white relative"
+                    : "ring-gray-200 bg-white hover:bg-gray-50"
                 }`}
               >
                 {tier.highlight && (
@@ -388,17 +384,17 @@ export default function PricingPage() {
                     </div>
                   </div>
                 )}
-                <h3 className="text-lg font-semibold leading-8 text-purple-600 dark:text-purple-400">
+                <h3 className="text-lg font-semibold leading-8 text-purple-600">
                   {tier.name}
                 </h3>
-                <p className="mt-1 text-sm leading-6 text-gray-600 dark:text-gray-300">
+                <p className="mt-1 text-sm leading-6 text-gray-600">
                   {tier.description}
                 </p>
                 <p className="mt-6 flex items-baseline gap-x-1">
-                  <span className="text-4xl font-bold tracking-tight text-black dark:text-white">
+                  <span className="text-4xl font-bold tracking-tight text-black">
                     ₹{isMonthly ? tier.price.monthly : tier.price.yearly}
                   </span>
-                  <span className="text-sm font-semibold leading-6 text-gray-600 dark:text-gray-300">
+                  <span className="text-sm font-semibold leading-6 text-gray-600">
                     /{isMonthly ? "month" : "year"}
                   </span>
                 </p>
@@ -406,7 +402,7 @@ export default function PricingPage() {
                   variants={container}
                   initial="hidden"
                   animate="show"
-                  className="mt-8 space-y-3 text-sm leading-6 text-gray-600 dark:text-gray-300"
+                  className="mt-8 space-y-3 text-sm leading-6 text-gray-600"
                 >
                   {tier.features.map((feature, featureIndex) => (
                     <Feature key={featureIndex}>{feature}</Feature>
@@ -422,7 +418,7 @@ export default function PricingPage() {
                       className={`w-full ${
                         tier.highlight
                           ? "bg-gradient-to-r from-purple-500 to-pink-500 hover:opacity-90 text-white"
-                          : "bg-white dark:bg-black text-black dark:text-white ring-1 ring-gray-200 dark:ring-gray-800 hover:bg-gray-50 dark:hover:bg-black/80"
+                          : "bg-white text-black ring-1 ring-gray-200 hover:bg-gray-50"
                       }`}
                       variant={tier.highlight ? "default" : "outline"}
                       onClick={tier.cta.onClick}
@@ -453,7 +449,7 @@ export default function PricingPage() {
             ))}
           </motion.div>
           <motion.div
-            className="mt-16 flex items-center justify-center gap-2 text-gray-500 dark:text-gray-400"
+            className="mt-16 flex items-center justify-center gap-2 text-gray-500"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}

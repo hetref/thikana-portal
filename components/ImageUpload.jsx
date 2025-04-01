@@ -72,8 +72,8 @@ export default function ImageUpload({
           <div
             className={
               isCover
-                ? "w-full h-[200px] relative mb-2 bg-gray-100 dark:bg-gray-800 flex items-center justify-center rounded-md"
-                : "w-20 h-20 relative flex-shrink-0 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center"
+                ? "w-full h-[200px] relative mb-2 bg-gray-100 flex items-center justify-center rounded-md"
+                : "w-20 h-20 relative flex-shrink-0 bg-gray-100 rounded-full flex items-center justify-center"
             }
           >
             <span className="text-gray-400 text-xs">No image</span>

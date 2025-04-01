@@ -23,7 +23,7 @@ export const TextHoverEffect = ({ children, className }) => {
     <motion.span
       animate={controls}
       onMouseOver={() => rubberBand()}
-      className={cn("dark:text-white text-black cursor-pointer inline-block", className)}
+      className={cn("text-black cursor-pointer inline-block", className)}
     >
       {children}
     </motion.span>

@@ -1,20 +1,20 @@
-"use client"
+"use client";
 
-import React from 'react'
-import { HoverBorderGradient } from './ui/hover-border-gradient'
-import { motion as m } from 'framer-motion'
-import Image from 'next/image'
-import { RainbowButton } from './ui/rainbow-button'
-import { AuroraBackground } from './ui/aurora-background'
+import React from "react";
+import { HoverBorderGradient } from "./ui/hover-border-gradient";
+import { motion as m } from "framer-motion";
+import Image from "next/image";
+import { RainbowButton } from "./ui/rainbow-button";
+import { AuroraBackground } from "./ui/aurora-background";
 
 const companies = [
-  { name: 'Company 1', logo: '/company/company1.png' },
-  { name: 'Company 2', logo: '/company/company2.png' },
-  { name: 'Company 3', logo: '/company/company3.png' },
-  { name: 'Company 4', logo: '/company/company4.png' },
-  { name: 'Company 5', logo: '/company/company5.png' },
+  { name: "Company 1", logo: "/company/company1.png" },
+  { name: "Company 2", logo: "/company/company2.png" },
+  { name: "Company 3", logo: "/company/company3.png" },
+  { name: "Company 4", logo: "/company/company4.png" },
+  { name: "Company 5", logo: "/company/company5.png" },
   // Add more companies as needed
-]
+];
 
 const BackgroundCircles = () => {
   return (
@@ -62,12 +62,12 @@ const BackgroundCircles = () => {
         }}
       />
     </div>
-  )
-}
+  );
+};
 
 const Hero = () => {
   return (
-    <div className="bg-white dark:bg-black transition-colors duration-300 relative">
+    <div className="bg-white transition-colors duration-300 relative">
       <BackgroundCircles />
       <div className="max-w-7xl mx-auto px-4">
         <div className="min-h-[100vh] flex flex-col items-center justify-center pt-16 pb-32">
@@ -76,15 +76,16 @@ const Hero = () => {
               ✨ Manage business smarter
             </HoverBorderGradient>
           </div>
-          <div className="text-black dark:text-white max-w-5xl text-center">
-            <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold mb-8 text-black dark:text-white">
+          <div className="text-black max-w-5xl text-center">
+            <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold mb-8 text-black">
               Smart Business with <br />
               <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-500 to-pink-500 inline-block mt-2">
                 Thikana
               </span>
             </h1>
-            <p className="text-lg md:text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto mb-12">
-              Effortlessly streamline your Business management with Thikana.<br />
+            <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto mb-12">
+              Effortlessly streamline your Business management with Thikana.
+              <br />
               Shorten, track, and organize all your Products in one place.
             </p>
             <div className="flex justify-center">
@@ -115,9 +116,7 @@ const Hero = () => {
       <div className="w-full bg-black py-16">
         <div className="text-sm mb-8 flex justify-center">
           <HoverBorderGradient>
-            <span className="text-white">
-              Trusted By Companies
-            </span>
+            <span className="text-white">Trusted By Companies</span>
           </HoverBorderGradient>
         </div>
 
@@ -149,7 +148,7 @@ const Hero = () => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default Hero
+export default Hero;

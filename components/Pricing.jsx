@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Check, CreditCard } from "lucide-react";
-import { HoverBorderGradient } from './ui/hover-border-gradient'
+import { HoverBorderGradient } from "./ui/hover-border-gradient";
 
 const fadeIn = {
   initial: { opacity: 0, y: 20 },
@@ -42,13 +42,13 @@ const Pricing = () => {
         yearly: 0,
       },
       description: "For small events",
-      features: [      
+      features: [
         "Basic features",
         "Access to limited templates",
         "Email support",
         "Event scheduling",
         "Basic analytics",
-        "Custom Form Builder"
+        "Custom Form Builder",
       ],
       cta: {
         text: "Get Started",
@@ -105,30 +105,26 @@ const Pricing = () => {
       >
         <div className="text-sm mb-4 flex justify-center">
           <HoverBorderGradient>
-            <span className="px-4">
-              Pricing
-            </span>
+            <span className="px-4">Pricing</span>
           </HoverBorderGradient>
         </div>
-        
-        <h1 className="mt-8 text-4xl font-bold tracking-tight text-black dark:text-white sm:text-6xl">
+
+        <h1 className="mt-8 text-4xl font-bold tracking-tight text-black sm:text-6xl">
           Simple, transparent pricing
         </h1>
-        <p className="mt-6 text-lg leading-8 text-gray-600 dark:text-gray-300">
+        <p className="mt-6 text-lg leading-8 text-gray-600">
           Choose the plan that's right for you
         </p>
 
         <div className="mt-10 flex items-center justify-center gap-x-6">
           <motion.div
-            className="flex items-center gap-4 rounded-lg p-1 bg-gray-100 dark:bg-black/40 ring-1 ring-purple-500/20"
+            className="flex items-center gap-4 rounded-lg p-1 bg-gray-100 ring-1 ring-purple-500/20"
             whileHover={{ scale: 1.02 }}
           >
             <button
               onClick={() => setIsMonthly(true)}
               className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
-                isMonthly 
-                  ? "bg-white dark:bg-black text-black dark:text-white" 
-                  : "text-gray-600 dark:text-gray-300"
+                isMonthly ? "bg-white text-black" : "text-gray-600"
               }`}
             >
               Monthly
@@ -136,9 +132,7 @@ const Pricing = () => {
             <button
               onClick={() => setIsMonthly(false)}
               className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
-                !isMonthly 
-                  ? "bg-white dark:bg-black text-black dark:text-white" 
-                  : "text-gray-600 dark:text-gray-300"
+                !isMonthly ? "bg-white text-black" : "text-gray-600"
               }`}
             >
               Yearly
@@ -160,8 +154,8 @@ const Pricing = () => {
             whileHover={{ scale: 1.02 }}
             className={`rounded-xl p-6 ring-1 h-fit transition-colors duration-300 ${
               tier.highlight
-                ? "ring-2 ring-purple-500 bg-white dark:bg-black relative"
-                : "ring-gray-200 dark:ring-gray-800 bg-white dark:bg-black hover:bg-gray-50 dark:hover:bg-black/80"
+                ? "ring-2 ring-purple-500 bg-white relative"
+                : "ring-gray-200 bg-white hover:bg-gray-50"
             }`}
           >
             {tier.highlight && (
@@ -171,17 +165,17 @@ const Pricing = () => {
                 </div>
               </div>
             )}
-            <h3 className="text-lg font-semibold leading-8 text-purple-600 dark:text-purple-400">
+            <h3 className="text-lg font-semibold leading-8 text-purple-600">
               {tier.name}
             </h3>
-            <p className="mt-1 text-sm leading-6 text-gray-600 dark:text-gray-300">
+            <p className="mt-1 text-sm leading-6 text-gray-600">
               {tier.description}
             </p>
             <p className="mt-6 flex items-baseline gap-x-1">
-              <span className="text-4xl font-bold tracking-tight text-black dark:text-white">
+              <span className="text-4xl font-bold tracking-tight text-black">
                 ₹{isMonthly ? tier.price.monthly : tier.price.yearly}
               </span>
-              <span className="text-sm font-semibold leading-6 text-gray-600 dark:text-gray-300">
+              <span className="text-sm font-semibold leading-6 text-gray-600">
                 /{isMonthly ? "month" : "year"}
               </span>
             </p>
@@ -189,7 +183,7 @@ const Pricing = () => {
               variants={container}
               initial="hidden"
               animate="show"
-              className="mt-8 space-y-3 text-sm leading-6 text-gray-600 dark:text-gray-300"
+              className="mt-8 space-y-3 text-sm leading-6 text-gray-600"
             >
               {tier.features.map((feature, featureIndex) => (
                 <Feature key={featureIndex}>{feature}</Feature>
@@ -204,7 +198,7 @@ const Pricing = () => {
                 className={`w-full ${
                   tier.highlight
                     ? "bg-gradient-to-r from-purple-500 to-pink-500 hover:opacity-90 text-white"
-                    : "bg-white dark:bg-black text-black dark:text-white ring-1 ring-gray-200 dark:ring-gray-800 hover:bg-gray-50 dark:hover:bg-black/80"
+                    : "bg-white text-black ring-1 ring-gray-200 hover:bg-gray-50"
                 }`}
                 variant={tier.highlight ? "default" : "outline"}
               >
@@ -216,7 +210,7 @@ const Pricing = () => {
       </motion.div>
 
       <motion.div
-        className="mt-16 flex items-center justify-center gap-2 text-gray-500 dark:text-gray-400"
+        className="mt-16 flex items-center justify-center gap-2 text-gray-500"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5 }}
@@ -228,4 +222,4 @@ const Pricing = () => {
   );
 };
 
-export default Pricing; 
+export default Pricing;

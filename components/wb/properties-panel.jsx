@@ -48,11 +48,11 @@ export function PropertiesPanel({
   const isPanelForElement = !!selectedElement;
 
   const inputClassName =
-    "mt-1 text-base text-black bg-white border border-gray-300 dark:text-white dark:bg-gray-800";
+    "mt-1 text-base text-black bg-white border border-gray-300";
   const selectClassName =
-    "w-full mt-1 p-2 text-base text-black bg-white border border-gray-300 dark:text-white dark:bg-gray-800 rounded-md";
+    "w-full mt-1 p-2 text-base text-black bg-white border border-gray-300 rounded-md";
   const textareaClassName =
-    "mt-1 text-base text-black bg-white border border-gray-300 dark:text-white dark:bg-gray-800 resize-vertical h-32";
+    "mt-1 text-base text-black bg-white border border-gray-300 resize-vertical h-32";
   const checkboxClassName =
     "w-4 h-4 mr-2 border border-gray-300 rounded-sm text-primary";
 

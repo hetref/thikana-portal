@@ -335,7 +335,7 @@ export default function BasicInfoForm() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto bg-white dark:bg-gray-900 rounded-lg shadow-sm p-6">
+    <div className="max-w-3xl mx-auto bg-white rounded-lg shadow-sm p-6">
       <h2 className="text-2xl font-semibold mb-6">Business Profile</h2>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -359,7 +359,7 @@ export default function BasicInfoForm() {
             </div>
 
             {uploadingType && (
-              <div className="md:col-span-2 bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md">
+              <div className="md:col-span-2 bg-blue-50 p-3 rounded-md">
                 <div className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span>
@@ -382,7 +382,7 @@ export default function BasicInfoForm() {
                       placeholder="John Doe"
                       {...field}
                       disabled={isSubmitting}
-                      className="bg-gray-50 dark:bg-gray-800"
+                      className="bg-gray-50"
                     />
                   </FormControl>
                   <FormMessage />
@@ -401,7 +401,7 @@ export default function BasicInfoForm() {
                       placeholder="Acme Inc."
                       {...field}
                       disabled={isSubmitting}
-                      className="bg-gray-50 dark:bg-gray-800"
+                      className="bg-gray-50"
                     />
                   </FormControl>
                   <FormMessage />
@@ -420,7 +420,7 @@ export default function BasicInfoForm() {
                       placeholder="+1234567890"
                       {...field}
                       disabled={isSubmitting}
-                      className="bg-gray-50 dark:bg-gray-800"
+                      className="bg-gray-50"
                     />
                   </FormControl>
                   <FormMessage />
@@ -439,7 +439,7 @@ export default function BasicInfoForm() {
                       placeholder="https://www.example.com"
                       {...field}
                       disabled={isSubmitting}
-                      className="bg-gray-50 dark:bg-gray-800"
+                      className="bg-gray-50"
                     />
                   </FormControl>
                   <FormMessage />
@@ -458,7 +458,7 @@ export default function BasicInfoForm() {
                       placeholder="123 Business St, City, Country"
                       {...field}
                       disabled={isSubmitting}
-                      className="bg-gray-50 dark:bg-gray-800"
+                      className="bg-gray-50"
                     />
                   </FormControl>
                   <FormMessage />
@@ -478,7 +478,7 @@ export default function BasicInfoForm() {
                         placeholder="Tell us about your business..."
                         {...field}
                         disabled={isSubmitting}
-                        className="bg-gray-50 dark:bg-gray-800 min-h-[100px]"
+                        className="bg-gray-50 min-h-[100px]"
                       />
                     </FormControl>
                     <FormDescription>Max 500 characters</FormDescription>
@@ -501,7 +501,7 @@ export default function BasicInfoForm() {
                           placeholder="Tell us about your business in detail..."
                           {...field}
                           disabled={isSubmitting}
-                          className="bg-gray-50 dark:bg-gray-800 min-h-[150px]"
+                          className="bg-gray-50 min-h-[150px]"
                         />
                         <Button
                           type="button"
@@ -542,7 +542,7 @@ export default function BasicInfoForm() {
                 </Button>
               </div>
 
-              <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-md">
+              <div className="p-4 bg-gray-50 rounded-md">
                 <div className="flex flex-wrap gap-2">
                   {businessTags.map((tag, index) => (
                     <Badge
@@ -594,7 +594,7 @@ export default function BasicInfoForm() {
                   ))}
 
                   {businessTags.length === 0 && (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="text-sm text-gray-500">
                       No tags yet. Generate tags from your business description
                       or add custom tags.
                     </p>
@@ -635,7 +635,7 @@ export default function BasicInfoForm() {
 
             <div className="md:col-span-2">
               <FormLabel>Business Category</FormLabel>
-              <div className="mt-2 space-y-2 p-4 bg-gray-50 dark:bg-gray-800 rounded-md">
+              <div className="mt-2 space-y-2 p-4 bg-gray-50 rounded-md">
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="serviceBasedBusiness"
@@ -672,7 +672,7 @@ export default function BasicInfoForm() {
             </div>
           </div>
 
-          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="pt-4 border-t border-gray-200">
             <Button
               type="submit"
               disabled={isSubmitting}

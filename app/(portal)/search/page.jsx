@@ -79,9 +79,9 @@ const Hit = ({ hit, userLocation, googleMapsService }) => {
       href={`/${hit.username || "business"}?user=${hit.objectID || hit.id}`}
       className="block"
     >
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 p-4 border border-gray-100 dark:border-gray-700">
+      <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 p-4 border border-gray-100">
         <div className="flex items-center gap-4">
-          {/* <div className="relative h-16 w-16 flex-shrink-0 rounded-full overflow-hidden border border-gray-200 dark:border-gray-700">
+          {/* <div className="relative h-16 w-16 flex-shrink-0 rounded-full overflow-hidden border border-gray-200">
             <Image
               src={
                 hit.profilePic ||
@@ -95,30 +95,30 @@ const Hit = ({ hit, userLocation, googleMapsService }) => {
           <div className="flex-1">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-1">
               <div>
-                <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                <h3 className="font-semibold text-gray-900">
                   {hit.businessName}
                 </h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-sm text-gray-500">
                   @{hit.username || "business"}
                 </p>
               </div>
-              <div className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-full capitalize">
+              <div className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-full capitalize">
                 {hit.plan || "basic"} plan
               </div>
             </div>
             <div className="mt-2 flex flex-wrap gap-2 items-center">
-              <div className="text-xs px-2 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 rounded-full flex items-center gap-1">
+              <div className="text-xs px-2 py-1 bg-blue-50 text-blue-600 rounded-full flex items-center gap-1">
                 <Briefcase className="w-3 h-3" />
                 {hit.business_type || hit.businessType || "Business"}
               </div>
               {loading && (
-                <div className="text-xs px-2 py-1 bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 rounded-full flex items-center gap-1">
+                <div className="text-xs px-2 py-1 bg-gray-50 text-gray-500 rounded-full flex items-center gap-1">
                   <div className="w-2 h-2 rounded-full bg-gray-400 animate-pulse mr-1"></div>
                   Calculating...
                 </div>
               )}
               {distance && !loading && (
-                <div className="text-xs px-2 py-1 bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-300 rounded-full flex items-center gap-1">
+                <div className="text-xs px-2 py-1 bg-green-50 text-green-600 rounded-full flex items-center gap-1">
                   <Navigation className="w-3 h-3 mr-1" />
                   {distance.text}
                 </div>
@@ -142,10 +142,10 @@ const CustomSearchBox = ({ ...props }) => (
         root: "w-full",
         form: "w-full",
         input:
-          "w-full pl-10 pr-4 py-3 rounded-lg border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100",
+          "w-full pl-10 pr-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white text-gray-900",
         submit: "hidden",
         reset:
-          "absolute right-3 top-1/2 -translate-y-1/2 p-1 bg-gray-100 dark:bg-gray-700 rounded-full text-gray-600 dark:text-gray-300",
+          "absolute right-3 top-1/2 -translate-y-1/2 p-1 bg-gray-100 rounded-full text-gray-600",
         loadingIndicator: "absolute right-12 top-1/2 -translate-y-1/2",
       }}
       placeholder="Search for businesses..."
@@ -157,10 +157,8 @@ const CustomSearchBox = ({ ...props }) => (
 const CustomRefinementList = ({ ...props }) => (
   <div className="mb-6">
     <div className="flex items-center gap-2 mb-3">
-      <Filter className="w-4 h-4 text-gray-700 dark:text-gray-300" />
-      <h3 className="font-medium text-gray-900 dark:text-gray-100">
-        Business Type
-      </h3>
+      <Filter className="w-4 h-4 text-gray-700" />
+      <h3 className="font-medium text-gray-900">Business Type</h3>
     </div>
     <RefinementList
       {...props}
@@ -170,10 +168,10 @@ const CustomRefinementList = ({ ...props }) => (
         item: "flex items-center",
         label: "flex items-center cursor-pointer",
         checkbox:
-          "w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary bg-white dark:bg-gray-800",
-        labelText: "ml-2 text-sm text-gray-700 dark:text-gray-300",
+          "w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary bg-white",
+        labelText: "ml-2 text-sm text-gray-700",
         count:
-          "ml-auto text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded-full",
+          "ml-auto text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full",
       }}
       operator="or"
       showMore
@@ -295,9 +293,9 @@ const SearchPage = () => {
           <Configure hitsPerPage={10} />
           {/* )} */}
 
-          <div className="bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-gray-800">
+          <div className="bg-white/50 backdrop-blur-sm rounded-2xl p-6 shadow-sm border border-gray-100">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              <h1 className="text-2xl font-bold text-gray-900">
                 Find Businesses
               </h1>
 
@@ -316,7 +314,7 @@ const SearchPage = () => {
               )}
 
               {userLocation && (
-                <div className="text-sm text-green-600 dark:text-green-400 flex items-center gap-2">
+                <div className="text-sm text-green-600 flex items-center gap-2">
                   <Navigation className="w-4 h-4" />
                   <span>Location active</span>
                   {googleLoading && (
@@ -337,15 +335,13 @@ const SearchPage = () => {
 
                   <div className="mb-6">
                     <div className="flex items-center gap-2 mb-3">
-                      <h3 className="font-medium text-gray-900 dark:text-gray-100">
-                        Sort By
-                      </h3>
+                      <h3 className="font-medium text-gray-900">Sort By</h3>
                     </div>
                     <SortBy
                       classNames={{
                         root: "w-full",
                         select:
-                          "w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100",
+                          "w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent bg-white text-gray-900",
                       }}
                       items={[
                         { label: "Featured", value: "business" },
@@ -364,10 +360,10 @@ const SearchPage = () => {
               </div>
 
               <div className="flex-1">
-                <div className="pb-4 mb-4 border-b border-gray-200 dark:border-gray-700">
+                <div className="pb-4 mb-4 border-b border-gray-200">
                   <Stats
                     classNames={{
-                      root: "text-sm text-gray-500 dark:text-gray-400",
+                      root: "text-sm text-gray-500",
                     }}
                     translations={{
                       stats: (nbHits) =>

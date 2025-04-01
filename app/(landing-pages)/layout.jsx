@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
 import TopNavbar from "@/components/TopNavbar";
-import Footer from "@/components/Footer"
-import { motion, AnimatePresence } from "framer-motion"
+import Footer from "@/components/Footer";
+import { motion, AnimatePresence } from "framer-motion";
 const LandingPageLayout = ({ children }) => {
   return (
     <AnimatePresence mode="wait">
@@ -10,7 +10,7 @@ const LandingPageLayout = ({ children }) => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 20 }}
-        className="bg-white dark:bg-black transition-colors duration-300"
+        className="bg-white transition-colors duration-300"
       >
         <TopNavbar />
         <motion.main

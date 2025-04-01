@@ -66,7 +66,7 @@ const FeatureCard = ({ feature }) => {
   return (
     <motion.div
       whileHover={{ scale: 1.02 }}
-      className={`${feature.className} group p-8 h-full bg-white/5 dark:bg-black/50 hover:bg-white/10 dark:hover:bg-black/60 rounded-3xl border border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 transition-all relative overflow-hidden`}
+      className={`${feature.className} group p-8 h-full bg-white/5 hover:bg-white/10 rounded-3xl border border-gray-200 hover:border-gray-300 transition-all relative overflow-hidden`}
     >
       <div className="absolute top-0 right-0 opacity-10">
         <IconCircleDotted
@@ -87,10 +87,10 @@ const FeatureCard = ({ feature }) => {
         <div className="flex items-end gap-4">
           <div className="flex-shrink-0">{feature.icon}</div>
           <div className="flex-grow">
-            <h3 className="text-xl font-semibold text-black dark:text-white group-hover:text-purple-400 transition-colors">
+            <h3 className="text-xl font-semibold text-black group-hover:text-purple-400 transition-colors">
               {feature.title}
             </h3>
-            <p className="text-gray-600 dark:text-gray-400 text-sm h-0 group-hover:h-auto opacity-0 group-hover:opacity-100 transition-all duration-300 overflow-hidden group-hover:mt-2">
+            <p className="text-gray-600 text-sm h-0 group-hover:h-auto opacity-0 group-hover:opacity-100 transition-all duration-300 overflow-hidden group-hover:mt-2">
               {feature.description}
             </p>
           </div>
@@ -102,16 +102,16 @@ const FeatureCard = ({ feature }) => {
 
 const Features = () => {
   return (
-    <section className="py-20 px-4 bg-white dark:bg-black transition-colors duration-300">
+    <section className="py-20 px-4 bg-white transition-colors duration-300">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
           <div className="flex justify-center mb-4">
             <HoverBorderGradient>Features</HoverBorderGradient>
           </div>
-          <h2 className="text-5xl font-medium text-black dark:text-white mb-4">
+          <h2 className="text-5xl font-medium text-black mb-4">
             Everything you need to grow your business
           </h2>
-          <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+          <p className="text-gray-600 max-w-2xl mx-auto">
             Powerful tools to help you manage and grow <br />
             your business efficiently
           </p>

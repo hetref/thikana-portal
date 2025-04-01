@@ -223,7 +223,7 @@ export default function BusinessInfoForm() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto bg-white dark:bg-gray-900 rounded-lg shadow-sm p-6">
+    <div className="max-w-3xl mx-auto bg-white rounded-lg shadow-sm p-6">
       <h2 className="text-2xl font-semibold mb-6">Business Details</h2>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -239,7 +239,7 @@ export default function BusinessInfoForm() {
                     onValueChange={handleBusinessTypeChange}
                   >
                     <FormControl>
-                      <SelectTrigger className="bg-gray-50 dark:bg-gray-800">
+                      <SelectTrigger className="bg-gray-50">
                         <SelectValue placeholder="Select business type" />
                       </SelectTrigger>
                     </FormControl>
@@ -258,7 +258,7 @@ export default function BusinessInfoForm() {
                       value={customBusinessType}
                       onChange={(e) => setCustomBusinessType(e.target.value)}
                       disabled={isSubmitting}
-                      className="mt-2 bg-gray-50 dark:bg-gray-800"
+                      className="mt-2 bg-gray-50"
                     />
                   )}
                   <FormMessage />
@@ -276,7 +276,7 @@ export default function BusinessInfoForm() {
                       type="date"
                       {...field}
                       disabled={isSubmitting}
-                      className="bg-gray-50 dark:bg-gray-800"
+                      className="bg-gray-50"
                     />
                   </FormControl>
                   <FormMessage />
@@ -294,7 +294,7 @@ export default function BusinessInfoForm() {
                       placeholder="Enter your GSTIN number"
                       {...field}
                       disabled={isSubmitting}
-                      className="bg-gray-50 dark:bg-gray-800"
+                      className="bg-gray-50"
                     />
                   </FormControl>
                   <FormMessage />
@@ -312,7 +312,7 @@ export default function BusinessInfoForm() {
                       placeholder="Enter your business license number"
                       {...field}
                       disabled={isSubmitting}
-                      className="bg-gray-50 dark:bg-gray-800"
+                      className="bg-gray-50"
                     />
                   </FormControl>
                   <FormMessage />
@@ -322,7 +322,7 @@ export default function BusinessInfoForm() {
 
             <div className="md:col-span-2">
               <h3 className="text-lg font-semibold mb-4">Operational Hours</h3>
-              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-md space-y-3">
+              <div className="bg-gray-50 p-4 rounded-md space-y-3">
                 <div className="grid grid-cols-3 gap-3 mb-2 text-sm font-medium text-muted-foreground">
                   <div>Day</div>
                   <div>Opening Time</div>
@@ -340,7 +340,7 @@ export default function BusinessInfoForm() {
                               {...field}
                               readOnly
                               disabled={isSubmitting}
-                              className="bg-white dark:bg-gray-900"
+                              className="bg-white"
                             />
                           </FormControl>
                         </FormItem>
@@ -356,7 +356,7 @@ export default function BusinessInfoForm() {
                               type="time"
                               {...field}
                               disabled={isSubmitting}
-                              className="bg-white dark:bg-gray-900"
+                              className="bg-white"
                             />
                           </FormControl>
                         </FormItem>
@@ -372,7 +372,7 @@ export default function BusinessInfoForm() {
                               type="time"
                               {...field}
                               disabled={isSubmitting}
-                              className="bg-white dark:bg-gray-900"
+                              className="bg-white"
                             />
                           </FormControl>
                         </FormItem>
@@ -397,7 +397,7 @@ export default function BusinessInfoForm() {
                   Add Link
                 </Button>
               </div>
-              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-md space-y-3">
+              <div className="bg-gray-50 p-4 rounded-md space-y-3">
                 {socialMediaFields.map((field, index) => (
                   <div key={field.id} className="flex gap-3 items-start">
                     <FormField
@@ -410,7 +410,7 @@ export default function BusinessInfoForm() {
                               placeholder="Platform (e.g., Facebook)"
                               {...field}
                               disabled={isSubmitting}
-                              className="bg-white dark:bg-gray-900"
+                              className="bg-white"
                             />
                           </FormControl>
                           <FormMessage />
@@ -427,7 +427,7 @@ export default function BusinessInfoForm() {
                               placeholder="URL"
                               {...field}
                               disabled={isSubmitting}
-                              className="bg-white dark:bg-gray-900"
+                              className="bg-white"
                             />
                           </FormControl>
                           <FormMessage />
@@ -447,7 +447,7 @@ export default function BusinessInfoForm() {
                   </div>
                 ))}
                 {socialMediaFields.length === 0 && (
-                  <p className="text-sm text-gray-500 dark:text-gray-400 py-2">
+                  <p className="text-sm text-gray-500 py-2">
                     No social media links added yet.
                   </p>
                 )}
@@ -455,7 +455,7 @@ export default function BusinessInfoForm() {
             </div>
           </div>
 
-          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="pt-4 border-t border-gray-200">
             <Button
               type="submit"
               disabled={isSubmitting}

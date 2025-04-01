@@ -264,7 +264,7 @@ export default function PhotosGrid({
           return (
             <div
               key={photo.id}
-              className="relative group overflow-hidden rounded-xl shadow-md hover:shadow-lg transition-all duration-300 bg-black/5 dark:bg-black/30 border border-border/30 hover:border-border/50 cursor-pointer"
+              className="relative group overflow-hidden rounded-xl shadow-md hover:shadow-lg transition-all duration-300 bg-black/5 border border-border/30 hover:border-border/50 cursor-pointer"
               style={{ height: dims ? `${height}px` : "240px" }}
               onClick={() => handlePhotoSelect(photo, index)}
             >
