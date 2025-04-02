@@ -8,10 +8,49 @@ import {
   getDocs,
   updateDoc,
   Timestamp,
+  addDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import CryptoJS from "crypto-js";
 import crypto from "crypto";
+
+// Get current date and time in YYYY-MM-DD HH:MM:SS format
+const getCurrentDateTime = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const hours = String(now.getHours()).padStart(2, "0");
+  const minutes = String(now.getMinutes()).padStart(2, "0");
+  const seconds = String(now.getSeconds()).padStart(2, "0");
+
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+};
+
+// Add to income collection
+async function addToIncome(userId, amount, category) {
+  try {
+    const timestamp = getCurrentDateTime();
+
+    // Create reference to user's income subcollection
+    const incomesRef = collection(db, "transactions", userId, "user_income");
+
+    // Add income document
+    await addDoc(incomesRef, {
+      name: timestamp, // Use timestamp as the name
+      amount: amount / 100, // Convert from paise to rupees
+      category,
+      timestamp,
+      type: "income",
+    });
+
+    console.log(
+      `Added ${category} income of ${amount / 100} for user ${userId}`
+    );
+  } catch (error) {
+    console.error("Error adding to income collection:", error);
+  }
+}
 
 export async function POST(req, { params }) {
   try {
@@ -194,6 +233,9 @@ export async function POST(req, { params }) {
             "paid",
             payload
           );
+          // Add payment amount to income collection with category "Sales"
+          await addToIncome(effectiveUserId, payload.amount, "Sales");
+
           if (payload.invoice_id) {
             // This payment might be for a subscription
             await updateSubscriptionStatusFromPayment(effectiveUserId, payload);
@@ -232,6 +274,10 @@ export async function POST(req, { params }) {
             "active",
             payload
           );
+          // Add subscription amount to income collection with category "Subscriptions"
+          if (payload.total_count > 0 && payload.amount) {
+            await addToIncome(effectiveUserId, payload.amount, "Subscriptions");
+          }
           break;
         case "subscription.charged":
           await updateSubscriptionStatus(
@@ -274,6 +320,10 @@ export async function POST(req, { params }) {
             "paid",
             payload
           );
+          // If there's a payment object with amount, add to income
+          if (payload.payment && payload.payment.amount) {
+            await addToIncome(effectiveUserId, payload.payment.amount, "Sales");
+          }
           break;
         case "payment_link.expired":
           await updatePaymentLinkStatus(
