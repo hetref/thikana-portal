@@ -233,12 +233,23 @@ export async function POST(req, { params }) {
             "paid",
             payload
           );
-          // Add payment amount to income collection with category "Sales"
-          await addToIncome(effectiveUserId, payload.amount, "Sales");
 
-          if (payload.invoice_id) {
-            // This payment might be for a subscription
+          // Check if this payment is for a subscription
+          if (payload.invoice_id && payload.notes?.subscription_id) {
+            // This is a subscription payment
+            await addToIncome(effectiveUserId, payload.amount, "Subscriptions");
+            console.log(
+              `Recorded subscription payment of ${payload.amount / 100} for user ${effectiveUserId}`
+            );
+
+            // Update subscription status
             await updateSubscriptionStatusFromPayment(effectiveUserId, payload);
+          } else {
+            // This is a regular payment (not for subscription)
+            await addToIncome(effectiveUserId, payload.amount, "Sales");
+            console.log(
+              `Recorded sales payment of ${payload.amount / 100} for user ${effectiveUserId}`
+            );
           }
           break;
         case "payment.failed":
@@ -274,10 +285,8 @@ export async function POST(req, { params }) {
             "active",
             payload
           );
-          // Add subscription amount to income collection with category "Subscriptions"
-          if (payload.total_count > 0 && payload.amount) {
-            await addToIncome(effectiveUserId, payload.amount, "Subscriptions");
-          }
+          // We don't add income here anymore since payments are handled by payment.captured
+          // This avoids duplicate entries
           break;
         case "subscription.charged":
           await updateSubscriptionStatus(
