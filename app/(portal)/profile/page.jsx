@@ -388,6 +388,9 @@ export default function Profile() {
         const photos = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
+          timestamp: doc.data().timestamp
+            ? new Date(doc.data().timestamp)
+            : null,
         }));
         setUserPhotos(photos);
         setLoadingPhotos(false);
