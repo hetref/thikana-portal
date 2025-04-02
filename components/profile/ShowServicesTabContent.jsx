@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import {
@@ -52,7 +52,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import toast from "react-hot-toast";
 
-export default function ShowServicesTabContent({ userId, userData }) {
+export default function ShowServicesTabContent({
+  userId,
+  userData,
+  isViewOnly = false,
+  currentUserView = false,
+}) {
   const router = useRouter();
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -62,6 +67,17 @@ export default function ShowServicesTabContent({ userId, userData }) {
     message: "",
     submitting: false,
   });
+
+  // Check if the current user is the owner of the business
+  const isOwner = useMemo(() => {
+    // If currentUserView is true, we're in the profile page
+    // If currentUserView is false, we're in the username page
+    if (currentUserView) {
+      return true; // In profile page, always show owner controls
+    } else {
+      return userId === auth.currentUser?.uid; // In username page, check if current user is the owner
+    }
+  }, [currentUserView, userId]);
 
   useEffect(() => {
     const fetchServices = async () => {
@@ -156,20 +172,22 @@ export default function ShowServicesTabContent({ userId, userData }) {
 
   return (
     <div className="space-y-6">
-      {/* <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center mb-6">
         <div>
           <h2 className="text-xl font-semibold text-gray-900">Services</h2>
           <p className="text-sm text-muted-foreground">
             Services offered by {userData?.businessName || "your business"}
           </p>
         </div>
-        <Link href="/profile/services">
-          <Button className="bg-black hover:bg-black/90">
-            <Settings className="w-4 h-4 mr-2" />
-            Manage Services
-          </Button>
-        </Link>
-      </div> */}
+        {isOwner && (
+          <Link href="/profile/services">
+            <Button className="bg-black hover:bg-black/90">
+              <Settings className="w-4 h-4 mr-2" />
+              Manage Services
+            </Button>
+          </Link>
+        )}
+      </div>
 
       {services.length === 0 ? (
         <div className="text-center py-10 rounded-lg">
@@ -181,11 +199,13 @@ export default function ShowServicesTabContent({ userId, userData }) {
             Start adding services that your business offers to attract more
             customers.
           </p>
-          <Link href="/profile/services">
-            <Button className="bg-black hover:bg-black/90">
-              Add Your First Service
-            </Button>
-          </Link>
+          {isOwner && (
+            <Link href="/profile/services">
+              <Button className="bg-black hover:bg-black/90">
+                Add Your First Service
+              </Button>
+            </Link>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-6">
@@ -228,30 +248,23 @@ export default function ShowServicesTabContent({ userId, userData }) {
                 </p>
               </CardContent>
               <CardFooter className="border-t flex justify-between pt-4 pb-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setContactForm((prev) => ({
-                      ...prev,
-                      serviceId: service.id,
-                    }));
-                    setContactDialogOpen(true);
-                  }}
-                  className="text-primary hover:text-primary-hover hover:bg-primary/5"
-                >
-                  Contact Business
-                  <MessageSquare className="ml-2 h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => router.push(`/profile/services`)}
-                  className="text-white bg-black hover:text-white/80 hover:bg-black/80"
-                >
-                  Buy Service
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
+                {!isOwner && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setContactForm((prev) => ({
+                        ...prev,
+                        serviceId: service.id,
+                      }));
+                      setContactDialogOpen(true);
+                    }}
+                    className="text-primary hover:text-primary-hover hover:bg-primary/5"
+                  >
+                    Contact Business
+                    <MessageSquare className="ml-2 h-4 w-4" />
+                  </Button>
+                )}
               </CardFooter>
             </Card>
           ))}

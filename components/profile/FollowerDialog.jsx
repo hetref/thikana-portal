@@ -19,6 +19,7 @@ import {
   UserPlus,
   UserX,
   UserCheck,
+  UserMinus,
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
@@ -169,14 +170,23 @@ const FollowerDialog = ({ followerCount, userId, className }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const currentUser = auth.currentUser;
 
+  // Determine if the current user is the owner of this profile
+  const isOwner = currentUser && currentUser.uid === userId;
+
   useEffect(() => {
     const fetchFollowers = async () => {
       if (!userId) return;
       try {
         setLoading(true);
-        const followersData = await getFollowers(userId);
-        setFollowers(followersData);
+        const followerData = await getFollowers(userId);
+        if (followerData && Array.isArray(followerData)) {
+          setFollowers(followerData);
+        } else {
+          console.error("Expected an array but got:", followerData);
+          setFollowers([]);
+        }
       } catch (err) {
+        console.error("Error fetching followers:", err);
         setError(err);
         toast.error("Could not load followers list");
       } finally {
@@ -189,49 +199,21 @@ const FollowerDialog = ({ followerCount, userId, className }) => {
     }
   }, [userId, open]);
 
-  const handleFollowToggle = async (followerId, isFollowing) => {
-    if (!auth.currentUser) return;
+  // Handle removing a follower
+  const handleRemoveFollower = async (followerId) => {
+    if (!currentUser) return;
 
     try {
-      if (isFollowing) {
-        // Unfollow logic
-        await deleteDoc(
-          doc(db, "users", followerId, "followers", auth.currentUser.uid)
-        );
-        await deleteDoc(
-          doc(db, "users", auth.currentUser.uid, "following", followerId)
-        );
-        toast.success("Unfollowed successfully");
-      } else {
-        // Follow logic
-        await setDoc(
-          doc(db, "users", followerId, "followers", auth.currentUser.uid),
-          {
-            uid: auth.currentUser.uid,
-            timestamp: new Date(),
-          }
-        );
-        await setDoc(
-          doc(db, "users", auth.currentUser.uid, "following", followerId),
-          {
-            uid: followerId,
-            timestamp: new Date(),
-          }
-        );
-        toast.success("Followed successfully");
-      }
+      // Remove follower logic
+      await deleteDoc(doc(db, "users", userId, "followers", followerId));
+      await deleteDoc(doc(db, "users", followerId, "following", userId));
 
-      // Update the local state
-      setFollowers((prevFollowers) =>
-        prevFollowers.map((follower) =>
-          follower.uid === followerId
-            ? { ...follower, isFollowing: !isFollowing }
-            : follower
-        )
-      );
+      // Update local state
+      setFollowers(followers.filter((user) => user.uid !== followerId));
+      toast.success("Follower removed successfully");
     } catch (error) {
-      console.error("Error toggling follow status:", error);
-      toast.error("Failed to update follow status");
+      console.error("Error removing follower:", error);
+      toast.error("Failed to remove follower");
     }
   };
 
@@ -239,152 +221,117 @@ const FollowerDialog = ({ followerCount, userId, className }) => {
     if (!searchQuery.trim()) return followers;
 
     return followers.filter(
-      (follower) =>
-        follower?.businessName
-          ?.toLowerCase()
-          .includes(searchQuery.toLowerCase()) ||
-        follower?.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        follower?.business_type
-          ?.toLowerCase()
-          .includes(searchQuery.toLowerCase())
+      (user) =>
+        user?.businessName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user?.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user?.business_type?.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [followers, searchQuery]);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger className={className}>
-        <div className="flex flex-col items-center hover:text-primary transition-colors">
+    <Dialog open={open} onOpenChange={isOwner ? setOpen : undefined}>
+      <DialogTrigger className={className} disabled={!isOwner}>
+        <div
+          className={`flex flex-col items-center ${isOwner ? "hover:text-primary transition-colors" : ""}`}
+          style={{ cursor: isOwner ? "pointer" : "default" }}
+        >
           <div className="font-semibold text-lg">{followerCount}</div>
           <div className="text-sm text-muted-foreground">Followers</div>
         </div>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader className="space-y-1">
-          <DialogTitle className="text-xl font-bold">Followers</DialogTitle>
-          <DialogDescription className="text-sm">
-            People and businesses following you
-          </DialogDescription>
-        </DialogHeader>
+      {isOwner && (
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader className="space-y-1">
+            <DialogTitle className="text-xl font-bold">Followers</DialogTitle>
+            <DialogDescription className="text-sm">
+              People and businesses who follow you
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="relative mt-2">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search followers..."
-            className="pl-8"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
+          <div className="relative mt-2">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search followers..."
+              className="pl-8"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
 
-        <div className="mt-2 max-h-[60vh] overflow-y-auto pr-1">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center py-8 space-y-2">
-              <Loader2 className="h-8 w-8 animate-spin text-primary/70" />
-              <p className="text-sm text-muted-foreground">
-                Loading followers...
-              </p>
-            </div>
-          ) : error ? (
-            <div className="text-center py-6 text-rose-500">
-              <p>Could not load followers list</p>
-            </div>
-          ) : Array.isArray(filteredFollowers) &&
-            filteredFollowers.length === 0 ? (
-            searchQuery ? (
-              <div className="text-center py-8 space-y-2">
-                <UserX className="h-12 w-12 mx-auto text-muted-foreground/50" />
-                <p className="text-muted-foreground">
-                  No matches found for "{searchQuery}"
+          <div className="mt-2 max-h-[60vh] overflow-y-auto pr-1">
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-8 space-y-2">
+                <Loader2 className="h-8 w-8 animate-spin text-primary/70" />
+                <p className="text-sm text-muted-foreground">
+                  Loading followers...
                 </p>
+              </div>
+            ) : error ? (
+              <div className="text-center py-6 text-rose-500">
+                <p>Could not load followers list</p>
+              </div>
+            ) : filteredFollowers.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <UserX className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                {searchQuery.trim() ? (
+                  <p>No results match your search</p>
+                ) : (
+                  <p>You don't have any followers yet</p>
+                )}
               </div>
             ) : (
-              <div className="text-center py-8 space-y-2">
-                <UserX className="h-12 w-12 mx-auto text-muted-foreground/50" />
-                <p className="text-muted-foreground">
-                  You don't have any followers yet
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  When people follow you, they'll show up here
-                </p>
-              </div>
-            )
-          ) : (
-            <div className="space-y-3 mt-3">
-              {filteredFollowers.map((follower) => (
-                <div
-                  key={follower?.uid}
-                  className="flex items-center justify-between p-3 rounded-lg border border-border/60 bg-background hover:bg-accent/5 transition-colors"
-                >
-                  <Link
-                    href={
-                      currentUser && follower?.uid === currentUser.uid
-                        ? "/profile"
-                        : `/${follower?.username}?user=${follower?.uid}`
-                    }
-                    className="flex items-center gap-3 flex-1"
+              <div className="space-y-3 mt-3">
+                {filteredFollowers.map((user) => (
+                  <div
+                    key={user?.uid}
+                    className="flex items-center justify-between p-3 rounded-lg border border-border/60 bg-background hover:bg-accent/5 transition-colors"
                   >
-                    <Avatar className="h-10 w-10 border border-border/50">
-                      <AvatarImage
-                        src={follower?.profilePic || "/avatar.png"}
-                        alt={follower?.businessName}
-                      />
-                      <AvatarFallback>
-                        {follower?.businessName?.charAt(0) || "B"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col min-w-0">
-                      <div className="font-medium truncate">
-                        {follower?.businessName || "Business"}
+                    <Link
+                      href={`/${user?.username}?user=${user?.uid}`}
+                      className="flex items-center gap-3 flex-1"
+                    >
+                      <Avatar className="h-10 w-10 border border-border/50">
+                        <AvatarImage
+                          src={user?.profilePic || "/avatar.png"}
+                          alt={user?.businessName}
+                        />
+                        <AvatarFallback>
+                          {user?.businessName?.charAt(0) || "B"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col min-w-0">
+                        <div className="font-medium truncate">
+                          {user?.businessName || "Business"}
+                        </div>
+                        <div className="text-xs text-muted-foreground flex items-center gap-2">
+                          <span>@{user?.username || "username"}</span>
+                          {user?.business_type && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs font-normal py-0 h-5"
+                            >
+                              {user.business_type}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-xs text-muted-foreground flex items-center gap-2">
-                        <span>@{follower?.username || "username"}</span>
-                        {follower?.business_type && (
-                          <Badge
-                            variant="outline"
-                            className="text-xs font-normal py-0 h-5"
-                          >
-                            {follower.business_type}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </Link>
-                  {auth.currentUser &&
-                    auth.currentUser.uid !== follower?.uid && (
-                      <Button
-                        size="sm"
-                        variant={follower.isFollowing ? "outline" : "default"}
-                        className={`h-9 px-2.5 ml-2 ${
-                          follower.isFollowing
-                            ? "border-gray-200 text-gray-700 hover:bg-gray-100"
-                            : "bg-primary text-primary-foreground"
-                        }`}
-                        onClick={() =>
-                          handleFollowToggle(
-                            follower?.uid,
-                            follower.isFollowing
-                          )
-                        }
-                      >
-                        {follower.isFollowing ? (
-                          <>
-                            <UserCheck className="h-4 w-4 mr-1.5" />
-                            <span>Following</span>
-                          </>
-                        ) : (
-                          <>
-                            <UserPlus className="h-4 w-4 mr-1.5" />
-                            <span>Follow</span>
-                          </>
-                        )}
-                      </Button>
-                    )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </DialogContent>
+                    </Link>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-9 px-3 ml-2 border-gray-200 text-gray-700 hover:bg-gray-100"
+                      onClick={() => handleRemoveFollower(user?.uid)}
+                    >
+                      <UserMinus className="h-4 w-4 mr-1.5" />
+                      <span>Remove</span>
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      )}
     </Dialog>
   );
 };

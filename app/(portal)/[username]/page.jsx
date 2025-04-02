@@ -19,6 +19,7 @@ import {
   Phone,
   Mail,
   Info,
+  Settings,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useGetUserPosts } from "@/hooks/useGetPosts";
@@ -53,6 +54,7 @@ import ShareBusinessDialog from "@/components/profile/ShareBusinessDialog";
 import RequestCallButton from "@/components/RequestCallButton";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
+import ShowServicesTabContent from "@/components/profile/ShowServicesTabContent";
 
 // Add a style element to hide scrollbars
 const scrollbarHideStyles = `
@@ -460,12 +462,12 @@ export default function UserProfile() {
             <FollowingDialog
               followingCount={followingCount}
               userId={userId}
-              className="flex flex-col items-center cursor-pointer"
+              className="flex flex-col items-center"
             />
             <FollowerDialog
               followerCount={followersCount}
               userId={userId}
-              className="flex flex-col items-center pl-4 cursor-pointer"
+              className="flex flex-col items-center pl-4"
             />
             <div className="flex flex-col items-center pl-4">
               <div className="font-semibold text-gray-900">{posts.length}</div>
@@ -547,6 +549,19 @@ export default function UserProfile() {
                 <SquareChartGantt className="w-4 h-4 mr-2" />
                 Products
               </TabsTrigger>
+              {userData?.business_categories?.includes("service") && (
+                <TabsTrigger
+                  value="services"
+                  className={cn(
+                    "rounded-none border-b-2 border-transparent",
+                    "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
+                    "px-6 py-3 font-medium text-sm transition-all duration-200"
+                  )}
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  Services
+                </TabsTrigger>
+              )}
             </TabsList>
           </div>
 
@@ -626,19 +641,37 @@ export default function UserProfile() {
             )}
           </TabsContent>
 
-          <TabsContent
-            value="products"
-            className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
-          >
-            {userData && (
-              <ShowProductsTabContent
-                userId={userId}
-                userData={userData}
-                isViewOnly={true}
-                currentUserView={false}
-              />
-            )}
-          </TabsContent>
+          {userData?.business_categories?.includes("product") && (
+            <TabsContent
+              value="products"
+              className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+            >
+              {userData && (
+                <ShowProductsTabContent
+                  userId={userId}
+                  userData={userData}
+                  isViewOnly={true}
+                  currentUserView={false}
+                />
+              )}
+            </TabsContent>
+          )}
+
+          {userData?.business_categories?.includes("service") && (
+            <TabsContent
+              value="services"
+              className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+            >
+              {userData && (
+                <ShowServicesTabContent
+                  userId={userId}
+                  userData={userData}
+                  isViewOnly={true}
+                  currentUserView={false}
+                />
+              )}
+            </TabsContent>
+          )}
         </Tabs>
       </Card>
     </div>

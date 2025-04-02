@@ -36,13 +36,14 @@ import {
   collection,
   onSnapshot,
 } from "firebase/firestore";
-import { EllipsisVertical } from "lucide-react";
+import { ChartBar, ChartNoAxesCombined, EllipsisVertical } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
+import Link from "next/link";
 
 const InventoryPage = () => {
   const [products, setProducts] = useState([]);
@@ -185,7 +186,15 @@ const InventoryPage = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="border px-3 py-2 rounded"
           />
+          {/* View Analytics */}
+          <Button variant="outline">
+            <Link href="/profile/analytics" className="flex items-center gap-2">
+              <ChartNoAxesCombined />
+              View Analytics
+            </Link>
+          </Button>
           {/* Bulk Edit Button */}
+
           <Button
             onClick={() => setIsBulkEditDialogOpen(true)}
             variant="outline"

@@ -305,12 +305,12 @@ export default function RequestCallButton({ businessId, businessName }) {
           <Phone className="w-4 h-4" />
           {onCooldown
             ? `Request again in ${cooldownTimeRemaining}h`
-            : "Request a Call"}
+            : "Request AI Call"}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Request a Call from {businessName}</DialogTitle>
+          <DialogTitle>Request an AI Call from {businessName}</DialogTitle>
           <DialogDescription>
             Select the type of call you'd like to receive from this business.
           </DialogDescription>
