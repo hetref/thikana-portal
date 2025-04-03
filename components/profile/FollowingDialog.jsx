@@ -26,6 +26,9 @@ const FollowingDialog = ({ followingCount, userId, className }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const currentUser = auth.currentUser;
 
+  // Determine if the current user is the owner of this profile
+  const isOwner = currentUser && currentUser.uid === userId;
+
   useEffect(() => {
     const fetchFollowing = async () => {
       if (!userId) return;
@@ -51,23 +54,24 @@ const FollowingDialog = ({ followingCount, userId, className }) => {
     }
   }, [userId, open]);
 
-  const handleUnfollow = async (businessId) => {
-    if (!auth.currentUser) return;
+  // Handle unfollowing
+  const handleUnfollow = async (followingId) => {
+    if (!currentUser) return;
+
     try {
-      await Promise.all([
-        deleteDoc(
-          doc(db, "users", businessId, "followers", auth.currentUser.uid)
-        ),
-        deleteDoc(
-          doc(db, "users", auth.currentUser.uid, "following", businessId)
-        ),
-      ]);
-      setFollowing((prevFollowing) =>
-        prevFollowing.filter((business) => business.uid !== businessId)
+      // Unfollow logic
+      await deleteDoc(
+        doc(db, "users", followingId, "followers", currentUser.uid)
       );
+      await deleteDoc(
+        doc(db, "users", currentUser.uid, "following", followingId)
+      );
+
+      // Update local state
+      setFollowing(following.filter((user) => user.uid !== followingId));
       toast.success("Unfollowed successfully");
     } catch (error) {
-      console.error("Error unfollowing business:", error);
+      console.error("Error unfollowing:", error);
       toast.error("Failed to unfollow");
     }
   };
@@ -76,131 +80,117 @@ const FollowingDialog = ({ followingCount, userId, className }) => {
     if (!searchQuery.trim()) return following;
 
     return following.filter(
-      (business) =>
-        business?.businessName
-          ?.toLowerCase()
-          .includes(searchQuery.toLowerCase()) ||
-        business?.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        business?.business_type
-          ?.toLowerCase()
-          .includes(searchQuery.toLowerCase())
+      (user) =>
+        user?.businessName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user?.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user?.business_type?.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [following, searchQuery]);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger className={className}>
-        <div className="flex flex-col items-center hover:text-primary transition-colors">
+    <Dialog open={open} onOpenChange={isOwner ? setOpen : undefined}>
+      <DialogTrigger className={className} disabled={!isOwner}>
+        <div
+          className={`flex flex-col items-center ${isOwner ? "hover:text-primary transition-colors" : ""}`}
+          style={{ cursor: isOwner ? "pointer" : "default" }}
+        >
           <div className="font-semibold text-lg">{followingCount}</div>
           <div className="text-sm text-muted-foreground">Following</div>
         </div>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader className="space-y-1">
-          <DialogTitle className="text-xl font-bold">Following</DialogTitle>
-          <DialogDescription className="text-sm">
-            People and businesses you follow
-          </DialogDescription>
-        </DialogHeader>
+      {isOwner && (
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader className="space-y-1">
+            <DialogTitle className="text-xl font-bold">Following</DialogTitle>
+            <DialogDescription className="text-sm">
+              People and businesses you follow
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="relative mt-2">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search following..."
-            className="pl-8"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
+          <div className="relative mt-2">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search following..."
+              className="pl-8"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
 
-        <div className="mt-2 max-h-[60vh] overflow-y-auto pr-1">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center py-8 space-y-2">
-              <Loader2 className="h-8 w-8 animate-spin text-primary/70" />
-              <p className="text-sm text-muted-foreground">
-                Loading following...
-              </p>
-            </div>
-          ) : error ? (
-            <div className="text-center py-6 text-rose-500">
-              <p>Could not load following list</p>
-            </div>
-          ) : Array.isArray(filteredFollowing) &&
-            filteredFollowing.length === 0 ? (
-            searchQuery ? (
-              <div className="text-center py-8 space-y-2">
-                <UserX className="h-12 w-12 mx-auto text-muted-foreground/50" />
-                <p className="text-muted-foreground">
-                  No matches found for "{searchQuery}"
+          <div className="mt-2 max-h-[60vh] overflow-y-auto pr-1">
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-8 space-y-2">
+                <Loader2 className="h-8 w-8 animate-spin text-primary/70" />
+                <p className="text-sm text-muted-foreground">
+                  Loading following...
                 </p>
+              </div>
+            ) : error ? (
+              <div className="text-center py-6 text-rose-500">
+                <p>Could not load following list</p>
+              </div>
+            ) : filteredFollowing.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <UserX className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                {searchQuery.trim() ? (
+                  <p>No results match your search</p>
+                ) : (
+                  <p>You are not following anyone yet</p>
+                )}
               </div>
             ) : (
-              <div className="text-center py-8 space-y-2">
-                <UserX className="h-12 w-12 mx-auto text-muted-foreground/50" />
-                <p className="text-muted-foreground">
-                  You're not following anyone yet
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  When you follow businesses or people, they'll show up here
-                </p>
+              <div className="space-y-3 mt-3">
+                {filteredFollowing.map((user) => (
+                  <div
+                    key={user?.uid}
+                    className="flex items-center justify-between p-3 rounded-lg border border-border/60 bg-background hover:bg-accent/5 transition-colors"
+                  >
+                    <Link
+                      href={`/${user?.username}?user=${user?.uid}`}
+                      className="flex items-center gap-3 flex-1"
+                    >
+                      <Avatar className="h-10 w-10 border border-border/50">
+                        <AvatarImage
+                          src={user?.profilePic || "/avatar.png"}
+                          alt={user?.businessName}
+                        />
+                        <AvatarFallback>
+                          {user?.businessName?.charAt(0) || "B"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col min-w-0">
+                        <div className="font-medium truncate">
+                          {user?.businessName || "Business"}
+                        </div>
+                        <div className="text-xs text-muted-foreground flex items-center gap-2">
+                          <span>@{user?.username || "username"}</span>
+                          {user?.business_type && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs font-normal py-0 h-5"
+                            >
+                              {user.business_type}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-9 px-3 ml-2 border-gray-200 text-gray-700 hover:bg-gray-100"
+                      onClick={() => handleUnfollow(user?.uid)}
+                    >
+                      <UserMinus className="h-4 w-4 mr-1.5" />
+                      <span>Unfollow</span>
+                    </Button>
+                  </div>
+                ))}
               </div>
-            )
-          ) : (
-            <div className="space-y-3 mt-3">
-              {filteredFollowing.map((business) => (
-                <div
-                  key={business?.uid}
-                  className="flex items-center justify-between p-3 rounded-lg border border-border/60 bg-background hover:bg-accent/5 transition-colors"
-                >
-                  <Link
-                    href={
-                      currentUser && business?.uid === currentUser.uid
-                        ? "/profile"
-                        : `/${business?.username}?user=${business?.uid}`
-                    }
-                    className="flex items-center gap-3 flex-1"
-                  >
-                    <Avatar className="h-10 w-10 border border-border/50">
-                      <AvatarImage
-                        src={business?.profilePic || "/avatar.png"}
-                        alt={business?.businessName}
-                      />
-                      <AvatarFallback>
-                        {business?.businessName?.charAt(0) || "B"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col min-w-0">
-                      <div className="font-medium truncate">
-                        {business?.businessName || "Business"}
-                      </div>
-                      <div className="text-xs text-muted-foreground flex items-center gap-2">
-                        <span>@{business?.username || "username"}</span>
-                        {business?.business_type && (
-                          <Badge
-                            variant="outline"
-                            className="text-xs font-normal py-0 h-5"
-                          >
-                            {business.business_type}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </Link>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    className="h-9 px-2.5 ml-2"
-                    onClick={() => handleUnfollow(business?.uid)}
-                  >
-                    <UserMinus className="h-4 w-4 mr-1.5" />
-                    <span>Unfollow</span>
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </DialogContent>
+            )}
+          </div>
+        </DialogContent>
+      )}
     </Dialog>
   );
 };

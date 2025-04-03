@@ -16,6 +16,7 @@ import {
   updateDoc,
   arrayUnion,
   setDoc,
+  addDoc,
 } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
@@ -30,24 +31,24 @@ function formatDate(isoDateString) {
   const diffInDays = Math.floor(diffInHours / 24);
 
   // Format as dd/mm/yyyy
-  const formattedDate = date.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
+  const formattedDate = date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
   });
 
   // Dynamic time display
   if (diffInSeconds < 60) {
-    return 'Just now';
+    return "Just now";
   } else if (diffInMinutes < 60) {
-    return `${diffInMinutes} minute${diffInMinutes !== 1 ? 's' : ''} ago`;
+    return `${diffInMinutes} minute${diffInMinutes !== 1 ? "s" : ""} ago`;
   } else if (diffInHours < 24) {
-    return `${diffInHours} hour${diffInHours !== 1 ? 's' : ''} ago`;
+    return `${diffInHours} hour${diffInHours !== 1 ? "s" : ""} ago`;
   } else if (diffInDays < 7) {
-    return `${diffInDays} day${diffInDays !== 1 ? 's' : ''} ago`;
+    return `${diffInDays} day${diffInDays !== 1 ? "s" : ""} ago`;
   } else if (diffInDays < 30) {
     const weeks = Math.floor(diffInDays / 7);
-    return `${weeks} week${weeks !== 1 ? 's' : ''} ago`;
+    return `${weeks} week${weeks !== 1 ? "s" : ""} ago`;
   } else {
     return formattedDate; // Fallback to formatted date
   }
@@ -63,9 +64,9 @@ export default function AddPhotoModal({ isOpen, onClose, userId }) {
     const files = Array.from(e.target.files || []);
     if (files.length > 0) {
       setImageFiles(files);
-      
+
       // Create preview URLs
-      const previews = files.map(file => {
+      const previews = files.map((file) => {
         return new Promise((resolve) => {
           const reader = new FileReader();
           reader.onloadend = () => {
@@ -80,8 +81,10 @@ export default function AddPhotoModal({ isOpen, onClose, userId }) {
   };
 
   const handleRemoveImage = (indexToRemove) => {
-    setImageFiles(prev => prev.filter((_, index) => index !== indexToRemove));
-    setPreviewUrls(prev => prev.filter((_, index) => index !== indexToRemove));
+    setImageFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
+    setPreviewUrls((prev) =>
+      prev.filter((_, index) => index !== indexToRemove)
+    );
   };
 
   const handleSubmit = async (e) => {
@@ -98,7 +101,9 @@ export default function AddPhotoModal({ isOpen, onClose, userId }) {
         const imageUrl = await uploadImage(imageFiles[i], (progress) => {
           // Calculate overall progress across all files
           const individualProgress = progress / imageFiles.length;
-          setUploadProgress(prevProgress => prevProgress + individualProgress);
+          setUploadProgress(
+            (prevProgress) => prevProgress + individualProgress
+          );
         });
 
         const uploadTimestamp = new Date().toISOString();
@@ -156,18 +161,14 @@ export default function AddPhotoModal({ isOpen, onClose, userId }) {
   }
 
   async function addPhotosToFirestore(userId, photosData) {
-    const userRef = doc(db, "users", userId);
-    const userDoc = await getDoc(userRef);
+    const photosRef = collection(db, "users", userId, "photos");
 
-    if (userDoc.exists()) {
-      // Update existing user document with new photos
-      await updateDoc(userRef, {
-        photos: arrayUnion(...photosData),
-      });
-    } else {
-      // Create user document if it doesn't exist
-      await setDoc(userRef, {
-        photos: photosData,
+    // Add each photo as a separate document in the photos subcollection
+    for (const photo of photosData) {
+      await addDoc(photosRef, {
+        photoUrl: photo.photoUrl,
+        timestamp: new Date().toISOString(),
+        uid: userId,
       });
     }
   }
@@ -189,7 +190,7 @@ export default function AddPhotoModal({ isOpen, onClose, userId }) {
               required
             />
           </div>
-          
+
           {previewUrls.length > 0 && (
             <div className="grid grid-cols-3 gap-2">
               {previewUrls.map((url, index) => (
@@ -212,7 +213,7 @@ export default function AddPhotoModal({ isOpen, onClose, userId }) {
               ))}
             </div>
           )}
-          
+
           {isLoading && (
             <div className="bg-muted p-3 rounded-md">
               <div className="flex items-center mb-2">
@@ -233,7 +234,7 @@ export default function AddPhotoModal({ isOpen, onClose, userId }) {
               </p>
             </div>
           )}
-          
+
           <Button
             type="submit"
             className="w-full bg-primary hover:bg-blend-darken"

@@ -61,11 +61,10 @@ export default function PhotosGrid({
 
     setIsDeleting(true);
     try {
-      // 1. Delete from Firestore collection
+      // 1. Delete from Firestore subcollection
       await deleteDoc(doc(db, "users", userId, "photos", photo.id));
 
       // 2. Delete from Firebase Storage
-      // Extract the file path from the URL or use the photo's path if available
       const photoPath =
         photo.storagePath || getStoragePathFromUrl(photo.photoUrl);
       if (photoPath) {
@@ -113,27 +112,33 @@ export default function PhotosGrid({
 
   // Function to get image dimensions for proper layout
   const preloadImage = (photoUrl, id) => {
-    const img = new window.Image(); // Use built-in browser Image constructor
-    img.src = photoUrl;
-    img.onload = () => {
-      setImageDimensions((prev) => ({
-        ...prev,
-        [id]: {
-          width: img.width,
-          height: img.height,
-          aspect: img.height / img.width,
-        },
-      }));
-    };
+    return new Promise((resolve) => {
+      const img = new window.Image();
+      img.onload = () => {
+        setImageDimensions((prev) => ({
+          ...prev,
+          [id]: {
+            width: img.width,
+            height: img.height,
+            aspect: img.height / img.width,
+          },
+        }));
+        resolve();
+      };
+      img.src = photoUrl;
+    });
   };
 
   // Preload images to get dimensions
   useEffect(() => {
-    photos.forEach((photo) => {
-      if (photo.photoUrl && !imageDimensions[photo.id]) {
-        preloadImage(photo.photoUrl, photo.id);
+    const loadImages = async () => {
+      for (const photo of photos) {
+        if (photo.photoUrl && !imageDimensions[photo.id]) {
+          await preloadImage(photo.photoUrl, photo.id);
+        }
       }
-    });
+    };
+    loadImages();
   }, [photos]);
 
   // Function to download the selected photo
@@ -273,16 +278,24 @@ export default function PhotosGrid({
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent shimmer-effect"></div>
               )}
 
-              <Image
-                src={photo.photoUrl}
-                alt="Photo"
-                fill
-                sizes="(max-width: 768px) 50vw, 50vw"
-                className={cn(
-                  "object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]",
-                  !dims && "opacity-50"
-                )}
-              />
+              <div className="relative w-full h-full">
+                <Image
+                  src={photo.photoUrl}
+                  alt="Photo"
+                  fill
+                  sizes="(max-width: 768px) 50vw, 50vw"
+                  className={cn(
+                    "object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]",
+                    !dims && "opacity-50"
+                  )}
+                  priority={index < 4} // Prioritize loading first 4 images
+                  onLoad={() => {
+                    if (!imageDimensions[photo.id]) {
+                      preloadImage(photo.photoUrl, photo.id);
+                    }
+                  }}
+                />
+              </div>
 
               {/* Overlay with date and controls */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-between p-3">

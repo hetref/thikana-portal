@@ -130,20 +130,33 @@ export function ProductGrid({ userId, userData, userType = "customer" }) {
                 <p className="font-bold text-lg text-primary">
                   ₹{product.price?.toFixed(2) || "0.00"}
                 </p>
-                <Badge
-                  variant={
-                    product.quantity > 5
-                      ? "outline"
-                      : product.quantity > 0
-                        ? "secondary"
-                        : "destructive"
-                  }
-                  className="text-xs"
-                >
-                  {product.quantity > 0
-                    ? `${product.quantity} in stock`
-                    : "Out of stock"}
-                </Badge>
+                {userType === "business" ? (
+                  <Badge
+                    variant={
+                      product.quantity > 5
+                        ? "outline"
+                        : product.quantity > 0
+                          ? "secondary"
+                          : "destructive"
+                    }
+                    className="text-xs"
+                  >
+                    {product.quantity > 0
+                      ? `${product.quantity} in stock`
+                      : "Out of stock"}
+                  </Badge>
+                ) : (
+                  <Badge
+                    variant={product.quantity > 0 ? "secondary" : "destructive"}
+                    className="text-xs"
+                  >
+                    {product.quantity > 0
+                      ? product.quantity <= 5
+                        ? "2-3 available"
+                        : "In stock"
+                      : "Out of stock"}
+                  </Badge>
+                )}
               </div>
             </CardContent>
           </Card>
