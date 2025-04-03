@@ -13,6 +13,7 @@ import { v4 as uuidv4 } from "uuid";
 import { useRouter } from "next/navigation";
 import ReactCrop, { centerCrop, makeAspectCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
+import { toast } from "react-hot-toast";
 
 const CreatePost = () => {
   const [formData, setFormData] = useState({
@@ -133,19 +134,37 @@ const CreatePost = () => {
     setLoading((prev) => ({ ...prev, isGenerating: true }));
 
     try {
-      const formData = new FormData();
-      formData.append("type", type);
-      formData.append("prompt", type === "description" ? formData.title : "");
-      if (formData.image) {
-        formData.append("image", formData.image);
+      const requestFormData = new FormData();
+      requestFormData.append("type", type);
+      
+      // For title generation, send only the image
+      if (type === "title") {
+        if (!formData.image) {
+          throw new Error("Please upload an image first");
+        }
+        requestFormData.append("image", formData.image);
+      }
+      
+      // For description generation, send both title and image
+      if (type === "description") {
+        if (!formData.title) {
+          throw new Error("Please provide a title first");
+        }
+        requestFormData.append("prompt", formData.title);
+        if (formData.image) {
+          requestFormData.append("image", formData.image);
+        }
       }
 
       const response = await fetch("/api/generate-content", {
         method: "POST",
-        body: formData,
+        body: requestFormData,
       });
 
-      if (!response.ok) throw new Error("Failed to generate content");
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error || "Failed to generate content");
+      }
 
       const data = await response.json();
 
@@ -155,7 +174,7 @@ const CreatePost = () => {
       }));
     } catch (error) {
       console.error("Generation error:", error);
-      alert("Failed to generate content. Please try again.");
+      toast.error(error.message || "Failed to generate content. Please try again.");
     } finally {
       setLoading((prev) => ({ ...prev, isGenerating: false }));
     }
