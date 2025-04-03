@@ -8,7 +8,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 
 export const metadata = {
   title: "Thikana",
-  description: "Find your next home",
+  description: "Your Business | Your Customers | Your Success",
 };
 
 export default function RootLayout({ children }) {

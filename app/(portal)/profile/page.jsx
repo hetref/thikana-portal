@@ -139,18 +139,8 @@ import { useReactToPrint } from "react-to-print";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { Textarea } from "@/components/ui/textarea";
-
-// Dynamically import heavy components
-const FranchiseModal = dynamic(
-  () => import("@/components/profile/FranchiseModal"),
-  {
-    loading: () => (
-      <div className="flex justify-center items-center h-[400px]">
-        <Loader2Icon className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    ),
-  }
-);
+import "leaflet/dist/leaflet.css";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 
 // Add a style element to hide scrollbars
 const scrollbarHideStyles = `
@@ -162,6 +152,28 @@ const scrollbarHideStyles = `
     scrollbar-width: none;
   }
 `;
+
+// Dynamically import Leaflet components to avoid SSR issues
+const MapComponent = dynamic(() => import("@/components/MapComponent"), {
+  loading: () => (
+    <div className="h-[300px] flex justify-center items-center bg-gray-100">
+      <Loader2Icon className="w-8 h-8 animate-spin text-primary" />
+    </div>
+  ),
+  ssr: false,
+});
+
+// Dynamically import FranchiseModal
+const FranchiseModal = dynamic(
+  () => import("@/components/profile/FranchiseModal"),
+  {
+    loading: () => (
+      <div className="flex justify-center items-center h-[400px]">
+        <Loader2Icon className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    ),
+  }
+);
 
 // Memoized components
 const LoadingSpinner = () => (
@@ -1156,12 +1168,14 @@ export default function Profile() {
                     </div>
 
                     {/* Location map */}
-                    {showLocationIFrame && isBusinessUser && (
+                    {showLocationIFrame && (
                       <div className="mt-6 rounded-lg border overflow-hidden bg-white shadow-sm">
                         <div className="p-4 border-b">
                           <h3 className="font-medium flex items-center gap-2 text-gray-900">
                             <MapPinIcon className="w-4 h-4" />
-                            Business Location
+                            {isBusinessUser
+                              ? "Business Location"
+                              : "User Location"}
                           </h3>
                           {userData?.locations?.address ? (
                             <div className="mt-1 text-sm text-gray-600">
@@ -1169,17 +1183,31 @@ export default function Profile() {
                             </div>
                           ) : null}
                         </div>
-                        <iframe
-                          src={
-                            userData?.locations?.mapUrl ||
-                            "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d7544.081477968485!2d73.08964204800337!3d19.017926421940366!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3be7e9d390c16fad%3A0x45a26096b6c171fd!2sKamothe%2C%20Panvel%2C%20Navi%20Mumbai%2C%20Maharashtra!5e0!3m2!1sen!2sin!4v1739571469059!5m2!1sen!2sin"
-                          }
-                          style={{ border: "0" }}
-                          allowFullScreen=""
-                          loading="lazy"
-                          referrerPolicy="no-referrer-when-downgrade"
-                          className="w-full h-[300px]"
-                        ></iframe>
+                        <div className="h-[300px] w-full relative">
+                          {userData?.location?.latitude &&
+                          userData?.location?.longitude ? (
+                            <MapComponent
+                              location={{
+                                lat: userData.location.latitude,
+                                lng: userData.location.longitude,
+                              }}
+                              name={
+                                isBusinessUser
+                                  ? userData?.businessName
+                                  : userData?.name
+                              }
+                              address={
+                                userData?.locations?.address || "Location"
+                              }
+                            />
+                          ) : (
+                            <div className="flex justify-center items-center h-full bg-gray-100">
+                              <p className="text-gray-500">
+                                No location data available
+                              </p>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1191,7 +1219,7 @@ export default function Profile() {
                     <div className="flex flex-col items-center text-center">
                       <p className="text-amber-800 mb-3">
                         Please verify your email to access all platform
-                        features.
+                        features.,
                       </p>
                       <Button
                         onClick={verifyEmailHandler}
