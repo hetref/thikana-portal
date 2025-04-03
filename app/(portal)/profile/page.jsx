@@ -67,6 +67,7 @@ import {
   HomeIcon,
   Printer,
   Star,
+  MoreHorizontal,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import WhoToFollow from "@/components/WhoToFollow";
@@ -128,6 +129,16 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import FranchiseSelector from "@/components/profile/FranchiseSelector";
 import WebsiteBuilderButton from "@/components/WebsiteBuilderButton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useReactToPrint } from "react-to-print";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
+import { Textarea } from "@/components/ui/textarea";
 
 // Dynamically import heavy components
 const FranchiseModal = dynamic(
@@ -140,10 +151,6 @@ const FranchiseModal = dynamic(
     ),
   }
 );
-import { useReactToPrint } from "react-to-print";
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
-import { Textarea } from "@/components/ui/textarea";
 
 // Add a style element to hide scrollbars
 const scrollbarHideStyles = `
@@ -1024,13 +1031,15 @@ export default function Profile() {
                         )}
                       </div>
 
-                      {/* Action buttons */}
-                      <div className="flex flex-wrap w-full gap-2 mt-3 md:mt-0">
+                      {/* Action buttons - simplified layout */}
+                      <div className="flex flex-wrap gap-2 mt-3 md:mt-0">
+                        {/* Primary buttons - always visible */}
                         {isCurrentUser && (
                           <Button
                             asChild
                             variant="default"
-                            className="bg-black hover:bg-black/90 px-4 w-full md:w-auto"
+                            className="bg-black hover:bg-black/90 h-9"
+                            size="sm"
                           >
                             <Link
                               href={
@@ -1039,96 +1048,71 @@ export default function Profile() {
                                   : "/profile/settings/user"
                               }
                             >
-                              <EditIcon className="w-4 h-4 mr-2" />
-                              Edit Profile
+                              <EditIcon className="w-3.5 h-3.5 mr-1.5" />
+                              <span className="text-xs">Edit Profile</span>
                             </Link>
                           </Button>
                         )}
 
                         {isCurrentUser && isBusinessUser && (
-                          <>
-                            <Button
-                              asChild
-                              variant="default"
-                              className="bg-primary hover:bg-primary/90 px-4 w-full md:w-auto"
-                            >
-                              <Link href="/dashboard">
-                                <LayoutDashboard className="w-4 h-4 mr-2" />
-                                Dashboard
-                              </Link>
-                            </Button>
-
-                            <WebsiteBuilderButton userId={user?.uid} />
-
-                            {/* Exit Franchise Mode button - shown when in franchise mode */}
-                            {selectedFranchiseId && (
-                              <Button
-                                variant="outline"
-                                className="gap-2 w-full md:w-auto"
-                                onClick={() => {
-                                  sessionStorage.removeItem(
-                                    "selectedFranchiseId"
-                                  );
-                                  toast.success(
-                                    userData?.franchiseOwner
-                                      ? "Returned to Business View"
-                                      : "Returned to Headquarters"
-                                  );
-                                  window.location.reload();
-                                }}
-                              >
-                                {userData?.franchiseOwner ? (
-                                  <>
-                                    <ArrowLeftIcon className="w-4 h-4" />
-                                    Return to Business
-                                  </>
-                                ) : (
-                                  <>
-                                    <HomeIcon className="w-4 h-4" />
-                                    Return to HQ
-                                  </>
-                                )}
-                              </Button>
-                            )}
-
-                            {/* Add Franchise button - only shown for business HQ, not for franchises or when in franchise mode */}
-                            {!selectedFranchiseId &&
-                              !userData?.franchiseOwner && (
-                                <Button
-                                  variant="outline"
-                                  className="text-primary border-primary hover:bg-primary/10 px-4 w-full md:w-auto"
-                                  onClick={() => setIsFranchiseModalOpen(true)}
-                                >
-                                  <Globe className="w-4 h-4 mr-2" />
-                                  Add a Franchise
-                                </Button>
-                              )}
-
-                            {/* Show FranchiseSelector only when not in franchise mode and when at headquarters */}
-                            {!selectedFranchiseId &&
-                              !userData?.franchiseOwner && (
-                                <FranchiseSelector />
-                              )}
-                          </>
+                          <Button
+                            asChild
+                            variant="default"
+                            className="bg-primary hover:bg-primary/90 h-9"
+                            size="sm"
+                          >
+                            <Link href="/dashboard">
+                              <LayoutDashboard className="w-3.5 h-3.5 mr-1.5" />
+                              <span className="text-xs">Dashboard</span>
+                            </Link>
+                          </Button>
                         )}
-
+                        
+                        {isCurrentUser && isBusinessUser && (
+                          <WebsiteBuilderButton userId={user?.uid} />
+                        )}
+                        
+                        {/* More options dropdown */}
                         {isBusinessUser && (
-                          <>
-                            <Button
-                              variant="outline"
-                              onClick={toggleLocationIFrame}
-                              className="w-full md:w-auto"
-                            >
-                              <MapPinIcon className="w-4 h-4 mr-1" />
-                              Location
-                            </Button>
-
-                            {userData && (
-                              <MoreInformationDialog userData={userData} />
-                            )}
-
-                            <ShareBusinessDialog userData={userData} />
-                          </>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                className="h-9 border-gray-200"
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={toggleLocationIFrame}>
+                                <MapPinIcon className="w-3.5 h-3.5 mr-2" />
+                                <span>Location</span>
+                              </DropdownMenuItem>
+                              
+                              {userData && !selectedFranchiseId && !userData?.franchiseOwner && (
+                                <DropdownMenuItem onClick={() => setIsFranchiseModalOpen(true)}>
+                                  <Globe className="w-3.5 h-3.5 mr-2" />
+                                  <span>Add Franchise</span>
+                                </DropdownMenuItem>
+                              )}
+                              
+                              {selectedFranchiseId && (
+                                <DropdownMenuItem onClick={() => {
+                                  sessionStorage.removeItem("selectedFranchiseId");
+                                  window.location.reload();
+                                }}>
+                                  <ArrowLeftIcon className="w-3.5 h-3.5 mr-2" />
+                                  <span>Return to {userData?.franchiseOwner ? "Business" : "HQ"}</span>
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                        
+                        {/* Always show the share button */}
+                        {isBusinessUser && userData && (
+                          <ShareBusinessDialog userData={userData} />
                         )}
                       </div>
                     </div>
@@ -1224,17 +1208,17 @@ export default function Profile() {
                   <Suspense fallback={<LoadingSpinner />}>
                     <Card className="border-0 shadow-sm overflow-hidden bg-white">
                       <Tabs defaultValue="posts" className="w-full">
-                        <div className="border-b">
-                          <TabsList className="justify-start h-auto p-0 bg-transparent overflow-x-auto scrollbar-hide whitespace-nowrap">
+                        <div className="border-b overflow-x-auto scrollbar-hide">
+                          <TabsList className="justify-start h-auto p-0 bg-transparent overflow-x-auto scrollbar-hide whitespace-nowrap w-max min-w-full">
                             <TabsTrigger
                               value="posts"
                               className={cn(
                                 "rounded-none border-b-2 border-transparent",
                                 "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-6 py-3 font-medium text-sm transition-all duration-200"
+                                "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
                               )}
                             >
-                              <FileTextIcon className="w-4 h-4 mr-2" />
+                              <FileTextIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                               Posts
                             </TabsTrigger>
                             <TabsTrigger
@@ -1242,10 +1226,10 @@ export default function Profile() {
                               className={cn(
                                 "rounded-none border-b-2 border-transparent",
                                 "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-6 py-3 font-medium text-sm transition-all duration-200"
+                                "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
                               )}
                             >
-                              <HeartIcon className="w-4 h-4 mr-2" />
+                              <HeartIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                               Likes
                             </TabsTrigger>
                             <TabsTrigger
@@ -1253,10 +1237,10 @@ export default function Profile() {
                               className={cn(
                                 "rounded-none border-b-2 border-transparent",
                                 "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-6 py-3 font-medium text-sm transition-all duration-200"
+                                "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
                               )}
                             >
-                              <Images className="w-4 h-4 mr-2" />
+                              <Images className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                               Photos
                             </TabsTrigger>
                             {userData?.business_categories?.includes(
@@ -1267,10 +1251,10 @@ export default function Profile() {
                                 className={cn(
                                   "rounded-none border-b-2 border-transparent",
                                   "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                  "px-6 py-3 font-medium text-sm transition-all duration-200"
+                                  "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
                                 )}
                               >
-                                <SquareChartGantt className="w-4 h-4 mr-2" />
+                                <SquareChartGantt className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                                 Products
                               </TabsTrigger>
                             )}
@@ -1282,10 +1266,10 @@ export default function Profile() {
                                 className={cn(
                                   "rounded-none border-b-2 border-transparent",
                                   "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                  "px-6 py-3 font-medium text-sm transition-all duration-200"
+                                  "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
                                 )}
                               >
-                                <Settings className="w-4 h-4 mr-2" />
+                                <Settings className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                                 Services
                               </TabsTrigger>
                             )}
@@ -1294,10 +1278,10 @@ export default function Profile() {
                               className={cn(
                                 "rounded-none border-b-2 border-transparent",
                                 "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-6 py-3 font-medium text-sm transition-all duration-200"
+                                "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
                               )}
                             >
-                              <Bookmark className="w-4 h-4 mr-2" />
+                              <Bookmark className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                               Saved
                             </TabsTrigger>
                             <TabsTrigger
@@ -1305,10 +1289,10 @@ export default function Profile() {
                               className={cn(
                                 "rounded-none border-b-2 border-transparent",
                                 "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-6 py-3 font-medium text-sm transition-all duration-200"
+                                "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
                               )}
                             >
-                              <ShoppingCart className="w-4 h-4 mr-2" />
+                              <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                               Orders
                             </TabsTrigger>
                           </TabsList>
@@ -1427,17 +1411,17 @@ export default function Profile() {
                   <Suspense fallback={<LoadingSpinner />}>
                     <Card className="border-0 shadow-sm overflow-hidden bg-white">
                       <Tabs defaultValue="saved" className="w-full">
-                        <div className="border-b">
-                          <TabsList className="justify-start h-auto p-0 bg-transparent overflow-x-auto scrollbar-hide whitespace-nowrap">
+                        <div className="border-b overflow-x-auto scrollbar-hide">
+                          <TabsList className="justify-start h-auto p-0 bg-transparent overflow-x-auto scrollbar-hide whitespace-nowrap w-max min-w-full">
                             <TabsTrigger
                               value="saved"
                               className={cn(
                                 "rounded-none border-b-2 border-transparent",
                                 "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-6 py-3 font-medium text-sm transition-all duration-200"
+                                "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
                               )}
                             >
-                              <Bookmark className="w-4 h-4 mr-2" />
+                              <Bookmark className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                               Saved Posts
                             </TabsTrigger>
                             <TabsTrigger
@@ -1445,10 +1429,10 @@ export default function Profile() {
                               className={cn(
                                 "rounded-none border-b-2 border-transparent",
                                 "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-6 py-3 font-medium text-sm transition-all duration-200"
+                                "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
                               )}
                             >
-                              <HeartIcon className="w-4 h-4 mr-2" />
+                              <HeartIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                               Likes
                             </TabsTrigger>
                             <TabsTrigger
@@ -1456,10 +1440,10 @@ export default function Profile() {
                               className={cn(
                                 "rounded-none border-b-2 border-transparent",
                                 "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-6 py-3 font-medium text-sm transition-all duration-200"
+                                "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
                               )}
                             >
-                              <ShoppingCart className="w-4 h-4 mr-2" />
+                              <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                               Orders
                             </TabsTrigger>
                           </TabsList>
