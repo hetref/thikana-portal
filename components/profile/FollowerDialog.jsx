@@ -9,7 +9,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { doc, setDoc, deleteDoc } from "firebase/firestore";
+import { doc, setDoc, deleteDoc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import Link from "next/link";
 import {
@@ -25,12 +25,14 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import toast from "react-hot-toast";
+import { sendNotificationToUser } from "@/lib/notifications";
 
 const FollowingDialog = ({ followingCount }) => {
   const [following, setFollowing] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [open, setOpen] = useState(false);
+  const [loadingId, setLoadingId] = useState(null);
   const userId = auth.currentUser?.uid;
 
   useEffect(() => {
@@ -57,9 +59,11 @@ const FollowingDialog = ({ followingCount }) => {
   }, [userId, open]);
 
   const handleFollow = async (businessId) => {
-    if (!auth.currentUser) return;
+    if (!auth.currentUser || loadingId) return;
 
     try {
+      setLoadingId(businessId);
+
       await Promise.all([
         setDoc(
           doc(db, "users", businessId, "followers", auth.currentUser.uid),
@@ -77,18 +81,35 @@ const FollowingDialog = ({ followingCount }) => {
         ),
       ]);
 
-      // Remove the followed business from the list immediately
+      const currentUserData = (
+        await getDoc(doc(db, "users", auth.currentUser.uid))
+      ).data();
+      const businessName =
+        currentUserData?.businessName ||
+        currentUserData?.displayName ||
+        "Someone";
+
+      await sendNotificationToUser(businessId, {
+        title: "New Follower",
+        message: `${businessName} started following you`,
+        type: "follower",
+        sender: "System",
+        whatsapp: false,
+        email: false,
+      });
+
       setFollowing((prevFollowing) =>
         prevFollowing.filter((business) => business.id !== businessId)
       );
 
-      // Only fetch new recommendations if we're running low
       if (following.length <= LIMIT) {
         setOffset(0);
         fetchRecommendedBusinesses(0);
       }
     } catch (error) {
       console.error("Error following business:", error);
+    } finally {
+      setLoadingId(null);
     }
   };
 
@@ -148,8 +169,13 @@ const FollowingDialog = ({ followingCount }) => {
                         variant="outline"
                         className="bg-green-500 text-primary-foreground hover:bg-green-400 hover:text-white"
                         onClick={() => handleFollow(business?.uid)}
+                        disabled={loadingId === business?.uid}
                       >
-                        <Plus />
+                        {loadingId === business?.uid ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Plus />
+                        )}
                       </Button>
                     </div>
                   </div>
@@ -168,9 +194,9 @@ const FollowerDialog = ({ followerCount, userId, className }) => {
   const [error, setError] = useState(null);
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [loadingId, setLoadingId] = useState(null);
   const currentUser = auth.currentUser;
 
-  // Determine if the current user is the owner of this profile
   const isOwner = currentUser && currentUser.uid === userId;
 
   useEffect(() => {
@@ -199,21 +225,39 @@ const FollowerDialog = ({ followerCount, userId, className }) => {
     }
   }, [userId, open]);
 
-  // Handle removing a follower
   const handleRemoveFollower = async (followerId) => {
-    if (!currentUser) return;
+    if (!currentUser || loadingId) return;
 
     try {
-      // Remove follower logic
+      setLoadingId(followerId);
+
       await deleteDoc(doc(db, "users", userId, "followers", followerId));
       await deleteDoc(doc(db, "users", followerId, "following", userId));
 
-      // Update local state
+      const currentUserData = (
+        await getDoc(doc(db, "users", currentUser.uid))
+      ).data();
+      const businessName =
+        currentUserData?.businessName ||
+        currentUserData?.displayName ||
+        "A business";
+
+      await sendNotificationToUser(followerId, {
+        title: "Follower Removed",
+        message: `${businessName} removed you from their followers`,
+        type: "follower",
+        sender: "System",
+        whatsapp: false,
+        email: false,
+      });
+
       setFollowers(followers.filter((user) => user.uid !== followerId));
       toast.success("Follower removed successfully");
     } catch (error) {
       console.error("Error removing follower:", error);
       toast.error("Failed to remove follower");
+    } finally {
+      setLoadingId(null);
     }
   };
 
@@ -321,9 +365,19 @@ const FollowerDialog = ({ followerCount, userId, className }) => {
                       variant="outline"
                       className="h-9 px-3 ml-2 border-gray-200 text-gray-700 hover:bg-gray-100"
                       onClick={() => handleRemoveFollower(user?.uid)}
+                      disabled={loadingId === user?.uid}
                     >
-                      <UserMinus className="h-4 w-4 mr-1.5" />
-                      <span>Remove</span>
+                      {loadingId === user?.uid ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                          <span>Removing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <UserMinus className="h-4 w-4 mr-1.5" />
+                          <span>Remove</span>
+                        </>
+                      )}
                     </Button>
                   </div>
                 ))}

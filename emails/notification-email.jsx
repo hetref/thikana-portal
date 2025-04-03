@@ -28,6 +28,8 @@ const getTypeIcon = (type) => {
       return "⚙️";
     case "test":
       return "🧪";
+    case "follower":
+      return "👥";
     default:
       return "🔔";
   }
@@ -45,6 +47,8 @@ const getTypeColor = (type) => {
       return "#6366f1"; // indigo-500
     case "test":
       return "#8b5cf6"; // violet-500
+    case "follower":
+      return "#ec4899"; // pink-500
     default:
       return "#6b7280"; // gray-500
   }

@@ -127,6 +127,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import FranchiseSelector from "@/components/profile/FranchiseSelector";
+import WebsiteBuilderButton from "@/components/WebsiteBuilderButton";
 
 // Dynamically import heavy components
 const FranchiseModal = dynamic(
@@ -1056,6 +1057,8 @@ export default function Profile() {
                                 Dashboard
                               </Link>
                             </Button>
+
+                            <WebsiteBuilderButton userId={user?.uid} />
 
                             {/* Exit Franchise Mode button - shown when in franchise mode */}
                             {selectedFranchiseId && (
