@@ -189,6 +189,7 @@ const FeedPage = () => {
           Accept: "application/json",
           "Content-Type": "application/json",
           "Cache-Control": "no-cache", // Force fresh content on client side
+          "Access-Control-Allow-Credentials": "true",
         },
       });
 
