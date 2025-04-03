@@ -55,6 +55,7 @@ import RequestCallButton from "@/components/RequestCallButton";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import ShowServicesTabContent from "@/components/profile/ShowServicesTabContent";
+import { sendNotificationToUser } from "@/lib/notifications";
 
 // Add a style element to hide scrollbars
 const scrollbarHideStyles = `
@@ -78,6 +79,7 @@ export default function UserProfile() {
   const [showLocationIFrame, setShowLocationIFrame] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [followLoading, setFollowLoading] = useState(false);
   const [userPhotos, setUserPhotos] = useState([]);
   const [loadingPhotos, setLoadingPhotos] = useState(false);
 
@@ -197,15 +199,35 @@ export default function UserProfile() {
   };
 
   const handleFollowToggle = async () => {
-    if (!currentUser || !userId) return;
+    if (!currentUser || !userId || followLoading) return;
 
     try {
+      setFollowLoading(true);
+
       if (isFollowing) {
         // Unfollow logic
         await Promise.all([
           deleteDoc(doc(db, "users", userId, "followers", currentUser.uid)),
           deleteDoc(doc(db, "users", currentUser.uid, "following", userId)),
         ]);
+
+        // Send notification to the business being unfollowed
+        const currentUserData = await getDoc(doc(db, "users", currentUser.uid));
+        const userData = currentUserData.exists()
+          ? currentUserData.data()
+          : null;
+        const businessName =
+          userData?.businessName || userData?.displayName || "Someone";
+
+        await sendNotificationToUser(userId, {
+          title: "Lost a Follower",
+          message: `${businessName} has unfollowed you`,
+          type: "follower",
+          sender: "System",
+          whatsapp: false,
+          email: false,
+        });
+
         toast.success("Unfollowed successfully");
       } else {
         // Follow logic
@@ -219,11 +241,31 @@ export default function UserProfile() {
             timestamp: new Date(),
           }),
         ]);
+
+        // Send notification to the business being followed
+        const currentUserData = await getDoc(doc(db, "users", currentUser.uid));
+        const userData = currentUserData.exists()
+          ? currentUserData.data()
+          : null;
+        const businessName =
+          userData?.businessName || userData?.displayName || "Someone";
+
+        await sendNotificationToUser(userId, {
+          title: "New Follower",
+          message: `${businessName} started following you`,
+          type: "follower",
+          sender: "System",
+          whatsapp: false,
+          email: false,
+        });
+
         toast.success("Followed successfully");
       }
     } catch (error) {
       console.error("Error updating follow status:", error);
       toast.error("Failed to update follow status");
+    } finally {
+      setFollowLoading(false);
     }
   };
 
@@ -405,8 +447,14 @@ export default function UserProfile() {
                   className={
                     isFollowing ? "px-4" : "bg-black hover:bg-black/90 px-4"
                   }
+                  disabled={followLoading}
                 >
-                  {isFollowing ? (
+                  {followLoading ? (
+                    <>
+                      <Loader2Icon className="w-4 h-4 mr-2 animate-spin" />
+                      {isFollowing ? "Unfollowing..." : "Following..."}
+                    </>
+                  ) : isFollowing ? (
                     <>
                       <Minus className="w-4 h-4 mr-2" />
                       Unfollow

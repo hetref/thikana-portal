@@ -9,7 +9,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { doc, setDoc, deleteDoc } from "firebase/firestore";
+import { doc, setDoc, deleteDoc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import Link from "next/link";
 import { Loader2, Minus, Search, UserMinus, UserX } from "lucide-react";
@@ -17,6 +17,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import toast from "react-hot-toast";
+import { sendNotificationToUser } from "@/lib/notifications";
 
 const FollowingDialog = ({ followingCount, userId, className }) => {
   const [following, setFollowing] = useState([]);
@@ -24,6 +25,7 @@ const FollowingDialog = ({ followingCount, userId, className }) => {
   const [error, setError] = useState(null);
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [loadingId, setLoadingId] = useState(null); // Track which button is loading
   const currentUser = auth.currentUser;
 
   // Determine if the current user is the owner of this profile
@@ -56,9 +58,12 @@ const FollowingDialog = ({ followingCount, userId, className }) => {
 
   // Handle unfollowing
   const handleUnfollow = async (followingId) => {
-    if (!currentUser) return;
+    if (!currentUser || loadingId) return;
 
     try {
+      // Set loading state for this specific button
+      setLoadingId(followingId);
+
       // Unfollow logic
       await deleteDoc(
         doc(db, "users", followingId, "followers", currentUser.uid)
@@ -67,12 +72,30 @@ const FollowingDialog = ({ followingCount, userId, className }) => {
         doc(db, "users", currentUser.uid, "following", followingId)
       );
 
+      // Send notification to the business being unfollowed
+      const currentUserData = await getDoc(doc(db, "users", currentUser.uid));
+      const userData = currentUserData.exists() ? currentUserData.data() : null;
+      const businessName =
+        userData?.businessName || userData?.displayName || "Someone";
+
+      await sendNotificationToUser(followingId, {
+        title: "Lost a Follower",
+        message: `${businessName} has unfollowed you`,
+        type: "follower",
+        sender: "System",
+        whatsapp: false,
+        email: false,
+      });
+
       // Update local state
       setFollowing(following.filter((user) => user.uid !== followingId));
       toast.success("Unfollowed successfully");
     } catch (error) {
       console.error("Error unfollowing:", error);
       toast.error("Failed to unfollow");
+    } finally {
+      // Clear loading state
+      setLoadingId(null);
     }
   };
 
@@ -180,9 +203,19 @@ const FollowingDialog = ({ followingCount, userId, className }) => {
                       variant="outline"
                       className="h-9 px-3 ml-2 border-gray-200 text-gray-700 hover:bg-gray-100"
                       onClick={() => handleUnfollow(user?.uid)}
+                      disabled={loadingId === user?.uid}
                     >
-                      <UserMinus className="h-4 w-4 mr-1.5" />
-                      <span>Unfollow</span>
+                      {loadingId === user?.uid ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                          <span>Unfollowing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <UserMinus className="h-4 w-4 mr-1.5" />
+                          <span>Unfollow</span>
+                        </>
+                      )}
                     </Button>
                   </div>
                 ))}

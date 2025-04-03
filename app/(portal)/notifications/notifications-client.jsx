@@ -122,6 +122,8 @@ export default function NotificationsClient() {
         return "🏷️";
       case "system":
         return "⚙️";
+      case "follower":
+        return "👥";
       default:
         return "🔔";
     }

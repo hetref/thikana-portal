@@ -405,7 +405,7 @@ export default function PlansTab() {
     const intervalText = interval.charAt(0).toUpperCase() + interval.slice(1);
 
     if (count === 1) {
-      return `${intervalText}ly`;
+      return `${intervalText}`;
     }
 
     return `Every ${count} ${interval}s`;
