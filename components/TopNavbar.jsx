@@ -103,9 +103,11 @@ const TopNavbar = ({ type = "unauthenticated" }) => {
             sm:gap-6 fixed sm:relative top-14 sm:top-auto right-0 sm:right-auto w-full sm:w-auto p-6`}
           >
             <div className="flex items-center gap-2">
-              <Link href="/search">
-                <Search className="h-5 w-5" />
-              </Link>
+              <Button variant="ghost" size="icon" className="border" asChild>
+                <Link href="/search">
+                  <Search className="h-5 w-5" />
+                </Link>
+              </Button>
               {type === "authenticated" && userData?.role === "user" && (
                 <CartIcon userData={userData} />
               )}
