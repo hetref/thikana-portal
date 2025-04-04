@@ -1,61 +1,75 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { adminAuth, adminDb } from "@/lib/firebase-admin";
 
-export async function GET(request) {
+export async function POST(req) {
   try {
-    // Get the business ID from the query parameters
-    const { searchParams } = new URL(request.url);
-    const businessId = searchParams.get("businessId");
+    // Get the request body
+    const { userId } = await req.json();
 
-    if (!businessId) {
+    // Validate input
+    if (!userId) {
       return NextResponse.json(
-        {
-          error: "Business ID is required",
-        },
+        { message: "User ID is required" },
         { status: 400 }
       );
     }
 
-    // Get business data from Firestore
-    const businessDoc = await getDoc(doc(db, "businesses", businessId));
+    // Get user data to check if they're a member
+    const userDoc = await adminDb.collection("users").doc(userId).get();
 
-    if (!businessDoc.exists()) {
-      return NextResponse.json(
-        {
-          error: "Business not found",
-        },
-        { status: 404 }
-      );
+    if (!userDoc.exists) {
+      return NextResponse.json({ message: "User not found" }, { status: 404 });
     }
 
-    // Get user data for the business
-    const userDoc = await getDoc(doc(db, "users", businessId));
-
-    if (!userDoc.exists()) {
-      return NextResponse.json(
-        {
-          error: "User data not found",
-        },
-        { status: 404 }
-      );
-    }
-
-    // Combine and return the data
-    const businessData = businessDoc.data();
     const userData = userDoc.data();
 
-    return NextResponse.json({
-      business: businessData,
-      user: userData,
-    });
+    // If user is not a member or doesn't have a business ID, return error
+    if (userData.role !== "member" || !userData.businessId) {
+      return NextResponse.json(
+        { message: "User is not a member of any business" },
+        { status: 400 }
+      );
+    }
+
+    // Get business data
+    const businessDoc = await adminDb
+      .collection("users")
+      .doc(userData.businessId)
+      .get();
+
+    if (!businessDoc.exists) {
+      return NextResponse.json(
+        { message: "Business not found" },
+        { status: 404 }
+      );
+    }
+
+    const businessData = businessDoc.data();
+
+    // Remove sensitive information from business data
+    const sanitizedBusinessData = {
+      businessId: userData.businessId,
+      businessName: businessData.businessName,
+      businessLogo: businessData.profilePic || null,
+      businessCover: businessData.coverPic || null,
+      businessAddress: businessData.locations || null,
+      businessLocation: businessData.location || null,
+      businessBio: businessData.bio || null,
+      businessWebsite: businessData.website || null,
+      businessCategories: businessData.business_categories || [],
+    };
+
+    return NextResponse.json(
+      {
+        success: true,
+        businessData: sanitizedBusinessData,
+      },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("Error fetching business data:", error);
     return NextResponse.json(
-      {
-        error: "Failed to fetch business data",
-        details: error.message,
-      },
+      { message: error.message || "Failed to fetch business data" },
       { status: 500 }
     );
   }

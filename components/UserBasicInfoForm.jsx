@@ -6,7 +6,13 @@ import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { auth, db } from "@/lib/firebase";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import {
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
+  serverTimestamp,
+} from "firebase/firestore";
 import toast from "react-hot-toast";
 import ImageUpload from "./ImageUpload";
 import { storage } from "@/lib/firebase";
@@ -25,7 +31,7 @@ const userInfoSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
 });
 
-export default function UserBasicInfoForm() {
+export default function UserBasicInfoForm({ userData = null }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [profileImageFile, setProfileImageFile] = useState(null);
@@ -37,9 +43,10 @@ export default function UserBasicInfoForm() {
     bannerImg: 0,
   });
   const [uploadingType, setUploadingType] = useState(null);
-  const [userData, setUserData] = useState(null);
   const [canChangeUsername, setCanChangeUsername] = useState(true);
   const [daysUntilUsernameChange, setDaysUntilUsernameChange] = useState(0);
+  const [businessData, setBusinessData] = useState(null);
+  const [localUserData, setLocalUserData] = useState(userData);
 
   const user = auth.currentUser;
   const {
@@ -67,20 +74,55 @@ export default function UserBasicInfoForm() {
         const userDocSnap = await getDoc(userDocRef);
         if (userDocSnap.exists()) {
           const data = userDocSnap.data();
-          setUserData(data);
+          setLocalUserData(data);
 
-          // Set form values
-          setValue("name", data.name || "");
-          setValue("username", data.username || "");
+          // If user is a member, fetch the business data
+          if (data.role === "member" && data.businessId) {
+            try {
+              const businessDocRef = doc(db, "users", data.businessId);
+              const businessDocSnap = await getDoc(businessDocRef);
 
-          // Set profile image preview
-          if (data.profilePic) {
-            setProfileImagePreview(data.profilePic);
-          }
+              if (businessDocSnap.exists()) {
+                const businessData = businessDocSnap.data();
+                setBusinessData(businessData);
 
-          // Set banner image preview
-          if (data.bannerImage) {
-            setBannerImagePreview(data.bannerImage);
+                // For members, we want to show the business name but keep their personal name
+                setValue("name", data.name || "");
+                setValue(
+                  "username",
+                  data.username || businessData.username || ""
+                );
+
+                // Use business profile picture and banner if member doesn't have one
+                if (!data.profilePic && businessData.profilePic) {
+                  setProfileImagePreview(businessData.profilePic);
+                } else if (data.profilePic) {
+                  setProfileImagePreview(data.profilePic);
+                }
+
+                if (!data.bannerImage && businessData.bannerImage) {
+                  setBannerImagePreview(businessData.bannerImage);
+                } else if (data.bannerImage) {
+                  setBannerImagePreview(data.bannerImage);
+                }
+              }
+            } catch (error) {
+              console.error("Error fetching business data:", error);
+            }
+          } else {
+            // Set form values for non-member users
+            setValue("name", data.name || "");
+            setValue("username", data.username || "");
+
+            // Set profile image preview
+            if (data.profilePic) {
+              setProfileImagePreview(data.profilePic);
+            }
+
+            // Set banner image preview
+            if (data.bannerImage) {
+              setBannerImagePreview(data.bannerImage);
+            }
           }
 
           // Check if username can be changed
@@ -149,59 +191,69 @@ export default function UserBasicInfoForm() {
     });
   }
 
-  async function onSubmit(data) {
-    if (!user) {
-      toast.error("You must be logged in to update your profile");
-      return;
-    }
-
-    setIsSubmitting(true);
+  const onSubmit = async (data) => {
     try {
-      // Check if username is being changed
-      const isUsernameChanged = userData?.username !== data.username;
+      setIsSubmitting(true);
+      if (!user) return;
 
-      // Prepare the userData object
-      const updateData = {
-        name: data.name,
+      let updateData = {
+        ...data,
+        updatedAt: serverTimestamp(),
       };
 
-      // Only update username if it's changed and allowed
-      if (isUsernameChanged) {
-        if (!canChangeUsername) {
-          toast.error(
-            `You can change your username only once every 2 months. ${daysUntilUsernameChange} days remaining.`
-          );
-          setIsSubmitting(false);
-          return;
-        }
-
-        updateData.username = data.username;
-        updateData.lastUsernameChange = new Date();
-      }
-
-      // Upload profile picture if selected
+      // Upload profile image if changed
       if (profileImageFile) {
-        const profilePicURL = await uploadImage(profileImageFile, "profileImg");
-        updateData.profilePic = profilePicURL;
-        setProfileImagePreview(profilePicURL);
+        const profileImageUrl = await uploadImage(
+          profileImageFile,
+          "profileImg"
+        );
+        if (profileImageUrl) {
+          updateData.profilePic = profileImageUrl;
+        }
       }
 
-      // Upload banner image if selected
+      // Upload banner image if changed
       if (bannerImageFile) {
-        const bannerImageURL = await uploadImage(bannerImageFile, "bannerImg");
-        updateData.bannerImage = bannerImageURL;
-        setBannerImagePreview(bannerImageURL);
+        const bannerImageUrl = await uploadImage(bannerImageFile, "bannerImg");
+        if (bannerImageUrl) {
+          updateData.bannerImage = bannerImageUrl;
+        }
       }
 
-      await updateProfile(updateData);
+      // Determine where to save data based on user role
+      const isMember = localUserData?.role === "member";
+      const businessId = localUserData?.businessId;
+
+      // If user is a member, we need to update in different places
+      if (isMember && businessId) {
+        // Update in the businesses/{businessId}/members/{memberId} collection
+        const memberRef = doc(
+          db,
+          `businesses/${businessId}/members/${user.uid}`
+        );
+        await updateDoc(memberRef, {
+          name: data.name,
+          phone: localUserData?.phone || "",
+          updatedAt: serverTimestamp(),
+        });
+
+        // Special handling for the business relationship
+        toast.success(
+          "Profile updated successfully for both your account and the business!"
+        );
+      } else {
+        toast.success("Profile updated successfully!");
+      }
+
+      // Always update the users/{userId} document
+      const userRef = doc(db, "users", user.uid);
+      await updateDoc(userRef, updateData);
 
       // Update local state
-      if (isUsernameChanged && canChangeUsername) {
+      if (localUserData?.username !== data.username && canChangeUsername) {
         setCanChangeUsername(false);
         setDaysUntilUsernameChange(60);
       }
-
-      toast.success("Profile updated successfully!");
     } catch (error) {
       console.error("Error updating profile:", error);
       toast.error("Failed to update profile");
@@ -209,7 +261,7 @@ export default function UserBasicInfoForm() {
       setIsSubmitting(false);
       setUploadingType(null);
     }
-  }
+  };
 
   const handleProfileImageChange = (file) => {
     setProfileImageFile(file);
@@ -246,8 +298,8 @@ export default function UserBasicInfoForm() {
   }
 
   // Format date for display
-  const createdAt = userData?.createdAt?.toDate
-    ? new Date(userData.createdAt.toDate()).toLocaleDateString("en-US", {
+  const createdAt = localUserData?.createdAt?.toDate
+    ? new Date(localUserData.createdAt.toDate()).toLocaleDateString("en-US", {
         month: "long",
         day: "numeric",
         year: "numeric",
@@ -264,6 +316,17 @@ export default function UserBasicInfoForm() {
     <div className="space-y-8">
       <div className="space-y-4">
         <h2 className="text-2xl font-semibold">Profile Information</h2>
+        {localUserData?.role === "member" && businessData && (
+          <div className="bg-violet-50 border border-violet-200 rounded-md p-4">
+            <p className="text-violet-800">
+              You are a member of{" "}
+              <span className="font-semibold">{businessData.businessName}</span>
+            </p>
+            <p className="text-sm text-violet-600 mt-1">
+              Your profile is connected to this business account
+            </p>
+          </div>
+        )}
         <p className="text-gray-600">Update your personal information</p>
       </div>
 
@@ -274,12 +337,14 @@ export default function UserBasicInfoForm() {
               <Avatar className="w-32 h-32 border-4 border-white shadow-md">
                 <AvatarImage
                   src={
-                    profileImagePreview || userData?.profilePic || "/avatar.png"
+                    profileImagePreview ||
+                    localUserData?.profilePic ||
+                    "/avatar.png"
                   }
-                  alt={userData?.name || "User"}
+                  alt={localUserData?.name || "User"}
                 />
                 <AvatarFallback className="text-2xl font-semibold">
-                  {userData?.name?.charAt(0) || "U"}
+                  {localUserData?.name?.charAt(0) || "U"}
                 </AvatarFallback>
               </Avatar>
             </div>
@@ -288,7 +353,7 @@ export default function UserBasicInfoForm() {
               <ImageUpload
                 title="Profile Picture"
                 description="Upload a profile picture"
-                defaultValue={userData?.profilePic}
+                defaultValue={localUserData?.profilePic}
                 onChange={handleProfileImageChange}
                 uploading={uploadingType === "profileImg"}
                 progress={uploadingProgress.profileImg}
@@ -309,7 +374,7 @@ export default function UserBasicInfoForm() {
               <ImageUpload
                 title="Banner Image"
                 description="Upload a banner image"
-                defaultValue={userData?.bannerImage}
+                defaultValue={localUserData?.bannerImage}
                 onChange={handleBannerImageChange}
                 uploading={uploadingType === "bannerImg"}
                 progress={uploadingProgress.bannerImg}
@@ -419,7 +484,7 @@ export default function UserBasicInfoForm() {
                 </label>
                 <Input
                   id="phone"
-                  value={userData?.phone || "Not provided"}
+                  value={localUserData?.phone || "Not provided"}
                   disabled
                   className="bg-gray-50"
                   readOnly

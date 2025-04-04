@@ -23,20 +23,22 @@ import {
   Maximize2,
   ChevronLeft,
   ChevronRight,
+  Loader2,
+  ImageIcon,
+  AlertCircle,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { deleteDoc, doc } from "firebase/firestore";
+import { deleteDoc, doc, collection, onSnapshot } from "firebase/firestore";
 import { deleteObject, ref } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
+import useBusinessIdForMember from "@/hooks/useBusinessIdForMember";
 
-export default function PhotosGrid({
-  photos = [],
-  userId,
-  onPhotoDeleted,
-  onAddPhoto,
-}) {
+export default function PhotosGrid({ userId }) {
+  const [photos, setPhotos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -46,6 +48,41 @@ export default function PhotosGrid({
   const [isFullScreen, setIsFullScreen] = useState(false);
   const imageRef = useRef(null);
   const { user } = useAuth();
+
+  // Use our custom hook to get the appropriate ID for fetching data
+  const {
+    targetId,
+    isMember,
+    loading: idLoading,
+  } = useBusinessIdForMember(userId);
+
+  useEffect(() => {
+    if (idLoading) return; // Wait until we know if the user is a member
+
+    const photosCol = collection(db, `users/${targetId}/photos`);
+    const unsubscribe = onSnapshot(
+      photosCol,
+      (photosSnapshot) => {
+        if (!photosSnapshot.empty) {
+          const photosData = photosSnapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+          setPhotos(photosData);
+        } else {
+          setPhotos([]);
+        }
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Error fetching photos:", error);
+        setError("Failed to fetch photos. Please try again.");
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [targetId, idLoading]);
 
   // Reset zoom when photo changes
   useEffect(() => {
@@ -75,9 +112,7 @@ export default function PhotosGrid({
       toast.success("Photo deleted successfully");
 
       // Notify parent component to update the photos list
-      if (onPhotoDeleted) {
-        onPhotoDeleted(photo.id);
-      }
+      setPhotos((prevPhotos) => prevPhotos.filter((p) => p.id !== photo.id));
 
       // Close the delete dialog
       setIsDeleteDialogOpen(false);
@@ -218,23 +253,39 @@ export default function PhotosGrid({
     });
   };
 
-  if (!photos || photos.length === 0) {
+  if (idLoading || loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 bg-muted/30 rounded-lg">
-        <div className="bg-background shadow-sm w-24 h-24 rounded-full flex items-center justify-center mb-5 border">
-          <Expand className="h-12 w-12 text-muted-foreground/70" />
-        </div>
-        <h3 className="text-xl font-medium mb-3">No Photos Yet</h3>
-        <p className="text-muted-foreground text-center max-w-md mb-6 px-4">
-          Photos you add will appear here. Share your moments and showcase your
-          work!
+      <div className="flex flex-col items-center justify-center py-16">
+        <Loader2 className="w-10 h-10 animate-spin text-primary/70 mb-4" />
+        <p className="text-muted-foreground">Loading photos...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <AlertCircle className="w-12 h-12 text-destructive/70 mb-4" />
+        <p className="text-destructive font-medium mb-1">
+          Something went wrong
         </p>
-        {canDelete && onAddPhoto && (
-          <Button onClick={onAddPhoto} size="lg" className="gap-2">
-            <Plus className="h-4 w-4" />
-            Add Your First Photo
-          </Button>
-        )}
+        <p className="text-muted-foreground text-sm">{error}</p>
+      </div>
+    );
+  }
+
+  if (photos.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <ImageIcon className="w-16 h-16 text-muted-foreground/30 mb-4" />
+        <h3 className="text-lg font-medium text-gray-800 mb-2">
+          No photos yet
+        </h3>
+        <p className="text-muted-foreground text-sm max-w-md">
+          {isMember
+            ? "The business hasn't added any photos yet."
+            : "This business hasn't added any photos yet."}
+        </p>
       </div>
     );
   }
@@ -244,12 +295,12 @@ export default function PhotosGrid({
       {/* Controls */}
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-medium">Photos ({photos.length})</h3>
-        {canDelete && onAddPhoto && (
+        {canDelete && (
           <Button
-            onClick={onAddPhoto}
             size="sm"
             variant="outline"
             className="gap-2"
+            onClick={() => setSelectedPhoto(null)}
           >
             <Plus className="h-4 w-4" />
             Add Photo
