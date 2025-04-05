@@ -113,10 +113,15 @@ const TopNavbar = ({ type = "unauthenticated" }) => {
             includedLanguages: languages.map((lang) => lang.code).join(","),
             autoDisplay: false,
             layout:
-              window.google.translate.TranslateElement.InlineLayout.SIMPLE,
+              window.google.translate.TranslateElement.InlineLayout.HORIZONTAL,
           },
           "google_translate_element"
         );
+        const googleFrame = document.getElementsByClassName('goog-te-banner-frame')[0];
+        if (googleFrame) {
+          googleFrame.style.display = 'none';
+        }
+        document.body.style.top = '0px';
       };
 
       // Add script to page
@@ -165,7 +170,7 @@ const TopNavbar = ({ type = "unauthenticated" }) => {
     <CartProvider>
       <header className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-sm border-b border-gray-200 transition-colors duration-300">
         {/* Hidden Google Translate element - not interactive, just for initialization */}
-        <div id="google_translate_element" style={{ display: "none" }}></div>
+        <div id="google_translate_element" className="hidden"></div>
 
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
           <Link href="/" className="flex items-center gap-2 font-semibold">
