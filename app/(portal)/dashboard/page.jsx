@@ -63,6 +63,7 @@ import {
   BarChart,
   Package,
   ShoppingBag,
+  Menu,
 } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import {
@@ -98,6 +99,7 @@ export default function DashboardPage() {
     useState("expense-analytics");
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userRole, setUserRole] = useState(null);
 
   // Fetch business user data
@@ -161,27 +163,28 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen">
-      <div className="max-w-7xl mx-auto py-8 px-4">
-        <div className="flex flex-col lg:flex-row gap-6">
+      <div className="max-w-7xl mx-auto py-4 sm:py-8 px-3 sm:px-4">
+        <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
           {/* Left Sidebar */}
           <aside className="hidden lg:block w-80">
             <Sidebar />
           </aside>
 
           {/* Main content */}
-          <main className="flex-1 space-y-6">
-            <div className="mb-8">
-              <h1 className="text-2xl font-bold mb-2">
+          <main className="flex-1 space-y-4 sm:space-y-6">
+            <div className="mb-4 sm:mb-8">
+              <h1 className="text-xl sm:text-2xl font-bold mb-1 sm:mb-2">
                 Welcome, {userData?.businessName || "Business Owner"}
               </h1>
-              <p className="text-muted-foreground">
+              <p className="text-sm sm:text-base text-muted-foreground">
                 Manage your business inquiries, payments and subscription plans
               </p>
             </div>
 
             <Tabs value={activeTab} onValueChange={handleTabChange}>
-              <div className="flex justify-between items-center mb-6">
-                <TabsList className="grid grid-cols-3 lg:grid-cols-7 mb-3">
+              {/* Desktop Tabs List */}
+              <div className="hidden md:flex justify-between items-center mb-6">
+                <TabsList className="grid grid-cols-4 lg:grid-cols-8 mb-3">
                   <TabsTrigger
                     value="contacts"
                     className="flex items-center gap-2"
@@ -250,6 +253,68 @@ export default function DashboardPage() {
                 </TabsList>
               </div>
 
+              {/* Mobile Scrollable Tabs */}
+              <div className="md:hidden mb-4 overflow-x-auto pb-2">
+                <TabsList className="inline-flex w-max min-w-full">
+                  <TabsTrigger
+                    value="contacts"
+                    className="flex items-center gap-1 whitespace-nowrap px-3 sm:px-4"
+                  >
+                    <MessageSquare className="h-3 w-3" />
+                    <span className="text-xs">Contacts</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="tickets"
+                    className="flex items-center gap-1 whitespace-nowrap px-3 sm:px-4"
+                  >
+                    <Inbox className="h-3 w-3" />
+                    <span className="text-xs">Tickets</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="payments"
+                    className="flex items-center gap-1 whitespace-nowrap px-3 sm:px-4"
+                  >
+                    <CreditCard className="h-3 w-3" />
+                    <span className="text-xs">Payments</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="plans"
+                    className="flex items-center gap-1 whitespace-nowrap px-3 sm:px-4"
+                  >
+                    <ClockIcon className="h-3 w-3" />
+                    <span className="text-xs">Plans</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="transactions"
+                    className="flex items-center gap-1 whitespace-nowrap px-3 sm:px-4"
+                  >
+                    <CreditCard className="h-3 w-3" />
+                    <span className="text-xs">Transactions</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="orders"
+                    className="flex items-center gap-1 whitespace-nowrap px-3 sm:px-4"
+                  >
+                    <ShoppingBag className="h-3 w-3" />
+                    <span className="text-xs">Orders</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="analytics"
+                    className="flex items-center gap-1 whitespace-nowrap px-3 sm:px-4"
+                  >
+                    <BarChart className="h-3 w-3" />
+                    <span className="text-xs">Analytics</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="settings"
+                    className="flex items-center gap-1 whitespace-nowrap px-3 sm:px-4"
+                  >
+                    <SettingsIcon className="h-3 w-3" />
+                    <span className="text-xs">Settings</span>
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+
               <TabsContent value="contacts" className="space-y-4">
                 <ContactsTab />
               </TabsContent>
@@ -271,7 +336,7 @@ export default function DashboardPage() {
                   value={activeTransactionTab}
                   onValueChange={setActiveTransactionTab}
                 >
-                  <TabsList className="w-full mb-6">
+                  <TabsList className="w-full mb-4 sm:mb-6">
                     <TabsTrigger value="expenses" className="flex-1">
                       Expenses
                     </TabsTrigger>
@@ -299,11 +364,11 @@ export default function DashboardPage() {
                   value={activeAnalyticsTab}
                   onValueChange={setActiveAnalyticsTab}
                 >
-                  <TabsList className="w-full mb-6">
-                    <TabsTrigger value="expense-analytics" className="flex-1">
+                  <TabsList className="w-full mb-4 sm:mb-6">
+                    <TabsTrigger value="expense-analytics" className="flex-1 text-xs sm:text-sm">
                       Expense Analytics
                     </TabsTrigger>
-                    <TabsTrigger value="income-analytics" className="flex-1">
+                    <TabsTrigger value="income-analytics" className="flex-1 text-xs sm:text-sm">
                       Income Analytics
                     </TabsTrigger>
                   </TabsList>

@@ -1,19 +1,35 @@
 "use client";
 import React, { useEffect, useState, useRef } from "react";
-import { Wand2 } from "lucide-react";
+import { Wand2, MoreVertical } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
-import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { doc, getDoc, serverTimestamp, setDoc, deleteDoc, updateDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { v4 as uuidv4 } from "uuid";
 import { useRouter } from "next/navigation";
 import ReactCrop, { centerCrop, makeAspectCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 import { toast } from "react-hot-toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const CreatePost = () => {
   const [formData, setFormData] = useState({
@@ -28,6 +44,17 @@ const CreatePost = () => {
   });
   const [businessType, setBusinessType] = useState("");
   const router = useRouter();
+
+  // Edit and delete states
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDeleteAlert, setShowDeleteAlert] = useState(false);
+  const [editData, setEditData] = useState({
+    postId: "",
+    title: "",
+    description: ""
+  });
+  const [isEditing, setIsEditing] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Image crop states
   const [crop, setCrop] = useState(null);
@@ -78,8 +105,8 @@ const CreatePost = () => {
       centerCrop(
         {
           unit: "%",
-          width: 90,
-          height: 90,
+          width: 100,
+          height: 65,
         },
         width,
         height
@@ -134,31 +161,16 @@ const CreatePost = () => {
     setLoading((prev) => ({ ...prev, isGenerating: true }));
 
     try {
-      const requestFormData = new FormData();
-      requestFormData.append("type", type);
-      
-      // For title generation, send only the image
-      if (type === "title") {
-        if (!formData.image) {
-          throw new Error("Please upload an image first");
-        }
-        requestFormData.append("image", formData.image);
-      }
-      
-      // For description generation, send both title and image
-      if (type === "description") {
-        if (!formData.title) {
-          throw new Error("Please provide a title first");
-        }
-        requestFormData.append("prompt", formData.title);
-        if (formData.image) {
-          requestFormData.append("image", formData.image);
-        }
+      const contentFormData = new FormData();
+      contentFormData.append("type", type);
+      contentFormData.append("prompt", type === "description" ? formData.title : "");
+      if (formData.image) {
+        contentFormData.append("image", formData.image);
       }
 
       const response = await fetch("/api/generate-content", {
         method: "POST",
-        body: requestFormData,
+        body: contentFormData,
       });
 
       if (!response.ok) {
@@ -228,126 +240,275 @@ const CreatePost = () => {
     }
   };
 
+  // Edit post function
+  const handleEditPost = async () => {
+    if (!editData.title.trim() || !editData.description.trim()) {
+      toast.error("Title and description cannot be empty.");
+      return;
+    }
+
+    setIsEditing(true);
+    try {
+      const postRef = doc(db, "posts", editData.postId);
+      await updateDoc(postRef, {
+        title: editData.title,
+        content: editData.description,
+        lastUpdated: serverTimestamp(),
+      });
+
+      toast.success("Post updated successfully!");
+      setShowEditDialog(false);
+    } catch (error) {
+      console.error("Error updating post:", error);
+      toast.error("Failed to update post. Please try again.");
+    } finally {
+      setIsEditing(false);
+    }
+  };
+
+  // Delete post function
+  const handleDeletePost = async () => {
+    setIsDeleting(true);
+    try {
+      await deleteDoc(doc(db, "posts", editData.postId));
+      toast.success("Post deleted successfully!");
+      setShowDeleteAlert(false);
+      // Optionally redirect or refresh posts
+      router.refresh();
+    } catch (error) {
+      console.error("Error deleting post:", error);
+      toast.error("Failed to delete post. Please try again.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Open edit dialog with post data
+  const openEditDialog = (post) => {
+    setEditData({
+      postId: post.id,
+      title: post.title,
+      description: post.content || post.description,
+    });
+    setShowEditDialog(true);
+  };
+
+  // Open delete confirmation
+  const openDeleteDialog = (post) => {
+    setEditData({
+      postId: post.id,
+      title: post.title,
+      description: post.content || post.description,
+    });
+    setShowDeleteAlert(true);
+  };
+
   return (
-    <Card className="max-w-2xl mx-auto my-8">
-      <CardHeader>
-        <CardTitle className="text-center">Create Post</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="image">Image</Label>
-            <Input
-              id="image"
-              type="file"
-              accept="image/*"
-              onChange={handleImageChange}
-              required
-            />
-            {showCropper && imgSrc && (
-              <div className="mt-4">
-                <ReactCrop
-                  crop={crop}
-                  onChange={(c) => setCrop(c)}
-                  aspect={16 / 9}
-                  className="max-w-full"
-                >
-                  <img
-                    ref={imgRef}
-                    src={imgSrc}
-                    onLoad={onImageLoad}
-                    alt="Crop me"
-                    className="max-w-full"
+    <>
+      <Card className="max-w-5xl mx-auto my-8 shadow-md">
+        <CardHeader>
+          <CardTitle className="text-center text-2xl">Create Post</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Left column - Image uploader */}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="image">Upload Image</Label>
+                  <Input
+                    id="image"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    required
+                    className="mb-2"
                   />
-                </ReactCrop>
-                <div className="mt-4 flex justify-end">
-                  <Button
-                    type="button"
-                    onClick={handleCropComplete}
-                    className="bg-blue-600 hover:bg-blue-700"
-                  >
-                    Apply Crop
-                  </Button>
+                  {showCropper && imgSrc && (
+                    <div className="mt-4">
+                      <ReactCrop
+                        crop={crop}
+                        onChange={(c) => setCrop(c)}
+                        aspect={16 / 9}
+                        className="max-w-full"
+                      >
+                        <img
+                          ref={imgRef}
+                          src={imgSrc}
+                          onLoad={onImageLoad}
+                          alt="Crop me"
+                          className="max-w-full"
+                        />
+                      </ReactCrop>
+                      <div className="mt-4 flex justify-end">
+                        <Button
+                          type="button"
+                          onClick={handleCropComplete}
+                          className="bg-blue-600 hover:bg-blue-700"
+                        >
+                          Apply Crop
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  {formData.preview && !showCropper && (
+                    <div className="mt-4">
+                      <img
+                        src={formData.preview}
+                        alt="Preview"
+                        className="w-full h-auto rounded-lg border object-cover aspect-[16/7] min-h-[350px] md:min-h-[450px]"
+                      />
+                    </div>
+                  )}
+                  {!formData.preview && !showCropper && (
+                    <div className="w-full h-[350px] md:h-[450px] aspect-[16/7] flex items-center justify-center border border-dashed rounded-lg bg-gray-50">
+                      <p className="text-gray-400 text-center px-4">
+                        Upload an image to preview it here
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
-            {formData.preview && !showCropper && (
-              <div className="mt-4">
-                <img
-                  src={formData.preview}
-                  alt="Preview"
-                  className="max-w-full rounded-lg"
-                />
-              </div>
-            )}
-          </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="title">Title</Label>
-              {formData.preview && (
+              {/* Right column - Post details */}
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="title" className="text-base font-medium">Post Title</Label>
+                    {formData.preview && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => generateContent("title")}
+                        disabled={loading.isGenerating}
+                        className="h-8 w-8"
+                        title="Generate title"
+                      >
+                        <Wand2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                  <Input
+                    id="title"
+                    value={formData.title}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, title: e.target.value }))
+                    }
+                    required
+                    placeholder="Enter a catchy title for your post"
+                    className="h-11"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="description" className="text-base font-medium">Description</Label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => generateContent("description")}
+                      disabled={
+                        loading.isGenerating || (!formData.title && !formData.preview)
+                      }
+                      className="h-8 w-8"
+                      title="Generate description"
+                    >
+                      <Wand2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <Textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        description: e.target.value,
+                      }))
+                    }
+                    rows={6}
+                    required
+                    placeholder="Describe your post in detail..."
+                    className="resize-none"
+                  />
+                </div>
+
                 <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => generateContent("title")}
-                  disabled={loading.isGenerating}
-                  className="h-8 w-8"
+                  type="submit"
+                  className="w-full h-11 mt-6 text-base"
+                  disabled={loading.isSubmitting || loading.isGenerating}
                 >
-                  <Wand2 className="h-4 w-4" />
+                  {loading.isSubmitting ? "Creating..." : "Create Post"}
                 </Button>
-              )}
+              </div>
             </div>
-            <Input
-              id="title"
-              value={formData.title}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, title: e.target.value }))
-              }
-              required
-            />
-          </div>
+          </form>
+        </CardContent>
+      </Card>
 
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="description">Description</Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => generateContent("description")}
-                disabled={
-                  loading.isGenerating || (!formData.title && !formData.preview)
-                }
-                className="h-8 w-8"
-              >
-                <Wand2 className="h-4 w-4" />
-              </Button>
+      {/* Edit Dialog */}
+      <AlertDialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Edit Post</AlertDialogTitle>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-title">Title</Label>
+              <Input
+                id="edit-title"
+                value={editData.title}
+                onChange={(e) => setEditData(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="Enter post title"
+              />
             </div>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  description: e.target.value,
-                }))
-              }
-              rows={4}
-              required
-            />
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <Textarea
+                id="edit-description"
+                value={editData.description}
+                onChange={(e) => setEditData(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Enter post description"
+                rows={5}
+                className="resize-none"
+              />
+            </div>
           </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isEditing}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleEditPost}
+              disabled={isEditing}
+            >
+              {isEditing ? "Saving..." : "Save Changes"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={loading.isSubmitting || loading.isGenerating}
-          >
-            {loading.isSubmitting ? "Creating..." : "Create Post"}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+      {/* Delete Confirmation */}
+      <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete your post.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeletePost}
+              disabled={isDeleting}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 };
 
