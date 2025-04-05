@@ -948,9 +948,9 @@ export default function Profile() {
                           <Image
                             src={userData?.coverPic || "/coverimg.png"}
                             width={1000}
-                            height={1000}
+                            height={400}
                             alt="Cover Image"
-                            className="z-30 object-cover transition-opacity hover:opacity-95 border border-black/40 rounded-t-xl"
+                            className="z-30 object-cover w-full h-[200px] md:h-[250px] transition-opacity hover:opacity-95 border border-black/40 rounded-t-xl"
                             priority
                           />
                         </DialogTrigger>
@@ -962,7 +962,7 @@ export default function Profile() {
                             <Image
                               src={userData?.coverPic || "/coverimg.png"}
                               width={1200}
-                              height={600}
+                              height={500}
                               alt="Cover Image"
                               className="w-full object-cover rounded-md"
                             />

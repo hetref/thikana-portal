@@ -6,6 +6,7 @@ import { motion as m } from "framer-motion";
 import Image from "next/image";
 import { RainbowButton } from "./ui/rainbow-button";
 import { AuroraBackground } from "./ui/aurora-background";
+import Link from "next/link";
 
 const companies = [
   { name: "Company 1", logo: "/company/company1.png" },
@@ -79,9 +80,9 @@ const Hero = () => {
           <div className="text-black max-w-5xl text-center">
             <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold mb-8 text-black">
               Smart Business with <br />
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-500 to-pink-500 inline-block mt-2">
-                Thikana
-              </span>
+                <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-500 to-pink-500 inline-block mt-2">
+                  Thikana
+                </span>
             </h1>
             <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto mb-12">
               Effortlessly streamline your Business management with Thikana.
@@ -89,10 +90,11 @@ const Hero = () => {
               Shorten, track, and organize all your Products in one place.
             </p>
             <div className="flex justify-center">
-              <RainbowButton>
-                <span className="flex items-center gap-2">
-                  Get Started
-                  <svg
+              <RainbowButton asChild>
+                <Link href="/login">
+                  <span className="flex items-center gap-2">
+                    Get Started
+                    <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="16"
                     height="16"
@@ -104,9 +106,10 @@ const Hero = () => {
                     strokeLinejoin="round"
                   >
                     <line x1="5" y1="12" x2="19" y2="12"></line>
-                    <polyline points="12 5 19 12 12 19"></polyline>
-                  </svg>
-                </span>
+                      <polyline points="12 5 19 12 12 19"></polyline>
+                    </svg>
+                  </span>
+                </Link>
               </RainbowButton>
             </div>
           </div>
