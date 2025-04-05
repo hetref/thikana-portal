@@ -20,6 +20,8 @@ import {
   UserX,
   UserCheck,
   UserMinus,
+  Building2,
+  User,
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
@@ -195,6 +197,7 @@ const FollowerDialog = ({ followerCount, userId, className }) => {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [loadingId, setLoadingId] = useState(null);
+  const [businessCount, setBusinessCount] = useState(0);
   const currentUser = auth.currentUser;
 
   const isOwner = currentUser && currentUser.uid === userId;
@@ -207,9 +210,15 @@ const FollowerDialog = ({ followerCount, userId, className }) => {
         const followerData = await getFollowers(userId);
         if (followerData && Array.isArray(followerData)) {
           setFollowers(followerData);
+          // Count businesses among followers
+          const businesses = followerData.filter(
+            (user) => !!user.business_type
+          );
+          setBusinessCount(businesses.length);
         } else {
           console.error("Expected an array but got:", followerData);
           setFollowers([]);
+          setBusinessCount(0);
         }
       } catch (err) {
         console.error("Error fetching followers:", err);
@@ -251,7 +260,14 @@ const FollowerDialog = ({ followerCount, userId, className }) => {
         email: false,
       });
 
+      // Update local state and business count if needed
+      const removedUser = followers.find((user) => user.uid === followerId);
       setFollowers(followers.filter((user) => user.uid !== followerId));
+
+      if (removedUser && removedUser.business_type) {
+        setBusinessCount((prevCount) => prevCount - 1);
+      }
+
       toast.success("Follower removed successfully");
     } catch (error) {
       console.error("Error removing follower:", error);
@@ -272,6 +288,11 @@ const FollowerDialog = ({ followerCount, userId, className }) => {
     );
   }, [followers, searchQuery]);
 
+  // Check if a user is a business
+  const isBusinessAccount = (user) => {
+    return !!user?.business_type;
+  };
+
   return (
     <Dialog open={open} onOpenChange={isOwner ? setOpen : undefined}>
       <DialogTrigger className={className} disabled={!isOwner}>
@@ -287,8 +308,26 @@ const FollowerDialog = ({ followerCount, userId, className }) => {
         <DialogContent className="sm:max-w-md">
           <DialogHeader className="space-y-1">
             <DialogTitle className="text-xl font-bold">Followers</DialogTitle>
-            <DialogDescription className="text-sm">
-              People and businesses who follow you
+            <DialogDescription className="text-sm flex flex-col gap-1">
+              <div>People and businesses who follow you</div>
+              {!loading && !error && (
+                <div className="text-xs flex items-center gap-2 mt-1">
+                  <Badge
+                    variant="secondary"
+                    className="font-normal py-0.5 px-2"
+                  >
+                    <Building2 className="h-3 w-3 mr-1" />
+                    {businessCount} Businesses
+                  </Badge>
+                  <Badge
+                    variant="secondary"
+                    className="font-normal py-0.5 px-2"
+                  >
+                    <User className="h-3 w-3 mr-1" />
+                    {followerCount - businessCount} Users
+                  </Badge>
+                </div>
+              )}
             </DialogDescription>
           </DialogHeader>
 
@@ -325,62 +364,104 @@ const FollowerDialog = ({ followerCount, userId, className }) => {
               </div>
             ) : (
               <div className="space-y-3 mt-3">
-                {filteredFollowers.map((user) => (
-                  <div
-                    key={user?.uid}
-                    className="flex items-center justify-between p-3 rounded-lg border border-border/60 bg-background hover:bg-accent/5 transition-colors"
-                  >
-                    <Link
-                      href={`/${user?.username}?user=${user?.uid}`}
-                      className="flex items-center gap-3 flex-1"
+                {filteredFollowers.map((user) => {
+                  const isBusiness = isBusinessAccount(user);
+
+                  return (
+                    <div
+                      key={user?.uid}
+                      className="flex items-center justify-between p-3 rounded-lg border border-border/60 bg-background hover:bg-accent/5 transition-colors"
                     >
-                      <Avatar className="h-10 w-10 border border-border/50">
-                        <AvatarImage
-                          src={user?.profilePic || "/avatar.png"}
-                          alt={user?.businessName}
-                        />
-                        <AvatarFallback>
-                          {user?.businessName?.charAt(0) || "B"}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex flex-col min-w-0">
-                        <div className="font-medium truncate">
-                          {user?.businessName || "Business"}
-                        </div>
-                        <div className="text-xs text-muted-foreground flex items-center gap-2">
-                          <span>@{user?.username || "username"}</span>
-                          {user?.business_type && (
-                            <Badge
-                              variant="outline"
-                              className="text-xs font-normal py-0 h-5"
-                            >
-                              {user.business_type}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    </Link>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-9 px-3 ml-2 border-gray-200 text-gray-700 hover:bg-gray-100"
-                      onClick={() => handleRemoveFollower(user?.uid)}
-                      disabled={loadingId === user?.uid}
-                    >
-                      {loadingId === user?.uid ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                          <span>Removing...</span>
-                        </>
+                      {isBusiness ? (
+                        <Link
+                          href={`/${user?.username}?user=${user?.uid}`}
+                          className="flex items-center gap-3 flex-1"
+                        >
+                          <Avatar className="h-10 w-10 border border-border/50">
+                            <AvatarImage
+                              src={user?.profilePic || "/avatar.png"}
+                              alt={user?.businessName}
+                            />
+                            <AvatarFallback>
+                              {user?.businessName?.charAt(0) || "B"}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col min-w-0">
+                            <div className="font-medium truncate">
+                              {user?.businessName || "Business"}
+                            </div>
+                            <div className="text-xs text-muted-foreground flex items-center gap-2">
+                              <span>@{user?.username || "username"}</span>
+                              <div className="flex items-center gap-1">
+                                <Badge
+                                  variant="outline"
+                                  className="text-xs font-normal py-0 h-5 flex items-center"
+                                >
+                                  <Building2 className="h-3 w-3 mr-1" />
+                                  Business
+                                </Badge>
+                                {user?.business_type && (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-xs font-normal py-0 h-5"
+                                  >
+                                    {user.business_type}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </Link>
                       ) : (
-                        <>
-                          <UserMinus className="h-4 w-4 mr-1.5" />
-                          <span>Remove</span>
-                        </>
+                        <div className="flex items-center gap-3 flex-1">
+                          <Avatar className="h-10 w-10 border border-border/50">
+                            <AvatarImage
+                              src={user?.profilePic || "/avatar.png"}
+                              alt={user?.displayName || "User"}
+                            />
+                            <AvatarFallback>
+                              {user?.displayName?.charAt(0) || "U"}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col min-w-0">
+                            <div className="font-medium truncate">
+                              {user?.displayName || "User"}
+                            </div>
+                            <div className="text-xs text-muted-foreground flex items-center gap-2">
+                              <span>@{user?.username || "username"}</span>
+                              <Badge
+                                variant="outline"
+                                className="text-xs font-normal py-0 h-5 flex items-center"
+                              >
+                                <User className="h-3 w-3 mr-1" />
+                                User
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
                       )}
-                    </Button>
-                  </div>
-                ))}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-9 px-3 ml-2 border-gray-200 text-gray-700 hover:bg-gray-100"
+                        onClick={() => handleRemoveFollower(user?.uid)}
+                        disabled={loadingId === user?.uid}
+                      >
+                        {loadingId === user?.uid ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                            <span>Removing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <UserMinus className="h-4 w-4 mr-1.5" />
+                            <span>Remove</span>
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

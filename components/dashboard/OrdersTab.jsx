@@ -41,6 +41,7 @@ import {
   User,
   Printer,
   FileText,
+  Star,
 } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import {
@@ -51,9 +52,16 @@ import {
   orderBy,
   startAfter,
   limit,
+  doc,
+  getDoc,
+  updateDoc,
+  addDoc,
 } from "firebase/firestore";
 import Image from "next/image";
 import { useReactToPrint } from "react-to-print";
+import { Textarea } from "@/components/ui/textarea";
+import { Timestamp } from "firebase/firestore";
+import { toast } from "react-hot-toast";
 
 export default function OrdersTab() {
   const [orders, setOrders] = useState([]);
@@ -64,6 +72,12 @@ export default function OrdersTab() {
   const [lastOrder, setLastOrder] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [billDialogOpen, setBillDialogOpen] = useState(false);
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+  const [selectedProductForReview, setSelectedProductForReview] =
+    useState(null);
+  const [ratingValue, setRatingValue] = useState(0);
+  const [ratingFeedback, setRatingFeedback] = useState("");
+  const [isSubmittingRating, setIsSubmittingRating] = useState(false);
 
   const billRef = useRef();
 
@@ -151,6 +165,172 @@ export default function OrdersTab() {
   const handleGenerateBill = (order) => {
     setSelectedOrder(order);
     setBillDialogOpen(true);
+  };
+
+  // Add this new function to handle review submission
+  const handleSubmitReview = async () => {
+    if (!selectedProductForReview || ratingValue === 0) {
+      toast.error("Please select a rating");
+      return;
+    }
+
+    try {
+      setIsSubmittingRating(true);
+
+      // Get the current user
+      const user = auth.currentUser;
+      if (!user) {
+        toast.error("You must be logged in to leave a review");
+        return;
+      }
+
+      // Prepare the rating data
+      const ratingData = {
+        productId: selectedProductForReview.id,
+        productName: selectedProductForReview.productName,
+        orderId: selectedProductForReview.orderId,
+        businessId: selectedProductForReview.businessId,
+        userId: user.uid,
+        userName: user.displayName || "Anonymous User",
+        userPhotoURL: user.photoURL,
+        rating: ratingValue,
+        feedback: ratingFeedback.trim(),
+        timestamp: Timestamp.now(),
+      };
+
+      // Add to the user's ratings collection
+      const userRatingRef = collection(db, "users", user.uid, "ratings");
+      await addDoc(userRatingRef, ratingData);
+
+      // Add to the product's ratings collection
+      const productRatingRef = collection(
+        db,
+        "products",
+        selectedProductForReview.id,
+        "ratings"
+      );
+      await addDoc(productRatingRef, ratingData);
+
+      // Update the product's ratings in the products collection
+      const productRef = doc(db, "products", selectedProductForReview.id);
+      const productDoc = await getDoc(productRef);
+
+      if (productDoc.exists()) {
+        const productData = productDoc.data();
+
+        // Calculate new rating stats
+        const currentRatingCount = productData.ratings?.count || 0;
+        const currentRatingTotal = productData.ratings?.total || 0;
+
+        const newRatingCount = currentRatingCount + 1;
+        const newRatingTotal = currentRatingTotal + ratingValue;
+        const newAverageRating = newRatingTotal / newRatingCount;
+
+        // Update the star counts
+        const starField =
+          ratingValue === 5
+            ? "fiveStars"
+            : ratingValue === 4
+              ? "fourStars"
+              : ratingValue === 3
+                ? "threeStars"
+                : ratingValue === 2
+                  ? "twoStars"
+                  : "oneStar";
+
+        const currentStarCount = productData.ratings?.[starField] || 0;
+
+        // Build the ratings object
+        const ratingsUpdate = {
+          count: newRatingCount,
+          total: newRatingTotal,
+          average: newAverageRating,
+          [starField]: currentStarCount + 1,
+        };
+
+        // Update the product document
+        await updateDoc(productRef, {
+          ratings: ratingsUpdate,
+        });
+
+        // Also update monthly and yearly analytics
+        const now = new Date();
+        const monthYear = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, "0")}`;
+        const year = now.getFullYear().toString();
+
+        // Create the update object for monthly/yearly data
+        const monthlySalesUpdate = {};
+        if (productData.monthlySales && productData.monthlySales[monthYear]) {
+          monthlySalesUpdate[`monthlySales.${monthYear}.ratingCount`] =
+            (productData.monthlySales[monthYear].ratingCount || 0) + 1;
+          monthlySalesUpdate[`monthlySales.${monthYear}.ratingTotal`] =
+            (productData.monthlySales[monthYear].ratingTotal || 0) +
+            ratingValue;
+        } else {
+          monthlySalesUpdate[`monthlySales.${monthYear}`] = {
+            ratingCount: 1,
+            ratingTotal: ratingValue,
+          };
+        }
+
+        const yearlySalesUpdate = {};
+        if (productData.yearlySales && productData.yearlySales[year]) {
+          yearlySalesUpdate[`yearlySales.${year}.ratingCount`] =
+            (productData.yearlySales[year].ratingCount || 0) + 1;
+          yearlySalesUpdate[`yearlySales.${year}.ratingTotal`] =
+            (productData.yearlySales[year].ratingTotal || 0) + ratingValue;
+        } else {
+          yearlySalesUpdate[`yearlySales.${year}`] = {
+            ratingCount: 1,
+            ratingTotal: ratingValue,
+          };
+        }
+
+        // Apply the updates
+        await updateDoc(productRef, {
+          ...monthlySalesUpdate,
+          ...yearlySalesUpdate,
+        });
+      }
+
+      toast.success("Thank you for your review!");
+      setReviewDialogOpen(false);
+
+      // Reset form
+      setRatingValue(0);
+      setRatingFeedback("");
+      setSelectedProductForReview(null);
+    } catch (error) {
+      console.error("Error submitting review:", error);
+      toast.error("Failed to submit review. Please try again.");
+    } finally {
+      setIsSubmittingRating(false);
+    }
+  };
+
+  // Function to render star rating component
+  const renderStarRating = (currentRating, isSelectable = false) => {
+    return (
+      <div className="flex items-center">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            type="button"
+            className={`${isSelectable ? "cursor-pointer hover:scale-110 transition-transform" : ""}`}
+            onClick={() => isSelectable && setRatingValue(star)}
+            disabled={!isSelectable}
+          >
+            <Star
+              className={`h-6 w-6 ${
+                star <= currentRating
+                  ? "fill-yellow-400 text-yellow-400"
+                  : "text-gray-300"
+              } ${isSelectable && star <= currentRating ? "text-yellow-400" : ""}`}
+            />
+          </button>
+        ))}
+      </div>
+    );
   };
 
   return (
@@ -360,6 +540,22 @@ export default function OrdersTab() {
                             <p className="font-medium">
                               ₹{(product.amount * product.quantity).toFixed(2)}
                             </p>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-xs text-primary mt-1"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedProductForReview({
+                                  ...product,
+                                  orderId: order.id,
+                                  businessId: order.businessId,
+                                });
+                                setReviewDialogOpen(true);
+                              }}
+                            >
+                              Rate & Review
+                            </Button>
                           </div>
                         </div>
                       ))}
@@ -508,6 +704,64 @@ export default function OrdersTab() {
             <Button onClick={handlePrint} className="flex items-center gap-1">
               <Printer className="h-4 w-4" />
               <span>Print / Save PDF</span>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rating Dialog */}
+      <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle>Rate Product</DialogTitle>
+            <DialogDescription>
+              Share your experience with {selectedProductForReview?.productName}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="flex flex-col items-center gap-3">
+              <span className="text-sm font-medium">
+                How would you rate this product?
+              </span>
+              {renderStarRating(ratingValue, true)}
+              <span className="text-sm text-muted-foreground mt-1">
+                {ratingValue === 0 && "Select a rating"}
+                {ratingValue === 1 && "Poor"}
+                {ratingValue === 2 && "Fair"}
+                {ratingValue === 3 && "Good"}
+                {ratingValue === 4 && "Very Good"}
+                {ratingValue === 5 && "Excellent"}
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="feedback" className="text-sm font-medium">
+                Your Review (Optional)
+              </label>
+              <Textarea
+                id="feedback"
+                placeholder="Share your experience with this product..."
+                value={ratingFeedback}
+                onChange={(e) => setRatingFeedback(e.target.value)}
+                rows={4}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setReviewDialogOpen(false)}
+              disabled={isSubmittingRating}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmitReview}
+              disabled={ratingValue === 0 || isSubmittingRating}
+            >
+              {isSubmittingRating ? "Submitting..." : "Submit Review"}
             </Button>
           </DialogFooter>
         </DialogContent>
