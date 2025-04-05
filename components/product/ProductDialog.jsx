@@ -7,11 +7,12 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Edit, Minus, Plus, ShoppingCart, Save } from "lucide-react";
+import { Edit, Minus, Plus, ShoppingCart, Save, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
-import { recordPurchase, updateProduct } from "@/lib/inventory-operations";
+import { recordPurchase, updateProduct, deleteProduct } from "@/lib/inventory-operations";
 import { doc, updateDoc, getDoc } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { Input } from "@/components/ui/input";
@@ -31,6 +32,7 @@ import { createRazorpayOrder } from "@/lib/payment/razorpay";
  * @param {Object} props.userData - The current user's data
  * @param {string} props.userType - The type of user (customer or business)
  * @param {Function} props.onEditProduct - Function to call when editing a product
+ * @param {Function} props.onDeleteProduct - Function to call when deleting a product
  */
 export default function ProductDialog({
   product,
@@ -40,12 +42,14 @@ export default function ProductDialog({
   userData,
   userType = "customer",
   onEditProduct,
+  onDeleteProduct,
 }) {
   const [isLoading, setIsLoading] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [isEditing, setIsEditing] = useState(false);
   const [editableProduct, setEditableProduct] = useState(null);
   const [imageFile, setImageFile] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { addToCart } = useCart();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -282,11 +286,51 @@ export default function ProductDialog({
       await updateProduct(userId, editableProduct, imageFile);
       toast.success("Product updated successfully");
       setIsEditing(false);
+      // If onEditProduct callback exists, call it to refresh the product list
+      if (typeof onEditProduct === 'function') {
+        onEditProduct(editableProduct);
+      }
     } catch (error) {
       console.error("Error updating product:", error);
       toast.error("Failed to update product. Please try again.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleProductDeleted = (productId) => {
+    // Update your product list state to remove the deleted product
+    setProducts(prevProducts => prevProducts.filter(p => p.id !== productId));
+    // Other cleanup as needed
+  };
+
+  // Handle product update
+  const handleProductUpdated = (updatedProduct) => {
+    if (typeof onEditProduct === 'function') {
+      onEditProduct(updatedProduct);
+    }
+    setIsEditing(false);
+    toast.success("Product updated successfully");
+  };
+
+  // Handle product deletion
+  const handleDeleteProduct = async () => {
+    if (!product || !product.id) return;
+    
+    setIsDeleting(true);
+    try {
+      await deleteProduct(userId, product.id, product.imageUrl);
+      toast.success("Product deleted successfully");
+      // If onDeleteProduct callback exists, call it to update the UI
+      if (typeof onDeleteProduct === 'function') {
+        onDeleteProduct(product.id);
+      }
+      onClose();
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      toast.error("Failed to delete product. Please try again.");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -302,8 +346,8 @@ export default function ProductDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent
-        className="sm:max-w-[425px]"
+      <DialogContent 
+        className="sm:max-w-[425px]" 
         aria-describedby="product-dialog-description"
       >
         <DialogHeader>
@@ -312,13 +356,26 @@ export default function ProductDialog({
               <>
                 {product.name}
                 {userType === "business" && (
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setIsEditing(true)}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setIsEditing(true)}
+                      title="Edit product"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={handleDeleteProduct}
+                      disabled={isDeleting}
+                      title="Delete product"
+                      className="text-red-500 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 )}
               </>
             ) : (

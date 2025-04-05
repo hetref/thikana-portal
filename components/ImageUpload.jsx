@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 
 export default function ImageUpload({
-  label,
+  label = "Image",
   currentImage,
   onImageChange,
   isCover = false,
@@ -39,16 +39,18 @@ export default function ImageUpload({
 
     // Reset the file input
     const fileInput = document.getElementById(
-      label.toLowerCase().replace(" ", "-")
+      label ? label.toLowerCase().replace(" ", "-") : "image"
     );
     if (fileInput) {
       fileInput.value = "";
     }
   };
 
+  const inputId = label ? label.toLowerCase().replace(" ", "-") : "image";
+
   return (
     <div className="space-y-2">
-      <Label htmlFor={label.toLowerCase().replace(" ", "-")}>{label}</Label>
+      <Label htmlFor={inputId}>{label}</Label>
       <div className={`${isCover ? "space-y-2" : "flex items-center gap-4"}`}>
         {previewUrl ? (
           <div
@@ -82,7 +84,7 @@ export default function ImageUpload({
         <div className="flex space-x-2">
           <input
             type="file"
-            id={label.toLowerCase().replace(" ", "-")}
+            id={inputId}
             accept="image/*"
             onChange={handleImageUpload}
             className="hidden"
@@ -91,11 +93,7 @@ export default function ImageUpload({
           <Button
             type="button"
             variant="outline"
-            onClick={() =>
-              document
-                .getElementById(label.toLowerCase().replace(" ", "-"))
-                ?.click()
-            }
+            onClick={() => document.getElementById(inputId)?.click()}
             disabled={isSubmitting}
           >
             {previewUrl ? "Change Image" : "Upload Image"}

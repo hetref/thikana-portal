@@ -90,8 +90,8 @@ const Hero = () => {
               Shorten, track, and organize all your Products in one place.
             </p>
             <div className="flex justify-center">
-              <Link href="/login">
-                <RainbowButton>
+              <RainbowButton asChild>
+                <Link href="/login">
                   <span className="flex items-center gap-2">
                     Get Started
                     <svg
@@ -109,8 +109,8 @@ const Hero = () => {
                       <polyline points="12 5 19 12 12 19"></polyline>
                     </svg>
                   </span>
-                </RainbowButton>
-              </Link>
+                </Link>
+              </RainbowButton>
             </div>
           </div>
         </div>

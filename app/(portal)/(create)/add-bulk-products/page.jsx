@@ -49,10 +49,12 @@ const BulkProductUpload = () => {
   };
 
   // Upload Image to Firebase Storage
-  const uploadImage = async (file, index) => {
+  const uploadImage = async (file, index, productName) => {
     if (!file) throw new Error(`Image is required for product ${index + 1}`);
 
-    const storageRef = ref(storage, `${user.uid}/products/${file.name}`);
+    // Use the same storage path structure as single product upload
+    const filename = `${Date.now()}_${file.name}`;
+    const storageRef = ref(storage, `products/${user.uid}/${filename}`);
     const snapshot = await uploadBytes(storageRef, file);
     return getDownloadURL(snapshot.ref);
   };
@@ -79,12 +81,12 @@ const BulkProductUpload = () => {
         if (!images[index]) {
           throw new Error(`Image is required for product: ${product.Name}`);
         }
-        return uploadImage(images[index], index);
+        return uploadImage(images[index], index, product.Name);
       });
 
       const imageUrls = await Promise.all(imageUploadPromises);
 
-      // Save products to Firestore
+      // Save products to Firestore with the same structure as single product upload
       const productUploadPromises = tableData.map(async (product, index) => {
         return addDoc(productsRef, {
           name: product.Name || "",
@@ -93,6 +95,19 @@ const BulkProductUpload = () => {
           category: product.Category || "",
           quantity: parseInt(product.Quantity) || 0,
           imageUrl: imageUrls[index],
+          businessId: user.uid,
+          createdAt: new Date(),
+          // Add analytics fields with initial values - matching single product upload
+          totalSales: 0,
+          totalRevenue: 0,
+          purchaseCount: 0,
+          ratings: {
+            average: 0,
+            count: 0,
+            total: 0,
+          },
+          monthlySales: {},
+          yearlySales: {},
         });
       });
 
@@ -126,10 +141,15 @@ const BulkProductUpload = () => {
 
   return (
     <div className="mt-10 max-w-2xl mx-auto p-6 shadow-md border rounded-md">
-      <h2 className="text-2xl font-bold text-center mb-6">Bulk Product Upload</h2>
+      <h2 className="text-2xl font-bold text-center mb-6">
+        Bulk Product Upload
+      </h2>
 
       <div className="flex justify-normal mb-4">
-        <Button onClick={handleViewTemplate} className="bg-primary text-white py-2 px-4 rounded-md mr-10">
+        <Button
+          onClick={handleViewTemplate}
+          className="bg-primary text-white py-2 px-4 rounded-md mr-10"
+        >
           View Template
         </Button>
         <Input type="file" accept=".csv" onChange={handleFileChange} />
@@ -169,7 +189,9 @@ const BulkProductUpload = () => {
 
                       {/* Image Upload Section */}
                       <span className="text-sm text-gray-600 mb-1">
-                        {images[index] ? "✅ Image Uploaded" : "📂 Choose Image"}
+                        {images[index]
+                          ? "✅ Image Uploaded"
+                          : "📂 Choose Image"}
                       </span>
                       <label className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded cursor-pointer">
                         Upload

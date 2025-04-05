@@ -51,6 +51,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import toast from "react-hot-toast";
+import { sendNotificationToUser } from "@/lib/notifications";
 
 export default function ShowServicesTabContent({
   userId,
@@ -130,21 +131,36 @@ export default function ShowServicesTabContent({
         (service) => service.id === contactForm.serviceId
       );
 
-      await addDoc(collection(db, "users", userId, "inquiries"), {
-        businessId: userId,
-        businessName: userData?.businessName || "",
-        customerId: currentUser.uid,
-        customerName:
-          customerData?.name || currentUser.displayName || "Anonymous",
-        customerEmail: customerData?.email || currentUser.email || "",
-        customerPhone: customerData?.phone || "",
-        customerPhoto: customerData?.profilePic || currentUser.photoURL || "",
-        serviceId: contactForm.serviceId,
-        serviceName: selectedService?.name || "",
-        message: contactForm.message,
-        status: "pending",
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+      // Add the inquiry to Firestore
+      const inquiryRef = await addDoc(
+        collection(db, "users", userId, "inquiries"),
+        {
+          businessId: userId,
+          businessName: userData?.businessName || "",
+          customerId: currentUser.uid,
+          customerName:
+            customerData?.name || currentUser.displayName || "Anonymous",
+          customerEmail: customerData?.email || currentUser.email || "",
+          customerPhone: customerData?.phone || "",
+          customerPhoto: customerData?.profilePic || currentUser.photoURL || "",
+          serviceId: contactForm.serviceId,
+          serviceName: selectedService?.name || "",
+          message: contactForm.message,
+          status: "pending",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }
+      );
+
+      // Send notification to business owner
+      await sendNotificationToUser(userId, {
+        title: "New Service Inquiry",
+        message: `${customerData?.name || currentUser.displayName || "A customer"} is interested in your "${selectedService?.name}" service.`,
+        type: "message",
+        sender: customerData?.name || currentUser.displayName || "Customer",
+        email: true, // Send email notification
+        whatsapp: false, // Optional: Set to true if you want WhatsApp notification too
+        link: `/dashboard`, // Optional: direct link to the inquiry details
       });
 
       toast.success("Your inquiry has been sent to the business");

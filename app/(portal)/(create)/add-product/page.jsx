@@ -1,183 +1,223 @@
 "use client";
 
-import React, { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import React, { useState, useEffect } from "react";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { auth, db, storage } from "@/lib/firebase"; // Ensure you have your Firebase setup in firebase.js
-import { collection, addDoc } from "firebase/firestore";
+import { FileUploader } from "@/components/ui/file-uploader";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import toast from "react-hot-toast";
+import { collection, addDoc } from "firebase/firestore";
+import { auth, db, storage } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
-
-const productSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  description: z.string().min(1, "Description is required"),
-  price: z.string().min(1, "Price must be a positive number"),
-  image: z
-    .instanceof(File)
-    .refine((file) => file.size <= 5000000, "Max file size is 5MB"),
-});
+import toast from "react-hot-toast";
 
 const AddProductPage = () => {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const user = auth.currentUser;
-  const router = useRouter();
-  const form = useForm({
-    resolver: zodResolver(productSchema),
-    defaultValues: {
-      title: "",
-      description: "",
-      price: 1,
-      image: null,
-    },
+  const [formState, setFormState] = useState({
+    name: "",
+    description: "",
+    price: "",
+    quantity: "",
+    category: "",
+    imageUrl: null,
   });
+  const [file, setFile] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
-  const onSubmit = async (data) => {
-    setIsSubmitting(true);
-    try {
+  useEffect(() => {
+    // Check if user is authenticated
+    const unsubscribe = auth.onAuthStateChanged((user) => {
       if (!user) {
-        throw new Error("User not authenticated");
+        router.push("/login");
+      }
+    });
+
+    return () => unsubscribe();
+  }, [router]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormState((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleFileChange = (selectedFile) => {
+    setFile(selectedFile);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      // Check if user is authenticated
+      const user = auth.currentUser;
+      if (!user) {
+        toast.error("You must be logged in to add a product");
+        setLoading(false);
+        return;
       }
 
-      // Convert price to a number
-      const price = parseFloat(data.price);
+      let imageUrl = null;
+      if (file) {
+        // Upload image to Firebase Storage using the same path as bulk upload
+        const filename = `${Date.now()}_${file.name}`;
+        const storageRef = ref(storage, `products/${user.uid}/${filename}`);
+        await uploadBytes(storageRef, file);
+        imageUrl = await getDownloadURL(storageRef);
+      }
 
-      // Upload image to Firebase Storage
-      const storageRef = ref(
-        storage,
-        `${user.uid}/products/${data.image.name}`
-      );
-      await uploadBytes(storageRef, data.image);
-      const imageUrl = await getDownloadURL(storageRef);
-
-      // Save product data to Firestore
-      const productsRef = collection(db, "users", user.uid, "products");
-      await addDoc(productsRef, {
-        title: data.title,
-        description: data.description,
-        price: price,
+      // Create a product document in Firestore
+      const productData = {
+        name: formState.name,
+        description: formState.description,
+        price: parseFloat(formState.price) || 0,
+        quantity: parseInt(formState.quantity) || 0,
+        category: formState.category,
         imageUrl: imageUrl,
-      });
+        businessId: user.uid,
+        createdAt: new Date(),
+        // Add analytics fields with initial values
+        totalSales: 0,
+        totalRevenue: 0,
+        purchaseCount: 0,
+        ratings: {
+          average: 0,
+          count: 0,
+          total: 0,
+        },
+        monthlySales: {},
+        yearlySales: {},
+      };
+
+      // Add to the user's products collection
+      const productsRef = collection(db, `users/${user.uid}/products`);
+      const docRef = await addDoc(productsRef, productData);
 
       toast.success("Product added successfully!");
-      form.reset(); // Reset the form
-      router.push("/profile");
+      // Clear form
+      setFormState({
+        name: "",
+        description: "",
+        price: "",
+        quantity: "",
+        category: "",
+        imageUrl: null,
+      });
+      setFile(null);
+
+      // Redirect to products page
+      router.push("/profile/products");
     } catch (error) {
       console.error("Error adding product:", error);
       toast.error("Failed to add product. Please try again.");
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="mt-20 max-w-lg mx-auto p-4 sm:p-6 md:p-8 shadow-md rounded-md text-primary border border-primary-foreground">
-      <h1 className="text-2xl font-bold text-center text-primary mb-6">
-        Add New Product
-      </h1>
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          <FormField
-            control={form.control}
-            name="title"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="font-medium">
-                  Product Title
-                </FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder="Enter product title"
-                    {...field}
-                    className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="description"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="font-medium">
-                  Product Description
-                </FormLabel>
-                <FormControl>
-                  <Textarea
-                    placeholder="Enter product description"
-                    {...field}
-                    className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="price"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="font-medium">
-                  Product Price
-                </FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    placeholder="Enter product price"
-                    {...field}
-                    className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="image"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="font-medium">
-                  Product Image
-                </FormLabel>
-                <FormControl>
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => field.onChange(e.target.files[0])}
-                    className="text-primary w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <Button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full bg-primary hover:bg-blend-darken font-semibold py-2 px-4 rounded-md transition-all duration-200 disabled:opacity-50"
-          >
-            {isSubmitting ? "Saving..." : "Save Product"}
-          </Button>
+    <div className="container mx-auto py-10">
+      <Card className="max-w-2xl mx-auto">
+        <CardHeader>
+          <CardTitle className="text-2xl">Add New Product</CardTitle>
+          <CardDescription>
+            Fill in the details below to add a new product to your inventory.
+          </CardDescription>
+        </CardHeader>
+        <form onSubmit={handleSubmit}>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Product Name</Label>
+              <Input
+                id="name"
+                name="name"
+                value={formState.name}
+                onChange={handleChange}
+                placeholder="Enter product name"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                name="description"
+                value={formState.description}
+                onChange={handleChange}
+                placeholder="Enter product description"
+                rows={4}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="price">Price (₹)</Label>
+                <Input
+                  id="price"
+                  name="price"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formState.price}
+                  onChange={handleChange}
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="quantity">Quantity in Stock</Label>
+                <Input
+                  id="quantity"
+                  name="quantity"
+                  type="number"
+                  min="0"
+                  value={formState.quantity}
+                  onChange={handleChange}
+                  placeholder="0"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="category">Category</Label>
+              <Input
+                id="category"
+                name="category"
+                value={formState.category}
+                onChange={handleChange}
+                placeholder="Enter product category"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Product Image</Label>
+              <FileUploader
+                onFileSelect={handleFileChange}
+                acceptedFileTypes="image/*"
+                selectedFile={file}
+              />
+            </div>
+          </CardContent>
+          <CardFooter>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Adding Product..." : "Add Product"}
+            </Button>
+          </CardFooter>
         </form>
-      </Form>
+      </Card>
     </div>
-  );  
+  );
 };
 
 export default AddProductPage;
