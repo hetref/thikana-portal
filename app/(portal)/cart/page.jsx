@@ -31,9 +31,11 @@ import {
   collection,
   getDocs,
   deleteDoc,
+  getDoc,
 } from "firebase/firestore";
 import Link from "next/link";
 import { CartProvider } from "@/components/CartContext";
+import { sendNotificationToUser } from "@/lib/notifications";
 
 // Create a client component wrapper that provides CartContext
 function CartPageContent() {
@@ -201,6 +203,48 @@ function CartPageContent() {
           status: "completed",
         }
       );
+
+      // Send notification to business owner
+      try {
+        // Get business owner's userId
+        const businessDoc = await getDoc(doc(db, "businesses", businessId));
+
+        if (businessDoc.exists()) {
+          const businessData = businessDoc.data();
+          const businessOwnerId = businessData.userId;
+
+          if (businessOwnerId) {
+            // Calculate total amount and items count
+            const totalAmount = calculateBusinessTotal(businessId).toFixed(2);
+            const itemsCount = productDetails.length;
+
+            // Get user info for the notification
+            const userDoc = await getDoc(
+              doc(db, "users", auth.currentUser.uid)
+            );
+            const userName = userDoc.exists()
+              ? userDoc.data().name ||
+                userDoc.data().displayName ||
+                "A customer"
+              : "A customer";
+
+            // Send notification to business owner
+            await sendNotificationToUser(businessOwnerId, {
+              title: "New Order Received",
+              message: `${userName} has placed an order for ${itemsCount} ${itemsCount === 1 ? "item" : "items"} worth ₹${totalAmount}. Check your orders tab for details.`,
+              type: "order_update",
+              link: "/profile?tab=orders",
+              email: true,
+              whatsapp: false, // Set to true if you want WhatsApp notifications
+            });
+
+            console.log("Order notification sent to business owner");
+          }
+        }
+      } catch (error) {
+        console.error("Error sending notification to business:", error);
+        // Don't fail the entire transaction if notification fails
+      }
 
       // Clear the business items from cart
       await clearBusinessItems(businessId);

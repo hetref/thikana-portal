@@ -102,8 +102,15 @@ const Hit = ({ hit, userLocation, googleMapsService }) => {
                   @{hit.username || "business"}
                 </p>
               </div>
-              <div className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-full capitalize">
-                {hit.plan || "basic"} plan
+              <div className="flex items-center gap-2">
+                {hit.isFranchise && (
+                  <div className="text-xs px-2 py-1 bg-purple-100 text-purple-600 rounded-full font-medium">
+                    Franchise
+                  </div>
+                )}
+                <div className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-full capitalize">
+                  {hit.plan || "basic"} plan
+                </div>
               </div>
             </div>
             <div className="mt-2 flex flex-wrap gap-2 items-center">

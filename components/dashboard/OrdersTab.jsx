@@ -34,7 +34,14 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Package, Search, ShoppingBag, User, Printer, FileText } from "lucide-react";
+import {
+  Package,
+  Search,
+  ShoppingBag,
+  User,
+  Printer,
+  FileText,
+} from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import {
   collection,
@@ -57,13 +64,13 @@ export default function OrdersTab() {
   const [lastOrder, setLastOrder] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [billDialogOpen, setBillDialogOpen] = useState(false);
-  
+
   const billRef = useRef();
-  
+
   // Handle printing functionality
   const handlePrint = useReactToPrint({
     content: () => billRef.current,
-    documentTitle: `Invoice_${selectedOrder?.orderId || 'order'}`,
+    documentTitle: `Invoice_${selectedOrder?.orderId || "order"}`,
   });
 
   useEffect(() => {
@@ -244,14 +251,31 @@ export default function OrdersTab() {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
           ) : filteredOrders.length === 0 ? (
-            <div className="text-center py-8">
-              <ShoppingBag className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">
-                No orders
+            <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+              <div className="w-20 h-20 rounded-full bg-gray-50 flex items-center justify-center mb-4">
+                <ShoppingBag className="h-10 w-10 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">
+                No Orders Yet
               </h3>
-              <p className="mt-1 text-sm text-gray-500">
-                No orders match your current filters
+              <p className="mt-2 text-sm text-gray-500 max-w-md">
+                {searchQuery
+                  ? "No orders match your search criteria. Try adjusting your filters."
+                  : "You haven't received any orders yet. Orders will appear here when customers make purchases."}
               </p>
+              <div className="mt-6">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setTimeFilter("all");
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <Search className="h-4 w-4" />
+                  Clear Filters
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
@@ -348,9 +372,9 @@ export default function OrdersTab() {
                             ₹{order.amount?.toFixed(2)}
                           </span>
                         </div>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           className="flex items-center gap-1 mt-2 w-full"
                           onClick={() => handleGenerateBill(order)}
                         >
@@ -378,7 +402,7 @@ export default function OrdersTab() {
           )}
         </CardContent>
       </Card>
-      
+
       {/* Bill Generation Dialog */}
       <Dialog open={billDialogOpen} onOpenChange={setBillDialogOpen}>
         <DialogContent className="sm:max-w-[600px]">
@@ -388,20 +412,24 @@ export default function OrdersTab() {
               Order #{selectedOrder?.orderId?.substring(0, 8)} details
             </DialogDescription>
           </DialogHeader>
-          
+
           <div ref={billRef} className="p-4 bg-white">
             {/* Bill Header */}
             <div className="text-center mb-6">
               <h1 className="text-2xl font-bold">INVOICE</h1>
               <p className="text-muted-foreground">Thikana Portal</p>
             </div>
-            
+
             {/* Bill Info */}
             <div className="flex justify-between mb-6">
               <div>
                 <h3 className="font-medium">Invoice To:</h3>
                 <p>Customer ID: {selectedOrder?.userId?.substring(0, 8)}</p>
-                <p>Order Date: {selectedOrder && format(new Date(selectedOrder?.timestamp), "MMM d, yyyy")}</p>
+                <p>
+                  Order Date:{" "}
+                  {selectedOrder &&
+                    format(new Date(selectedOrder?.timestamp), "MMM d, yyyy")}
+                </p>
               </div>
               <div className="text-right">
                 <h3 className="font-medium">Invoice Details:</h3>
@@ -409,7 +437,7 @@ export default function OrdersTab() {
                 <p>Order #: {selectedOrder?.orderId?.substring(0, 8)}</p>
               </div>
             </div>
-            
+
             {/* Bill Items */}
             <table className="w-full mb-6">
               <thead className="border-b-2 border-gray-300">
@@ -425,51 +453,59 @@ export default function OrdersTab() {
                   <tr key={idx}>
                     <td className="py-2">{product.productName}</td>
                     <td className="py-2 text-right">{product.quantity}</td>
-                    <td className="py-2 text-right">₹{product.amount?.toFixed(2)}</td>
-                    <td className="py-2 text-right">₹{(product.amount * product.quantity).toFixed(2)}</td>
+                    <td className="py-2 text-right">
+                      ₹{product.amount?.toFixed(2)}
+                    </td>
+                    <td className="py-2 text-right">
+                      ₹{(product.amount * product.quantity).toFixed(2)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
               <tfoot className="border-t-2 border-gray-300 font-medium">
                 <tr>
-                  <td colSpan={3} className="py-2 text-right">Subtotal:</td>
-                  <td className="py-2 text-right">₹{selectedOrder?.amount?.toFixed(2)}</td>
+                  <td colSpan={3} className="py-2 text-right">
+                    Subtotal:
+                  </td>
+                  <td className="py-2 text-right">
+                    ₹{selectedOrder?.amount?.toFixed(2)}
+                  </td>
                 </tr>
                 <tr>
-                  <td colSpan={3} className="py-2 text-right">Tax:</td>
+                  <td colSpan={3} className="py-2 text-right">
+                    Tax:
+                  </td>
                   <td className="py-2 text-right">₹0.00</td>
                 </tr>
                 <tr className="font-bold">
-                  <td colSpan={3} className="py-2 text-right">Total:</td>
-                  <td className="py-2 text-right">₹{selectedOrder?.amount?.toFixed(2)}</td>
+                  <td colSpan={3} className="py-2 text-right">
+                    Total:
+                  </td>
+                  <td className="py-2 text-right">
+                    ₹{selectedOrder?.amount?.toFixed(2)}
+                  </td>
                 </tr>
               </tfoot>
             </table>
-            
+
             {/* Payment info */}
             <div className="border-t pt-4 mb-6">
               <h3 className="font-medium mb-2">Payment Information</h3>
               <p>Status: {selectedOrder?.paymentStatus || "Paid"}</p>
               <p>Method: {selectedOrder?.paymentMethod || "Online Payment"}</p>
             </div>
-            
+
             {/* Thank You */}
             <div className="text-center mt-8">
               <p className="font-medium">Thank you for your business!</p>
             </div>
           </div>
-          
+
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setBillDialogOpen(false)}
-            >
+            <Button variant="outline" onClick={() => setBillDialogOpen(false)}>
               Close
             </Button>
-            <Button 
-              onClick={handlePrint}
-              className="flex items-center gap-1"
-            >
+            <Button onClick={handlePrint} className="flex items-center gap-1">
               <Printer className="h-4 w-4" />
               <span>Print / Save PDF</span>
             </Button>

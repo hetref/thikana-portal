@@ -78,7 +78,10 @@ const businessTypes = [
   "Other",
 ];
 
-export default function BusinessInfoForm() {
+export default function BusinessInfoForm({
+  readOnly = false,
+  businessId = null,
+}) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [customBusinessType, setCustomBusinessType] = useState("");
@@ -108,9 +111,52 @@ export default function BusinessInfoForm() {
         return;
       }
       try {
-        const businessDocRef = doc(db, "businesses", user.uid);
+        // Determine which ID to use - either businessId (for members) or user.uid (for business owners)
+        const targetId = businessId || user.uid;
+
+        const businessDocRef = doc(db, "businesses", targetId);
         const businessDocSnap = await getDoc(businessDocRef);
-        if (businessDocSnap.exists()) {
+
+        // If business data doesn't exist in businesses collection, try to fetch from users collection
+        if (!businessDocSnap.exists()) {
+          const userDocRef = doc(db, "users", targetId);
+          const userDocSnap = await getDoc(userDocRef);
+
+          if (userDocSnap.exists()) {
+            const userData = userDocSnap.data();
+
+            // Check if business_type is one of the predefined types or a custom type
+            const storedBusinessType = userData.business_type || "";
+            const isCustomType =
+              !businessTypes.includes(storedBusinessType) &&
+              storedBusinessType !== "";
+
+            setSelectedBusinessType(
+              isCustomType ? "Other" : storedBusinessType
+            );
+            setCustomBusinessType(isCustomType ? storedBusinessType : "");
+
+            // Initialize form with existing data
+            const formData = {
+              business_type: isCustomType ? "Other" : storedBusinessType,
+              gstinNumber: userData.gstinNumber || "",
+              businessLicense: userData.businessLicense || "",
+              registrationDate: userData.registrationDate || "",
+              operationalHours:
+                userData.operationalHours ||
+                days.map((day) => ({
+                  day,
+                  openTime: "",
+                  closeTime: "",
+                })),
+              socialMediaLinks: userData.socialMediaLinks || [
+                { platform: "", url: "" },
+              ],
+            };
+
+            form.reset(formData);
+          }
+        } else {
           const businessData = businessDocSnap.data();
 
           // Check if business_type is one of the predefined types or a custom type
@@ -150,7 +196,7 @@ export default function BusinessInfoForm() {
     };
 
     fetchBusinessData();
-  }, [user, form]);
+  }, [user, form, businessId]);
 
   const handleBusinessTypeChange = (value) => {
     setSelectedBusinessType(value);
@@ -170,6 +216,12 @@ export default function BusinessInfoForm() {
   });
 
   async function onSubmit(data) {
+    // Don't submit if in readonly mode
+    if (readOnly) {
+      toast.error("You don't have permission to update business information");
+      return;
+    }
+
     setIsSubmitting(true);
     const toastId = toast.loading("Saving business information...");
 
@@ -207,6 +259,97 @@ export default function BusinessInfoForm() {
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  // Add a render function to create readonly inputs
+  const renderReadOnlyInput = (label, value) => (
+    <div className="mb-4">
+      <div className="text-sm font-medium text-gray-700 mb-1">{label}</div>
+      <div className="p-2 border rounded-md bg-gray-50 text-gray-700">
+        {value || "Not provided"}
+      </div>
+    </div>
+  );
+
+  // Render a simplified readonly view for members
+  if (readOnly) {
+    const { getValues } = form;
+    const values = getValues();
+
+    return (
+      <div className="space-y-6">
+        <div className="bg-violet-50 text-violet-800 p-4 rounded-md mb-4">
+          You are viewing business information in read-only mode.
+        </div>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        ) : (
+          <div>
+            {renderReadOnlyInput(
+              "Business Type",
+              values.business_type === "Other"
+                ? customBusinessType
+                : values.business_type
+            )}
+            {renderReadOnlyInput("GSTIN Number", values.gstinNumber)}
+            {renderReadOnlyInput("Business License", values.businessLicense)}
+            {renderReadOnlyInput("Registration Date", values.registrationDate)}
+
+            <div className="mb-4">
+              <div className="text-sm font-medium text-gray-700 mb-2">
+                Operational Hours
+              </div>
+              <div className="border rounded-md overflow-hidden">
+                {values.operationalHours.map((item, index) => (
+                  <div
+                    key={index}
+                    className={`flex p-2 ${index % 2 === 0 ? "bg-gray-50" : "bg-white"}`}
+                  >
+                    <div className="flex-1 font-medium">{item.day}</div>
+                    <div className="flex-1">
+                      {item.openTime && item.closeTime
+                        ? `${item.openTime} - ${item.closeTime}`
+                        : "Closed"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {values.socialMediaLinks && values.socialMediaLinks.length > 0 && (
+              <div className="mb-4">
+                <div className="text-sm font-medium text-gray-700 mb-2">
+                  Social Media Links
+                </div>
+                <div className="space-y-2">
+                  {values.socialMediaLinks.map((link, index) =>
+                    link.platform && link.url ? (
+                      <div
+                        key={index}
+                        className="flex items-center gap-2 p-2 border rounded-md"
+                      >
+                        <div className="font-medium">{link.platform}:</div>
+                        <a
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline truncate"
+                        >
+                          {link.url}
+                        </a>
+                      </div>
+                    ) : null
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
   }
 
   if (isLoading) {

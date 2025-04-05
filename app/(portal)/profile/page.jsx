@@ -127,18 +127,9 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import FranchiseSelector from "@/components/profile/FranchiseSelector";
-
-// Dynamically import heavy components
-const FranchiseModal = dynamic(
-  () => import("@/components/profile/FranchiseModal"),
-  {
-    loading: () => (
-      <div className="flex justify-center items-center h-[400px]">
-        <Loader2Icon className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    ),
-  }
-);
+import WebsiteBuilderButton from "@/components/WebsiteBuilderButton";
+import "leaflet/dist/leaflet.css";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import { useReactToPrint } from "react-to-print";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -154,6 +145,28 @@ const scrollbarHideStyles = `
     scrollbar-width: none;
   }
 `;
+
+// Dynamically import Leaflet components to avoid SSR issues
+const MapComponent = dynamic(() => import("@/components/MapComponent"), {
+  loading: () => (
+    <div className="h-[300px] flex justify-center items-center bg-gray-100">
+      <Loader2Icon className="w-8 h-8 animate-spin text-primary" />
+    </div>
+  ),
+  ssr: false,
+});
+
+// Dynamically import FranchiseModal
+const FranchiseModal = dynamic(
+  () => import("@/components/profile/FranchiseModal"),
+  {
+    loading: () => (
+      <div className="flex justify-center items-center h-[400px]">
+        <Loader2Icon className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    ),
+  }
+);
 
 // Memoized components
 const LoadingSpinner = () => (
@@ -203,6 +216,7 @@ export default function Profile() {
 
   const billRef = useRef();
   const [isFranchiseModalOpen, setIsFranchiseModalOpen] = useState(false);
+  const [isBusinessUser, setIsBusinessUser] = useState(false);
 
   const franchiseFormSchema = z.object({
     adminName: z.string().min(2, { message: "Admin name is required" }),
@@ -233,11 +247,6 @@ export default function Profile() {
   };
 
   // Memoized values
-  const isBusinessUser = useMemo(() => {
-    if (!userData) return null;
-    return userData?.role === "business";
-  }, [userData]);
-
   const isCurrentUser = useMemo(() => {
     return userId === user?.uid;
   }, [userId, user?.uid]);
@@ -314,13 +323,69 @@ export default function Profile() {
       setSelectedFranchiseId(storedFranchiseId);
     }
 
-    const unsubscribe = auth.onAuthStateChanged((authUser) => {
-      if (authUser) {
-        setUser(authUser);
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        setUser(user);
+        setLoadingUserData(true);
+
+        try {
+          const userDocRef = doc(db, "users", user.uid);
+          const userSnapshot = await getDoc(userDocRef);
+
+          if (userSnapshot.exists()) {
+            const userDoc = userSnapshot.data();
+
+            // Check if user is a member with a businessId
+            if (userDoc.role === "member" && userDoc.businessId) {
+              // Fetch the business data
+              const businessDocRef = doc(db, "businesses", userDoc.businessId);
+              const businessSnapshot = await getDoc(businessDocRef);
+
+              if (businessSnapshot.exists()) {
+                const businessData = businessSnapshot.data();
+
+                // Merge business data with user-specific data
+                const mergedData = {
+                  ...businessData,
+                  // Keep user email, phone, and name from user data
+                  email: userDoc.email,
+                  phone: userDoc.phone || businessData.phone,
+                  name: userDoc.name,
+                  // Set role to member for badge display
+                  role: "member",
+                  // Store original user data for reference
+                  _userData: userDoc,
+                  // Keep user's original ID for posts and other user-specific operations
+                  uid: user.uid,
+                };
+
+                setUserData(mergedData);
+                setIsBusinessUser(true);
+              } else {
+                // If business not found, fall back to user data
+                setUserData(userDoc);
+                setIsBusinessUser(!!userDoc.businessName);
+              }
+            } else {
+              // Not a member or no businessId, use user data as is
+              setUserData(userDoc);
+              setIsBusinessUser(!!userDoc.businessName);
+            }
+          } else {
+            setUserData(null);
+            setIsBusinessUser(false);
+          }
+        } catch (error) {
+          console.error("Error fetching user data:", error);
+          toast.error("Failed to load user profile");
+        } finally {
+          setLoadingUserData(false);
+        }
       } else {
         router.push("/login");
       }
     });
+
     return () => unsubscribe();
   }, [router]);
 
@@ -344,65 +409,40 @@ export default function Profile() {
     };
   }, [userId]);
 
+  // User photos listener
   useEffect(() => {
     if (!userId) {
-      setLoadingUserData(false);
+      setLoadingPhotos(false);
       return;
     }
 
-    setLoadingUserData(true);
-    const userRef = doc(db, "users", userId);
-    const unsubscribe = onSnapshot(
-      userRef,
-      (docSnap) => {
-        if (docSnap.exists()) {
-          setUserData({
-            uid: userId,
-            ...docSnap.data(),
-          });
-        } else {
-          setUserData(null);
-        }
-        setLoadingUserData(false);
-      },
-      (error) => {
-        console.error("Error fetching user data:", error);
-        setLoadingUserData(false);
-      }
-    );
-
-    return () => unsubscribe();
-  }, [userId]);
-
-  // User photos listener
-  useEffect(() => {
-    if (!userId) return;
-
     setLoadingPhotos(true);
-    const photosRef = collection(db, "users", userId, "photos");
-    const photosQuery = query(photosRef, orderBy("timestamp", "desc"));
+
+    // For members, use the business ID for fetching photos
+    const targetUserId = userData?.businessId || userId;
+
+    const photosRef = collection(db, "users", targetUserId, "photos");
+    // Photos can use 'timestamp' or 'addedOn' field for ordering
+    const q = query(photosRef, orderBy("addedOn", "desc"));
 
     const unsubscribe = onSnapshot(
-      photosQuery,
+      q,
       (snapshot) => {
-        const photos = snapshot.docs.map((doc) => ({
+        const photosData = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
-          timestamp: doc.data().timestamp
-            ? new Date(doc.data().timestamp)
-            : null,
         }));
-        setUserPhotos(photos);
+        setUserPhotos(photosData);
         setLoadingPhotos(false);
       },
       (error) => {
-        console.error("Error fetching photos:", error);
+        console.error("Error fetching user photos:", error);
         setLoadingPhotos(false);
       }
     );
 
     return () => unsubscribe();
-  }, [userId]);
+  }, [userId, userData?.businessId]);
 
   // Liked posts listener
   useEffect(() => {
@@ -430,77 +470,69 @@ export default function Profile() {
 
   // Saved posts listener
   useEffect(() => {
-    if (!user?.uid) return;
-
-    setLoadingSavedPosts(true);
-
-    try {
-      const savedPostsRef = collection(db, "users", user.uid, "savedPosts");
-      const unsubscribe = onSnapshot(
-        savedPostsRef,
-        async (snapshot) => {
-          const savedPostsData = await Promise.all(
-            snapshot.docs.map(async (savedPostDoc) => {
-              const postData = savedPostDoc.data();
-              const postRef = doc(db, "posts", postData.postId);
-              const postDoc = await getDoc(postRef);
-
-              if (postDoc.exists()) {
-                return {
-                  ...postDoc.data(),
-                  id: postDoc.id,
-                  savedAt: postData.timestamp,
-                  authorName: postData.authorName,
-                  authorProfileImage: postData.authorProfileImage,
-                  authorUsername: postData.authorUsername,
-                };
-              }
-              return null;
-            })
-          );
-
-          // Filter out any null values and sort by savedAt timestamp
-          const validPosts = savedPostsData
-            .filter(Boolean)
-            .sort((a, b) => b.savedAt?.toMillis() - a.savedAt?.toMillis());
-
-          setSavedPosts(validPosts);
-          setLoadingSavedPosts(false);
-        },
-        (error) => {
-          console.error("Error in saved posts snapshot:", error);
-          setLoadingSavedPosts(false);
-        }
-      );
-
-      return () => unsubscribe();
-    } catch (error) {
-      console.error("Error fetching saved posts:", error);
-      toast.error("Failed to load saved posts");
-      setLoadingSavedPosts(false);
+    // Skip if not the current user
+    if (!user || !isCurrentUser) {
+      return;
     }
-  }, [user?.uid]);
+
+    const fetchSavedPosts = async () => {
+      try {
+        setLoadingSavedPosts(true);
+
+        const savedPostsRef = collection(db, "users", user.uid, "savedPosts");
+        const savedPostsSnap = await getDocs(savedPostsRef);
+
+        const postsData = [];
+
+        for (const doc of savedPostsSnap.docs) {
+          const postRef = doc.ref;
+          const postData = doc.data();
+
+          // If postData has a reference to the original post
+          if (postData.postId) {
+            const postDoc = await getDoc(doc(db, "posts", postData.postId));
+
+            if (postDoc.exists()) {
+              postsData.push({
+                id: postDoc.id,
+                ...postDoc.data(),
+                savedAt: postData.timestamp,
+                savedId: doc.id,
+              });
+            }
+          }
+        }
+
+        // Sort by savedAt timestamp
+        postsData.sort((a, b) => b.savedAt - a.savedAt);
+
+        setSavedPosts(postsData);
+      } catch (error) {
+        console.error("Error fetching saved posts:", error);
+      } finally {
+        setLoadingSavedPosts(false);
+      }
+    };
+
+    fetchSavedPosts();
+  }, [user, isCurrentUser]);
 
   // Orders listener
   useEffect(() => {
-    if (!user?.uid) return;
+    // Skip if not the current user
+    if (!user?.uid || !isCurrentUser) {
+      return;
+    }
 
-    setLoadingOrders(true);
     const fetchOrders = async () => {
       try {
-        // Fetch user's orders
+        setLoadingOrders(true);
+
         const ordersRef = collection(db, "users", user.uid, "orders");
-        const ordersQuery = query(ordersRef, orderBy("timestamp", "desc"));
-        const orderDocs = await getDocs(ordersQuery);
+        const q = query(ordersRef, orderBy("timestamp", "desc"));
+        const ordersSnap = await getDocs(q);
 
-        if (orderDocs.empty) {
-          setOrders([]);
-          setLoadingOrders(false);
-          return;
-        }
-
-        // Process each order
-        const ordersData = orderDocs.docs.map((doc) => ({
+        const ordersData = ordersSnap.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
           timestamp: doc.data().timestamp?.toDate() || new Date(),
@@ -516,7 +548,37 @@ export default function Profile() {
     };
 
     fetchOrders();
-  }, [user?.uid]);
+  }, [user?.uid, isCurrentUser]);
+
+  // Load product ratings
+  useEffect(() => {
+    if (!user?.uid || !isCurrentUser) {
+      return;
+    }
+
+    const fetchProductRatings = async () => {
+      try {
+        const ratingsRef = collection(db, "users", user.uid, "productRatings");
+        const ratingsSnap = await getDocs(ratingsRef);
+
+        const ratingsData = {};
+
+        ratingsSnap.docs.forEach((doc) => {
+          const data = doc.data();
+          ratingsData[data.productId] = {
+            id: doc.id,
+            ...data,
+          };
+        });
+
+        setProductRatings(ratingsData);
+      } catch (error) {
+        console.error("Error fetching product ratings:", error);
+      }
+    };
+
+    fetchProductRatings();
+  }, [user?.uid, isCurrentUser]);
 
   // Memoized UI components
   const renderPosts = useMemo(() => {
@@ -750,33 +812,6 @@ export default function Profile() {
     setBillDialogOpen(true);
   };
 
-  // Add the fetch ratings effect
-  useEffect(() => {
-    if (!user?.uid) return;
-
-    const fetchProductRatings = async () => {
-      try {
-        const ratingsRef = collection(db, "users", user.uid, "ratings");
-        const ratingsSnapshot = await getDocs(ratingsRef);
-
-        const ratingsData = {};
-        ratingsSnapshot.docs.forEach((doc) => {
-          const data = doc.data();
-          ratingsData[data.productId] = {
-            id: doc.id,
-            ...data,
-          };
-        });
-
-        setProductRatings(ratingsData);
-      } catch (error) {
-        console.error("Error fetching product ratings:", error);
-      }
-    };
-
-    fetchProductRatings();
-  }, [user?.uid]);
-
   // Handle rating submission
   const handleSubmitRating = async () => {
     if (!selectedProductForRating || !user?.uid || ratingValue === 0) return;
@@ -993,24 +1028,30 @@ export default function Profile() {
                       <div className="flex-1 space-y-2">
                         <h1 className="text-2xl font-bold text-gray-900 flex items-center">
                           {isBusinessUser
-                            ? userData?.businessName
+                            ? userData?.businessName || userData?.name
                             : userData?.name}
-                          {isBusinessUser &&
-                            (userData?.isFranchise ? (
-                              <Badge
-                                variant="outline"
-                                className="ml-2 bg-blue-50 text-blue-600 border-blue-200 text-xs"
-                              >
-                                Franchise
-                              </Badge>
-                            ) : (
-                              <Badge
-                                variant="outline"
-                                className="ml-2 bg-primary/10 text-primary border-primary/20 text-xs"
-                              >
-                                Headquarters
-                              </Badge>
-                            ))}
+                          {isBusinessUser && userData?.role === "member" ? (
+                            <Badge
+                              variant="outline"
+                              className="ml-2 bg-violet-50 text-violet-600 border-violet-200 text-xs"
+                            >
+                              Member
+                            </Badge>
+                          ) : isBusinessUser && userData?.isFranchise ? (
+                            <Badge
+                              variant="outline"
+                              className="ml-2 bg-blue-50 text-blue-600 border-blue-200 text-xs"
+                            >
+                              Franchise
+                            </Badge>
+                          ) : isBusinessUser ? (
+                            <Badge
+                              variant="outline"
+                              className="ml-2 bg-primary/10 text-primary border-primary/20 text-xs"
+                            >
+                              Headquarters
+                            </Badge>
+                          ) : null}
                         </h1>
                         <div className="flex items-center text-gray-600 gap-1">
                           <User className="w-4 h-4" />
@@ -1057,39 +1098,45 @@ export default function Profile() {
                               </Link>
                             </Button>
 
-                            {/* Exit Franchise Mode button - shown when in franchise mode */}
-                            {selectedFranchiseId && (
-                              <Button
-                                variant="outline"
-                                className="gap-2 w-full md:w-auto"
-                                onClick={() => {
-                                  sessionStorage.removeItem(
-                                    "selectedFranchiseId"
-                                  );
-                                  toast.success(
-                                    userData?.franchiseOwner
-                                      ? "Returned to Business View"
-                                      : "Returned to Headquarters"
-                                  );
-                                  window.location.reload();
-                                }}
-                              >
-                                {userData?.franchiseOwner ? (
-                                  <>
-                                    <ArrowLeftIcon className="w-4 h-4" />
-                                    Return to Business
-                                  </>
-                                ) : (
-                                  <>
-                                    <HomeIcon className="w-4 h-4" />
-                                    Return to HQ
-                                  </>
-                                )}
-                              </Button>
+                            {userData?.role !== "member" && (
+                              <WebsiteBuilderButton userId={user?.uid} />
                             )}
 
-                            {/* Add Franchise button - only shown for business HQ, not for franchises or when in franchise mode */}
-                            {!selectedFranchiseId &&
+                            {/* Only show franchise-related buttons for business owners, not members */}
+                            {userData?.role !== "member" &&
+                              selectedFranchiseId && (
+                                <Button
+                                  variant="outline"
+                                  className="gap-2 w-full md:w-auto"
+                                  onClick={() => {
+                                    sessionStorage.removeItem(
+                                      "selectedFranchiseId"
+                                    );
+                                    toast.success(
+                                      userData?.franchiseOwner
+                                        ? "Returned to Business View"
+                                        : "Returned to Headquarters"
+                                    );
+                                    window.location.reload();
+                                  }}
+                                >
+                                  {userData?.franchiseOwner ? (
+                                    <>
+                                      <ArrowLeftIcon className="w-4 h-4" />
+                                      Return to Business
+                                    </>
+                                  ) : (
+                                    <>
+                                      <HomeIcon className="w-4 h-4" />
+                                      Return to HQ
+                                    </>
+                                  )}
+                                </Button>
+                              )}
+
+                            {/* Add Franchise button - only shown for business HQ, not for franchises or members */}
+                            {userData?.role !== "member" &&
+                              !selectedFranchiseId &&
                               !userData?.franchiseOwner && (
                                 <Button
                                   variant="outline"
@@ -1101,32 +1148,24 @@ export default function Profile() {
                                 </Button>
                               )}
 
-                            {/* Show FranchiseSelector only when not in franchise mode and when at headquarters */}
-                            {!selectedFranchiseId &&
+                            {/* Show FranchiseSelector only when at headquarters and not for members */}
+                            {userData?.role !== "member" &&
+                              !selectedFranchiseId &&
                               !userData?.franchiseOwner && (
                                 <FranchiseSelector />
                               )}
                           </>
                         )}
 
-                        {isBusinessUser && (
-                          <>
-                            <Button
-                              variant="outline"
-                              onClick={toggleLocationIFrame}
-                              className="w-full md:w-auto"
-                            >
-                              <MapPinIcon className="w-4 h-4 mr-1" />
-                              Location
-                            </Button>
-
-                            {userData && (
-                              <MoreInformationDialog userData={userData} />
-                            )}
-
-                            <ShareBusinessDialog userData={userData} />
-                          </>
-                        )}
+                        {/* Location button for all users */}
+                        <Button
+                          variant="outline"
+                          onClick={toggleLocationIFrame}
+                          className="w-full md:w-auto"
+                        >
+                          <MapPinIcon className="w-4 h-4 mr-1" />
+                          Location
+                        </Button>
                       </div>
                     </div>
 
@@ -1169,12 +1208,14 @@ export default function Profile() {
                     </div>
 
                     {/* Location map */}
-                    {showLocationIFrame && isBusinessUser && (
+                    {showLocationIFrame && (
                       <div className="mt-6 rounded-lg border overflow-hidden bg-white shadow-sm">
                         <div className="p-4 border-b">
                           <h3 className="font-medium flex items-center gap-2 text-gray-900">
                             <MapPinIcon className="w-4 h-4" />
-                            Business Location
+                            {isBusinessUser
+                              ? "Business Location"
+                              : "User Location"}
                           </h3>
                           {userData?.locations?.address ? (
                             <div className="mt-1 text-sm text-gray-600">
@@ -1182,17 +1223,31 @@ export default function Profile() {
                             </div>
                           ) : null}
                         </div>
-                        <iframe
-                          src={
-                            userData?.locations?.mapUrl ||
-                            "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d7544.081477968485!2d73.08964204800337!3d19.017926421940366!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3be7e9d390c16fad%3A0x45a26096b6c171fd!2sKamothe%2C%20Panvel%2C%20Navi%20Mumbai%2C%20Maharashtra!5e0!3m2!1sen!2sin!4v1739571469059!5m2!1sen!2sin"
-                          }
-                          style={{ border: "0" }}
-                          allowFullScreen=""
-                          loading="lazy"
-                          referrerPolicy="no-referrer-when-downgrade"
-                          className="w-full h-[300px]"
-                        ></iframe>
+                        <div className="h-[300px] w-full relative">
+                          {userData?.location?.latitude &&
+                          userData?.location?.longitude ? (
+                            <MapComponent
+                              location={{
+                                lat: userData.location.latitude,
+                                lng: userData.location.longitude,
+                              }}
+                              name={
+                                isBusinessUser
+                                  ? userData?.businessName
+                                  : userData?.name
+                              }
+                              address={
+                                userData?.locations?.address || "Location"
+                              }
+                            />
+                          ) : (
+                            <div className="flex justify-center items-center h-full bg-gray-100">
+                              <p className="text-gray-500">
+                                No location data available
+                              </p>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1204,7 +1259,7 @@ export default function Profile() {
                     <div className="flex flex-col items-center text-center">
                       <p className="text-amber-800 mb-3">
                         Please verify your email to access all platform
-                        features.
+                        features.,
                       </p>
                       <Button
                         onClick={verifyEmailHandler}
@@ -1232,7 +1287,8 @@ export default function Profile() {
                               )}
                             >
                               <FileTextIcon className="w-4 h-4 mr-2" />
-                              Posts
+                              Posts{" "}
+                              {userData?.role === "member" && "from Business"}
                             </TabsTrigger>
                             <TabsTrigger
                               value="likes"

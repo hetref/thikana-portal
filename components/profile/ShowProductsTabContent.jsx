@@ -1,21 +1,33 @@
-import React, { useEffect, useState } from "react";
-import { collection, getDocs, query } from "firebase/firestore";
-import { db } from "@/lib/firebase"; // Ensure you have your Firebase setup in firebase.js
-import { ProductGrid } from "../ProductGrid";
+"use client";
+import { useState, useEffect } from "react";
+import { ProductGrid } from "@/components/ProductGrid";
+import useBusinessIdForMember from "@/hooks/useBusinessIdForMember";
 import { Button } from "../ui/button";
 import Link from "next/link";
 import { Blocks } from "lucide-react";
-import { getProducts } from "@/lib/inventory-operations";
 import { CartProvider } from "../CartContext";
 
-
-
-const ShowProductsTabContent = ({
+export default function ShowProductsTabContent({
   userId,
   userData,
   currentUserView = false,
   isViewOnly = false,
-}) => {
+}) {
+  const {
+    targetId,
+    isMember,
+    loading: idLoading,
+  } = useBusinessIdForMember(userId);
+
+  // If still loading the targetId, show loading state
+  if (idLoading) {
+    return (
+      <div className="flex justify-center py-10">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   return (
     <div>
       {/* Only show the Manage Inventory button if this is the current user's view and not view-only mode */}
@@ -36,14 +48,12 @@ const ShowProductsTabContent = ({
       )}
 
       <CartProvider>
-        <ProductGrid 
-          userId={userId} 
-          userData={userData} 
-          userType={currentUserView ? "business" : "customer"} 
+        <ProductGrid
+          userId={targetId}
+          userData={userData}
+          userType={currentUserView ? "business" : "customer"}
         />
       </CartProvider>
     </div>
   );
-};
-
-export default ShowProductsTabContent;
+}
