@@ -55,6 +55,7 @@ import {
 import { Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useEffect } from "react";
+import { sendNotificationToUser } from "@/lib/notifications";
 
 export default function ContactsTab() {
   const [contacts, setContacts] = useState([]);
@@ -164,6 +165,45 @@ export default function ContactsTab() {
 
       if (selectedContact && selectedContact.id === contactId) {
         setSelectedContact({ ...selectedContact, status: newStatus });
+      }
+
+      // Find the contact to get customer data for notification
+      const contactToUpdate = contacts.find(
+        (contact) => contact.id === contactId
+      );
+
+      if (contactToUpdate && contactToUpdate.customerId) {
+        // Create a user-friendly status label
+        const statusLabels = {
+          pending: "Pending",
+          "in-progress": "In Progress",
+          completed: "Completed",
+          cancelled: "Cancelled",
+        };
+
+        const statusLabel = statusLabels[newStatus] || newStatus;
+        const serviceName = contactToUpdate.serviceName || "General Inquiry";
+
+        // Send notification to the customer
+        try {
+          await sendNotificationToUser(contactToUpdate.customerId, {
+            title: `Inquiry Status Updated: ${statusLabel}`,
+            message: `Your inquiry about "${serviceName}" has been updated to "${statusLabel}".`,
+            type: "order_update",
+            sender: user.displayName || "Service Provider",
+            email: true, // Enable email notification
+            inquiryId: contactId,
+            serviceName: serviceName,
+            status: newStatus,
+          });
+
+          console.log(
+            "Notification sent to customer:",
+            contactToUpdate.customerId
+          );
+        } catch (notificationError) {
+          console.error("Error sending notification:", notificationError);
+        }
       }
 
       toast.success(`Status updated to ${newStatus}`);

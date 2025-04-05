@@ -36,11 +36,8 @@ export default function UserBasicInfoForm({ userData = null }) {
   const [isLoading, setIsLoading] = useState(true);
   const [profileImageFile, setProfileImageFile] = useState(null);
   const [profileImagePreview, setProfileImagePreview] = useState(null);
-  const [bannerImageFile, setBannerImageFile] = useState(null);
-  const [bannerImagePreview, setBannerImagePreview] = useState(null);
   const [uploadingProgress, setUploadingProgress] = useState({
     profileImg: 0,
-    bannerImg: 0,
   });
   const [uploadingType, setUploadingType] = useState(null);
   const [canChangeUsername, setCanChangeUsername] = useState(true);
@@ -93,17 +90,11 @@ export default function UserBasicInfoForm({ userData = null }) {
                   data.username || businessData.username || ""
                 );
 
-                // Use business profile picture and banner if member doesn't have one
+                // Use business profile picture if member doesn't have one
                 if (!data.profilePic && businessData.profilePic) {
                   setProfileImagePreview(businessData.profilePic);
                 } else if (data.profilePic) {
                   setProfileImagePreview(data.profilePic);
-                }
-
-                if (!data.bannerImage && businessData.bannerImage) {
-                  setBannerImagePreview(businessData.bannerImage);
-                } else if (data.bannerImage) {
-                  setBannerImagePreview(data.bannerImage);
                 }
               }
             } catch (error) {
@@ -117,11 +108,6 @@ export default function UserBasicInfoForm({ userData = null }) {
             // Set profile image preview
             if (data.profilePic) {
               setProfileImagePreview(data.profilePic);
-            }
-
-            // Set banner image preview
-            if (data.bannerImage) {
-              setBannerImagePreview(data.bannerImage);
             }
           }
 
@@ -212,14 +198,6 @@ export default function UserBasicInfoForm({ userData = null }) {
         }
       }
 
-      // Upload banner image if changed
-      if (bannerImageFile) {
-        const bannerImageUrl = await uploadImage(bannerImageFile, "bannerImg");
-        if (bannerImageUrl) {
-          updateData.bannerImage = bannerImageUrl;
-        }
-      }
-
       // Determine where to save data based on user role
       const isMember = localUserData?.role === "member";
       const businessId = localUserData?.businessId;
@@ -271,19 +249,6 @@ export default function UserBasicInfoForm({ userData = null }) {
       const reader = new FileReader();
       reader.onloadend = () => {
         setProfileImagePreview(reader.result);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleBannerImageChange = (file) => {
-    setBannerImageFile(file);
-
-    // Create preview
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setBannerImagePreview(reader.result);
       };
       reader.readAsDataURL(file);
     }
@@ -357,28 +322,6 @@ export default function UserBasicInfoForm({ userData = null }) {
                 onChange={handleProfileImageChange}
                 uploading={uploadingType === "profileImg"}
                 progress={uploadingProgress.profileImg}
-              />
-            </div>
-
-            <div className="w-full">
-              <h3 className="text-lg font-medium mb-2">Banner Image</h3>
-              {bannerImagePreview && (
-                <div className="mb-4 rounded-lg overflow-hidden border">
-                  <img
-                    src={bannerImagePreview}
-                    alt="Banner preview"
-                    className="w-full h-32 object-cover"
-                  />
-                </div>
-              )}
-              <ImageUpload
-                title="Banner Image"
-                description="Upload a banner image"
-                defaultValue={localUserData?.bannerImage}
-                onChange={handleBannerImageChange}
-                uploading={uploadingType === "bannerImg"}
-                progress={uploadingProgress.bannerImg}
-                aspectRatio={16 / 9}
               />
             </div>
           </div>

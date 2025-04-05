@@ -53,6 +53,8 @@ export async function POST(req) {
 
           console.log("Successfully decrypted Razorpay keys");
 
+          console.log(decryptedKeyId, decryptedKeySecret);
+
           // Create Razorpay order
           const razorpay = new Razorpay({
             key_id: decryptedKeyId,
