@@ -49,8 +49,16 @@ import {
   Calendar,
   User,
   Mail,
+  FileText,
+  AlertCircle,
+  Code,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function RequestCallsManager() {
   const [callRequests, setCallRequests] = useState([]);
@@ -58,7 +66,10 @@ export default function RequestCallsManager() {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [processingCall, setProcessingCall] = useState(false);
+  const [callSummary, setCallSummary] = useState(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
   const user = auth.currentUser;
+  const [debugOpen, setDebugOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -137,6 +148,14 @@ export default function RequestCallsManager() {
 
       toast.success("Call initiated successfully");
       setShowDetailsDialog(false);
+
+      // Reset summary when opening a new call details
+      setCallSummary(null);
+
+      // If call has been initiated, fetch the summary
+      if (responseData.call_id && request.status === "initiated") {
+        fetchCallSummary(responseData.call_id);
+      }
     } catch (error) {
       console.error("Error initiating call:", error);
       toast.error(error.message || "Failed to initiate call");
@@ -211,9 +230,44 @@ export default function RequestCallsManager() {
     }
   };
 
+  const fetchCallSummary = async (callId) => {
+    if (!callId) return;
+
+    setLoadingSummary(true);
+    try {
+      const response = await fetch(
+        `/api/bland-ai/call-details?call_id=${callId}`,
+        {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch call details");
+      }
+
+      const data = await response.json();
+      setCallSummary(data);
+    } catch (error) {
+      console.error("Error fetching call summary:", error);
+      toast.error("Failed to load call summary");
+    } finally {
+      setLoadingSummary(false);
+    }
+  };
+
   const openDetailsDialog = (request) => {
     setSelectedRequest(request);
     setShowDetailsDialog(true);
+
+    // Reset summary when opening a new call details
+    setCallSummary(null);
+
+    // If call has been initiated, fetch the summary
+    if (request.callId && request.status === "initiated") {
+      fetchCallSummary(request.callId);
+    }
   };
 
   const formatDate = (timestamp) => {
@@ -348,7 +402,7 @@ export default function RequestCallsManager() {
       {/* Request Details Dialog */}
       {selectedRequest && (
         <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
-          <DialogContent className="sm:max-w-[550px]">
+          <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Call Request Details</DialogTitle>
               <DialogDescription>
@@ -424,89 +478,193 @@ export default function RequestCallsManager() {
                 </div>
               </div>
 
-              {selectedRequest.callStatus && (
-                <>
-                  <Separator />
+              {/* Add Call Summary section */}
+              {selectedRequest.callId &&
+                selectedRequest.status === "initiated" && (
+                  <>
+                    <Separator />
 
-                  <div>
-                    <h3 className="font-medium mb-2">Call Status</h3>
-                    <div className="space-y-2">
-                      <div>
-                        <span className="text-sm text-muted-foreground">
-                          Status:{" "}
-                        </span>
-                        <span>{selectedRequest.callStatus}</span>
-                      </div>
-                      {selectedRequest.callId && (
-                        <div>
-                          <span className="text-sm text-muted-foreground">
-                            Call ID:{" "}
-                          </span>
-                          <span className="font-mono text-xs">
-                            {selectedRequest.callId}
-                          </span>
+                    <div>
+                      <h3 className="font-medium mb-2 flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        Call Summary
+                      </h3>
+
+                      {loadingSummary ? (
+                        <div className="space-y-2">
+                          <Skeleton className="h-4 w-full" />
+                          <Skeleton className="h-4 w-full" />
+                          <Skeleton className="h-4 w-3/4" />
                         </div>
-                      )}
-                      {selectedRequest.callStartedAt && (
-                        <div>
-                          <span className="text-sm text-muted-foreground">
-                            Started:{" "}
-                          </span>
+                      ) : callSummary ? (
+                        <div className="text-sm bg-secondary/30 p-3 rounded-md">
+                          {callSummary.summary || "No summary available yet."}
+                        </div>
+                      ) : (
+                        // <Tabs defaultValue="summary" className="w-full">
+                        //   <TabsList className="grid w-full grid-cols-1">
+                        //     <TabsTrigger value="summary">Summary</TabsTrigger>
+                        //     {/* <TabsTrigger value="transcript">
+                        //       Transcript
+                        //     </TabsTrigger> */}
+                        //   </TabsList>
+
+                        //   <TabsContent value="summary" className="pt-2">
+
+                        //   </TabsContent>
+
+                        //   {/* <TabsContent value="transcript" className="pt-2">
+                        //     <ScrollArea className="h-60 rounded-md border p-2">
+                        //       {callSummary?.transcript &&
+                        //       callSummary.transcript.length > 0 ? (
+                        //         <div className="space-y-2 text-sm">
+                        //           {callSummary.transcript.map((entry, i) => (
+                        //             <div
+                        //               key={i}
+                        //               className={`p-2 rounded-md ${
+                        //                 entry.speaker === "AI"
+                        //                   ? "bg-muted/50"
+                        //                   : "bg-primary/10"
+                        //               }`}
+                        //             >
+                        //               <span className="font-semibold">
+                        //                 {entry.speaker === "AI"
+                        //                   ? "Assistant"
+                        //                   : "Customer"}
+                        //                 :
+                        //               </span>{" "}
+                        //               {entry.text}
+                        //             </div>
+                        //           ))}
+                        //         </div>
+                        //       ) : (
+                        //         <div className="text-center text-muted-foreground p-4 flex flex-col items-center gap-2">
+                        //           <AlertCircle className="h-5 w-5" />
+                        //           <span>
+                        //             No transcript data available yet. The call
+                        //             may still be in progress or the transcript
+                        //             hasn't been processed.
+                        //           </span>
+                        //         </div>
+                        //       )}
+                        //     </ScrollArea>
+                        //   </TabsContent> */}
+                        // </Tabs>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
+                          <AlertCircle className="h-4 w-4" />
                           <span>
-                            {formatDate(selectedRequest.callStartedAt)}
+                            Call summary not available. The call may still be in
+                            progress or has not been processed yet.
                           </span>
-                        </div>
-                      )}
-                      {selectedRequest.completedAt && (
-                        <div>
-                          <span className="text-sm text-muted-foreground">
-                            Completed:{" "}
-                          </span>
-                          <span>{formatDate(selectedRequest.completedAt)}</span>
-                        </div>
-                      )}
-                      {selectedRequest.failedAt && (
-                        <div>
-                          <span className="text-sm text-muted-foreground">
-                            Failed:{" "}
-                          </span>
-                          <span>{formatDate(selectedRequest.failedAt)}</span>
-                        </div>
-                      )}
-                      {selectedRequest.failureReason && (
-                        <div>
-                          <span className="text-sm text-muted-foreground">
-                            Reason:{" "}
-                          </span>
-                          <span className="text-red-600">
-                            {selectedRequest.failureReason}
-                          </span>
-                        </div>
-                      )}
-                      {selectedRequest.autoProcessing && (
-                        <div className="mt-1">
-                          <Badge
-                            variant="outline"
-                            className="bg-blue-50 text-blue-600 border-blue-200"
-                          >
-                            Auto-processing enabled
-                          </Badge>
                         </div>
                       )}
                     </div>
-                  </div>
+                  </>
+                )}
 
-                  {selectedRequest.transcript && (
-                    <div className="mt-4">
-                      <h4 className="font-medium mb-1">Call Transcript</h4>
-                      <div className="max-h-[200px] overflow-y-auto border rounded p-3 text-sm bg-gray-50">
-                        <p className="whitespace-pre-line">
-                          {selectedRequest.transcript}
-                        </p>
-                      </div>
+              {/* Add a debug section that displays the raw data in development mode for troubleshooting */}
+              {process.env.NODE_ENV === "development" && callSummary && (
+                <div className="mt-4 pt-4 border-t">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="flex items-center gap-1"
+                    onClick={() => setDebugOpen(!debugOpen)}
+                  >
+                    <Code className="h-4 w-4" />
+                    <span>Debug: Raw Call Data</span>
+                    {debugOpen ? (
+                      <ChevronUp className="h-4 w-4 ml-1" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 ml-1" />
+                    )}
+                  </Button>
+
+                  {debugOpen && (
+                    <pre className="text-xs p-2 bg-muted rounded-md overflow-auto max-h-40 mt-2">
+                      {JSON.stringify(callSummary, null, 2)}
+                    </pre>
+                  )}
+                </div>
+              )}
+
+              <Separator />
+
+              <div>
+                <h3 className="font-medium mb-2">Call Status</h3>
+                <div className="space-y-2">
+                  <div>
+                    <span className="text-sm text-muted-foreground">
+                      Status:{" "}
+                    </span>
+                    <span>{selectedRequest.callStatus}</span>
+                  </div>
+                  {selectedRequest.callId && (
+                    <div>
+                      <span className="text-sm text-muted-foreground">
+                        Call ID:{" "}
+                      </span>
+                      <span className="font-mono text-xs">
+                        {selectedRequest.callId}
+                      </span>
                     </div>
                   )}
-                </>
+                  {selectedRequest.callStartedAt && (
+                    <div>
+                      <span className="text-sm text-muted-foreground">
+                        Started:{" "}
+                      </span>
+                      <span>{formatDate(selectedRequest.callStartedAt)}</span>
+                    </div>
+                  )}
+                  {selectedRequest.completedAt && (
+                    <div>
+                      <span className="text-sm text-muted-foreground">
+                        Completed:{" "}
+                      </span>
+                      <span>{formatDate(selectedRequest.completedAt)}</span>
+                    </div>
+                  )}
+                  {selectedRequest.failedAt && (
+                    <div>
+                      <span className="text-sm text-muted-foreground">
+                        Failed:{" "}
+                      </span>
+                      <span>{formatDate(selectedRequest.failedAt)}</span>
+                    </div>
+                  )}
+                  {selectedRequest.failureReason && (
+                    <div>
+                      <span className="text-sm text-muted-foreground">
+                        Reason:{" "}
+                      </span>
+                      <span className="text-red-600">
+                        {selectedRequest.failureReason}
+                      </span>
+                    </div>
+                  )}
+                  {selectedRequest.autoProcessing && (
+                    <div className="mt-1">
+                      <Badge
+                        variant="outline"
+                        className="bg-blue-50 text-blue-600 border-blue-200"
+                      >
+                        Auto-processing enabled
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {selectedRequest.transcript && (
+                <div className="mt-4">
+                  <h4 className="font-medium mb-1">Call Transcript</h4>
+                  <div className="max-h-[200px] overflow-y-auto border rounded p-3 text-sm bg-gray-50">
+                    <p className="whitespace-pre-line">
+                      {selectedRequest.transcript}
+                    </p>
+                  </div>
+                </div>
               )}
             </div>
 
