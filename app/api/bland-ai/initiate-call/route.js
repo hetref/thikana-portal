@@ -64,10 +64,33 @@ export async function POST(req) {
       webhook_url: webhookUrl,
       caller_id: finalCallerId, // Always use our Twilio number
       transfer_phone_number: finalCallerId, // Add this for additional caller ID enforcement
+
+      // Enhanced voice settings for more natural speech and noise cancellation
       voice_settings: {
         stability: 0.7,
-        similarity_boost: 0.7,
+        similarity_boost: 0.75,
+        style: 0.3, // Add some style variation for more natural speech
+        use_voice_enhancement: true, // Enable voice enhancement
       },
+
+      // Add settings for better call quality
+      asr_settings: {
+        endpointing: 500, // Shorter endpointing for more responsive conversation
+        denoise: true, // Enable noise cancellation
+        diarize: true, // Better speaker separation
+      },
+
+      // Define slots to extract structured booking data
+      slots: [
+        { name: "customer_name", entity_type: "any", required: true },
+        { name: "phone_number", entity_type: "phone_number", required: true },
+        { name: "email", entity_type: "email", required: false },
+        { name: "booking_date", entity_type: "date", required: true },
+        { name: "booking_time", entity_type: "time", required: true },
+        { name: "number_of_people", entity_type: "number", required: true },
+        { name: "special_requests", entity_type: "any", required: false },
+        { name: "address", entity_type: "any", required: false },
+      ],
     };
 
     console.log(

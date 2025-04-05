@@ -126,6 +126,21 @@ export async function GET(request) {
         "No summary is available for this call yet. Once the call is completed, a summary will be generated automatically.";
     }
 
+    // Extract booking information from the call if available
+    let bookingInfo = null;
+
+    // Check for structured data in different possible locations in the Bland AI response
+    if (callData.results && callData.results.slots) {
+      bookingInfo = callData.results.slots;
+      console.log("Found booking info in results.slots:", bookingInfo);
+    } else if (callData.extracted_data) {
+      bookingInfo = callData.extracted_data;
+      console.log("Found booking info in extracted_data:", bookingInfo);
+    } else if (callData.call_result && callData.call_result.slots) {
+      bookingInfo = callData.call_result.slots;
+      console.log("Found booking info in call_result.slots:", bookingInfo);
+    }
+
     // Return the formatted response
     return NextResponse.json({
       call_id: callId,
@@ -135,6 +150,7 @@ export async function GET(request) {
       end_time: callData.end_time || callData.completed_at || null,
       summary: summary,
       transcript: transcript,
+      booking_info: bookingInfo,
       raw_data: callData, // Include the raw data for debugging
     });
   } catch (error) {

@@ -13,6 +13,7 @@ import {
   onSnapshot,
   Timestamp,
   getDoc,
+  setDoc,
 } from "firebase/firestore";
 import {
   Table,
@@ -70,6 +71,7 @@ export default function RequestCallsManager() {
   const [loadingSummary, setLoadingSummary] = useState(false);
   const user = auth.currentUser;
   const [debugOpen, setDebugOpen] = useState(false);
+  const [savingBooking, setSavingBooking] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -327,6 +329,49 @@ export default function RequestCallsManager() {
     return badge;
   };
 
+  const saveBookingInfo = async (bookingInfo, callId) => {
+    if (!user || !bookingInfo || !callId) return;
+
+    setSavingBooking(true);
+    try {
+      // Format the booking data
+      const bookingData = {
+        ...bookingInfo,
+        callId: callId,
+        status: "new", // new, confirmed, cancelled, completed
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      };
+
+      // Add it to the bookings collection
+      const bookingRef = doc(collection(db, "users", user.uid, "bookings"));
+      await setDoc(bookingRef, bookingData);
+
+      // Also update the call request to mark that booking was saved
+      await updateDoc(
+        doc(db, "users", user.uid, "requestCalls", selectedRequest.id),
+        {
+          bookingSaved: true,
+          bookingId: bookingRef.id,
+        }
+      );
+
+      toast.success("Booking information saved");
+
+      // Update the local state to reflect the change
+      setSelectedRequest({
+        ...selectedRequest,
+        bookingSaved: true,
+        bookingId: bookingRef.id,
+      });
+    } catch (error) {
+      console.error("Error saving booking information:", error);
+      toast.error("Failed to save booking information");
+    } finally {
+      setSavingBooking(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-48">
@@ -501,55 +546,6 @@ export default function RequestCallsManager() {
                           {callSummary.summary || "No summary available yet."}
                         </div>
                       ) : (
-                        // <Tabs defaultValue="summary" className="w-full">
-                        //   <TabsList className="grid w-full grid-cols-1">
-                        //     <TabsTrigger value="summary">Summary</TabsTrigger>
-                        //     {/* <TabsTrigger value="transcript">
-                        //       Transcript
-                        //     </TabsTrigger> */}
-                        //   </TabsList>
-
-                        //   <TabsContent value="summary" className="pt-2">
-
-                        //   </TabsContent>
-
-                        //   {/* <TabsContent value="transcript" className="pt-2">
-                        //     <ScrollArea className="h-60 rounded-md border p-2">
-                        //       {callSummary?.transcript &&
-                        //       callSummary.transcript.length > 0 ? (
-                        //         <div className="space-y-2 text-sm">
-                        //           {callSummary.transcript.map((entry, i) => (
-                        //             <div
-                        //               key={i}
-                        //               className={`p-2 rounded-md ${
-                        //                 entry.speaker === "AI"
-                        //                   ? "bg-muted/50"
-                        //                   : "bg-primary/10"
-                        //               }`}
-                        //             >
-                        //               <span className="font-semibold">
-                        //                 {entry.speaker === "AI"
-                        //                   ? "Assistant"
-                        //                   : "Customer"}
-                        //                 :
-                        //               </span>{" "}
-                        //               {entry.text}
-                        //             </div>
-                        //           ))}
-                        //         </div>
-                        //       ) : (
-                        //         <div className="text-center text-muted-foreground p-4 flex flex-col items-center gap-2">
-                        //           <AlertCircle className="h-5 w-5" />
-                        //           <span>
-                        //             No transcript data available yet. The call
-                        //             may still be in progress or the transcript
-                        //             hasn't been processed.
-                        //           </span>
-                        //         </div>
-                        //       )}
-                        //     </ScrollArea>
-                        //   </TabsContent> */}
-                        // </Tabs>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
                           <AlertCircle className="h-4 w-4" />
                           <span>
@@ -586,6 +582,71 @@ export default function RequestCallsManager() {
                     </pre>
                   )}
                 </div>
+              )}
+
+              {callSummary?.booking_info && (
+                <>
+                  <Separator />
+
+                  <div>
+                    <h3 className="font-medium mb-2 flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      Booking Information
+                    </h3>
+
+                    <div className="bg-muted/30 p-4 rounded-md space-y-3">
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                        {Object.entries(callSummary.booking_info).map(
+                          ([key, value]) => (
+                            <div key={key}>
+                              <span className="text-sm font-medium capitalize">
+                                {key.replace(/_/g, " ")}:
+                              </span>
+                              <p className="text-sm">
+                                {value || "Not provided"}
+                              </p>
+                            </div>
+                          )
+                        )}
+                      </div>
+
+                      {!selectedRequest.bookingSaved && (
+                        <Button
+                          onClick={() =>
+                            saveBookingInfo(
+                              callSummary.booking_info,
+                              callSummary.call_id
+                            )
+                          }
+                          disabled={savingBooking}
+                          className="mt-2 w-full"
+                          variant="secondary"
+                        >
+                          {savingBooking ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              <Check className="mr-2 h-4 w-4" />
+                              Save Booking Information
+                            </>
+                          )}
+                        </Button>
+                      )}
+
+                      {selectedRequest.bookingSaved && (
+                        <div className="flex items-center justify-center text-green-600 gap-1 bg-green-50 py-2 rounded-md">
+                          <Check className="h-4 w-4" />
+                          <span className="text-sm">
+                            Booking information saved
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
               )}
 
               <Separator />
