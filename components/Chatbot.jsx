@@ -47,6 +47,7 @@ function useCustomChat() {
 
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
+    const currentInput = input;
     setInput("");
 
     try {
@@ -56,12 +57,15 @@ function useCustomChat() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          message: input,
+          message: currentInput,
         }),
       });
 
       if (!response.ok) {
-        throw new Error("Failed to get response");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.message || `Failed with status: ${response.status}`
+        );
       }
 
       const data = await response.json();
@@ -70,7 +74,7 @@ function useCustomChat() {
       setMessages((prev) => [
         ...prev,
         {
-          id: generateId(),
+          id: data.id || generateId(),
           role: "assistant",
           content:
             data.response || "I'm sorry, I couldn't process that request.",
@@ -79,6 +83,17 @@ function useCustomChat() {
     } catch (err) {
       console.error("Chat error:", err);
       setError(err.message);
+
+      // Add error message to the chat
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: generateId(),
+          role: "assistant",
+          content:
+            "Sorry, I encountered an error. Please try again or rephrase your question.",
+        },
+      ]);
     } finally {
       setIsLoading(false);
     }

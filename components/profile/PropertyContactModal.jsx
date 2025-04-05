@@ -98,7 +98,7 @@ export default function PropertyContactModal({ property, businessId }) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button className="w-full bg-primary hover:bg-primary/90 text-white font-medium shadow-sm">
-          Contact About This Property
+          Contact Now
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">

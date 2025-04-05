@@ -65,6 +65,7 @@ export default function ContactsTab() {
   const [selectedContact, setSelectedContact] = useState(null);
   const [isContactDetailOpen, setIsContactDetailOpen] = useState(false);
   const [contactType, setContactType] = useState("all");
+  const [userBusinessType, setUserBusinessType] = useState(null);
 
   // Fetch contacts (inquiries)
   useEffect(() => {
@@ -76,6 +77,19 @@ export default function ContactsTab() {
 
       try {
         console.log("Fetching inquiries for user:", user.uid);
+
+        // Fetch user's business data to determine business type
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          // Set the business type/category
+          if (
+            userData.business_categories &&
+            userData.business_categories.length > 0
+          ) {
+            setUserBusinessType(userData.business_categories);
+          }
+        }
 
         // Query inquiries for the current user
         const inquiriesRef = collection(db, "users", user.uid, "inquiries");
@@ -266,17 +280,29 @@ export default function ContactsTab() {
   const filteredContacts = contacts.filter((contact) => {
     const matchesStatus =
       statusFilter === "all" || contact.status === statusFilter;
-    const matchesType = contactType === "all" || contact.type === contactType;
-    const searchLower = searchQuery.toLowerCase();
+
+    // Check if the contact type matches the filter
+    const matchesType =
+      contactType === "all" ||
+      contact.type === contactType ||
+      contact.inquiryType === contactType;
+
+    // Check if any of the contact fields match the search query
     const matchesSearch =
       !searchQuery ||
       (contact.customerName &&
-        contact.customerName.toLowerCase().includes(searchLower)) ||
+        contact.customerName
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase())) ||
+      (contact.customerEmail &&
+        contact.customerEmail
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase())) ||
+      (contact.message &&
+        contact.message.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (contact.serviceName &&
-        contact.serviceName.toLowerCase().includes(searchLower)) ||
-      (contact.propertyTitle &&
-        contact.propertyTitle.toLowerCase().includes(searchLower)) ||
-      (contact.message && contact.message.toLowerCase().includes(searchLower));
+        contact.serviceName.toLowerCase().includes(searchQuery.toLowerCase()));
+
     return matchesStatus && matchesType && matchesSearch;
   });
 
@@ -304,23 +330,11 @@ export default function ContactsTab() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col sm:flex-row justify-between gap-4 mb-6">
+          <div className="flex flex-col sm:flex-row gap-3 mb-4">
             <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search contacts..."
-                  className="w-full appearance-none pl-8"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Select status" />
+                <SelectTrigger>
+                  <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
@@ -330,17 +344,41 @@ export default function ContactsTab() {
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
 
+            <div className="flex-1">
               <Select value={contactType} onValueChange={setContactType}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Select type" />
+                <SelectTrigger>
+                  <SelectValue placeholder="Filter by type" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="service">Services</SelectItem>
-                  <SelectItem value="real-estate">Real Estate</SelectItem>
+                  {/* Only show services option if business has service category */}
+                  {(!userBusinessType ||
+                    userBusinessType.includes("service")) && (
+                    <SelectItem value="service">Services</SelectItem>
+                  )}
+                  {/* Only show real estate option if business has real_estate category */}
+                  {(!userBusinessType ||
+                    userBusinessType.includes("real_estate")) && (
+                    <SelectItem value="real-estate">Real Estate</SelectItem>
+                  )}
+                  <SelectItem value="general">General</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="flex-[2]">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Search contacts..."
+                  className="pl-8"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
             </div>
           </div>
 
