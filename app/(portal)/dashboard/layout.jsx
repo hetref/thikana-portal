@@ -21,12 +21,18 @@ export default function DashboardLayout({ children }) {
 
         try {
           const userDoc = await getDoc(doc(db, "users", user.uid));
-          if (userDoc.exists() && userDoc.data().role === "business") {
+          if (
+            userDoc.exists() &&
+            (userDoc.data().role === "business" ||
+              userDoc.data().role === "member")
+          ) {
             setIsAuthorized(true);
           } else {
-            // Not a business user, redirect to home
+            // Not a business or member user, redirect to home
             router.push("/");
-            toast.error("Only business accounts can access the dashboard");
+            toast.error(
+              "Only business accounts and members can access the dashboard"
+            );
           }
         } catch (error) {
           console.error("Error checking user role:", error);

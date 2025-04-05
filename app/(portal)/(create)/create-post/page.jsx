@@ -13,6 +13,7 @@ import { v4 as uuidv4 } from "uuid";
 import { useRouter } from "next/navigation";
 import ReactCrop, { centerCrop, makeAspectCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
+import { toast } from "react-hot-toast";
 
 const CreatePost = () => {
   const [formData, setFormData] = useState({
@@ -145,7 +146,10 @@ const CreatePost = () => {
         body: contentFormData,
       });
 
-      if (!response.ok) throw new Error("Failed to generate content");
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error || "Failed to generate content");
+      }
 
       const data = await response.json();
 
@@ -155,7 +159,7 @@ const CreatePost = () => {
       }));
     } catch (error) {
       console.error("Generation error:", error);
-      alert("Failed to generate content. Please try again.");
+      toast.error(error.message || "Failed to generate content. Please try again.");
     } finally {
       setLoading((prev) => ({ ...prev, isGenerating: false }));
     }

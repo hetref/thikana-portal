@@ -9,15 +9,41 @@ export async function POST(request) {
     const prompt = formData.get('prompt');
     const imageFile = formData.get('image');
 
+    if (!type) {
+      return new Response('Type is required', { status: 400 });
+    }
+
+    if (type === 'title' && !imageFile) {
+      return new Response('Image is required for title generation', { status: 400 });
+    }
+
+    if (type === 'description' && !prompt) {
+      return new Response('Title is required for description generation', { status: 400 });
+    }
+
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
     let promptText = "";
     if (type === "title") {
-      promptText = `Generate a creative and engaging title for a social media post based on this image. Keep it concise and catchy, under 20 characters.`;
+      promptText = `You are a creative social media content writer. Generate a creative, engaging, and relevant title for a social media post based on this image. The title should be:
+      1. Concise (under 50 characters)
+      2. Catchy and attention-grabbing
+      3. Relevant to the image content
+      4. Suitable for social media
+      5. No hashtags or emojis
+      
+      Respond with ONLY the title text, nothing else.`;
     } else if (type === "description") {
-      promptText = `Generate an engaging description for a social media post ${
-        imageFile ? "based on this image" : `with the title: "${prompt}"`
-      }. Keep it natural, conversational, and between 100-150 words.`;
+      promptText = `You are a creative social media content writer. Generate an engaging description for a social media post with the title "${prompt}" ${
+        imageFile ? "and based on this image" : ""
+      }. The description should be:
+      1. Natural and conversational in tone
+      2. Between 100-150 words
+      3. Include relevant hashtags at the end
+      4. Engaging and encourage interaction
+      5. Highlight key aspects of ${imageFile ? "the image and " : ""}the title
+      
+      Respond with ONLY the description text, nothing else.`;
     }
 
     let result;
@@ -34,15 +60,21 @@ export async function POST(request) {
 
       result = await model.generateContent([promptText, imageParts]);
     } else {
-      result = await model.generateContent(promptText + " " + prompt);
+      result = await model.generateContent(promptText);
     }
 
     const response = await result.response;
     const text = response.text();
 
-    return Response.json({ generated: text });
+    if (!text) {
+      throw new Error('No content generated');
+    }
+
+    return Response.json({ generated: text.trim() });
   } catch (error) {
     console.error('Generation error:', error);
-    return Response.json({ error: 'Failed to generate content' }, { status: 500 });
+    return new Response(error.message || 'Failed to generate content', { 
+      status: 500 
+    });
   }
 }

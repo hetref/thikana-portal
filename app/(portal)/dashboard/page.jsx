@@ -90,6 +90,7 @@ import IncomeTab from "@/components/dashboard/IncomeTab";
 import IncomeAnalyticsTab from "@/components/dashboard/IncomeAnalyticsTab";
 import TicketsTab from "@/components/dashboard/TicketsTab";
 import OrdersTab from "@/components/dashboard/OrdersTab";
+import MembersTab from "@/components/dashboard/MembersTab";
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState("tickets");
@@ -99,6 +100,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [userRole, setUserRole] = useState(null);
 
   // Fetch business user data
   useEffect(() => {
@@ -111,7 +113,22 @@ export default function DashboardPage() {
         const userDoc = await getDoc(userDocRef);
 
         if (userDoc.exists()) {
-          setUserData(userDoc.data());
+          const data = userDoc.data();
+          setUserData(data);
+          setUserRole(data.role || "owner");
+
+          // If user is a member, get the business data for display
+          if (data.role === "member" && data.businessId) {
+            const businessRef = doc(db, "users", data.businessId);
+            const businessDoc = await getDoc(businessRef);
+            if (businessDoc.exists()) {
+              // Set business name for display but keep member role
+              setUserData((prev) => ({
+                ...prev,
+                businessName: businessDoc.data().businessName || "Business",
+              }));
+            }
+          }
         }
       } catch (error) {
         console.error("Error fetching user data:", error);
@@ -122,6 +139,19 @@ export default function DashboardPage() {
 
     fetchUserData();
   }, []);
+
+  // Handle tab selection according to user role
+  const handleTabChange = (value) => {
+    // If user is a member, don't allow access to the members tab
+    if (
+      userRole === "member" &&
+      (value === "members" || value === "settings")
+    ) {
+      toast.error("You don't have permission to access this section");
+      return;
+    }
+    setActiveTab(value);
+  };
 
   if (loading) {
     return (
@@ -151,10 +181,10 @@ export default function DashboardPage() {
               </p>
             </div>
 
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <Tabs value={activeTab} onValueChange={handleTabChange}>
               {/* Desktop Tabs List */}
               <div className="hidden md:flex justify-between items-center mb-6">
-                <TabsList className="grid grid-cols-4 lg:grid-cols-8">
+                <TabsList className="grid grid-cols-4 lg:grid-cols-8 mb-3">
                   <TabsTrigger
                     value="contacts"
                     className="flex items-center gap-2"
@@ -205,8 +235,17 @@ export default function DashboardPage() {
                     Analytics
                   </TabsTrigger>
                   <TabsTrigger
+                    value="members"
+                    className="flex items-center gap-2"
+                    disabled={userRole === "member"}
+                  >
+                    <User className="h-4 w-4" />
+                    Members
+                  </TabsTrigger>
+                  <TabsTrigger
                     value="settings"
                     className="flex items-center gap-2"
+                    disabled={userRole === "member"}
                   >
                     <SettingsIcon className="h-4 w-4" />
                     Settings
@@ -342,6 +381,10 @@ export default function DashboardPage() {
                     <IncomeAnalyticsTab />
                   </TabsContent>
                 </Tabs>
+              </TabsContent>
+
+              <TabsContent value="members" className="space-y-4">
+                <MembersTab />
               </TabsContent>
 
               <TabsContent value="settings" className="space-y-4">
