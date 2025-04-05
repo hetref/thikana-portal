@@ -28,20 +28,47 @@ const getCurrentDateTime = () => {
 };
 
 // Add to income collection
-async function addToIncome(userId, amount, category) {
+async function addToIncome(userId, amount, category, paymentData = null) {
   try {
     const timestamp = getCurrentDateTime();
 
     // Create reference to user's income subcollection
     const incomesRef = collection(db, "transactions", userId, "user_income");
 
+    // Generate a more descriptive name based on payment data if available
+    let name = timestamp;
+    let description = "";
+
+    if (paymentData) {
+      // Use receipt or order ID if available, otherwise use payment ID
+      const receiptId =
+        paymentData.receipt || paymentData.order_id || paymentData.id;
+
+      // Create a more descriptive name
+      if (category === "Subscriptions") {
+        name = `Subscription Payment - ${receiptId}`;
+        description = paymentData.notes?.plan_name || "Subscription payment";
+      } else if (category === "Sales") {
+        name = `Sales Payment - ${receiptId}`;
+        description = paymentData.notes?.purpose || "Product/service payment";
+      } else if (category === "Refunds") {
+        name = `Refund - ${receiptId}`;
+        description = "Payment refund";
+      }
+    }
+
     // Add income document
     await addDoc(incomesRef, {
-      name: timestamp, // Use timestamp as the name
+      name: name,
       amount: amount / 100, // Convert from paise to rupees
       category,
       timestamp,
       type: "income",
+      description: description,
+      paymentId: paymentData?.id || null,
+      paymentMethod: paymentData?.method || null,
+      paymentStatus: paymentData?.status || "completed",
+      customerDetails: paymentData?.customer_details || null,
     });
 
     console.log(
@@ -237,7 +264,12 @@ export async function POST(req, { params }) {
           // Check if this payment is for a subscription
           if (payload.invoice_id && payload.notes?.subscription_id) {
             // This is a subscription payment
-            await addToIncome(effectiveUserId, payload.amount, "Subscriptions");
+            await addToIncome(
+              effectiveUserId,
+              payload.amount,
+              "Subscriptions",
+              payload
+            );
             console.log(
               `Recorded subscription payment of ${payload.amount / 100} for user ${effectiveUserId}`
             );
@@ -246,7 +278,12 @@ export async function POST(req, { params }) {
             await updateSubscriptionStatusFromPayment(effectiveUserId, payload);
           } else {
             // This is a regular payment (not for subscription)
-            await addToIncome(effectiveUserId, payload.amount, "Sales");
+            await addToIncome(
+              effectiveUserId,
+              payload.amount,
+              "Sales",
+              payload
+            );
             console.log(
               `Recorded sales payment of ${payload.amount / 100} for user ${effectiveUserId}`
             );
@@ -267,6 +304,18 @@ export async function POST(req, { params }) {
             "refunded",
             payload
           );
+          // Add refund as a separate transaction if it's a full or partial refund
+          if (payload.amount > 0) {
+            await addToIncome(
+              effectiveUserId,
+              payload.amount,
+              "Refunds",
+              payload
+            );
+            console.log(
+              `Recorded refund of ${payload.amount / 100} for user ${effectiveUserId}`
+            );
+          }
           break;
 
         // Subscription events
@@ -331,7 +380,12 @@ export async function POST(req, { params }) {
           );
           // If there's a payment object with amount, add to income
           if (payload.payment && payload.payment.amount) {
-            await addToIncome(effectiveUserId, payload.payment.amount, "Sales");
+            await addToIncome(
+              effectiveUserId,
+              payload.payment.amount,
+              "Sales",
+              payload
+            );
           }
           break;
         case "payment_link.expired":

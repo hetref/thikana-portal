@@ -117,11 +117,13 @@ const TopNavbar = ({ type = "unauthenticated" }) => {
           },
           "google_translate_element"
         );
-        const googleFrame = document.getElementsByClassName('goog-te-banner-frame')[0];
+        const googleFrame = document.getElementsByClassName(
+          "goog-te-banner-frame"
+        )[0];
         if (googleFrame) {
-          googleFrame.style.display = 'none';
+          googleFrame.style.display = "none";
         }
-        document.body.style.top = '0px';
+        document.body.style.top = "0px";
       };
 
       // Add script to page
@@ -238,9 +240,7 @@ const TopNavbar = ({ type = "unauthenticated" }) => {
                   <Search className="h-5 w-5" />
                 </Link>
               </Button>
-              {type === "authenticated" && userData?.role === "user" && (
-                <CartIcon userData={userData} />
-              )}
+              {type === "authenticated" && <CartIcon userData={userData} />}
             </div>
 
             {authUser &&

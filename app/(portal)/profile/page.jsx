@@ -965,16 +965,16 @@ export default function Profile() {
                 {/* Profile Card */}
                 <Card className="overflow-hidden bg-white border-0 shadow-sm">
                   {/* Cover Image */}
-                  <div className="relative h-full w-full">
+                  <div className="relative h-[180px] w-full">
                     {isBusinessUser && (
                       <Dialog>
                         <DialogTrigger className="z-30 w-full h-full">
                           <Image
                             src={userData?.coverPic || "/coverimg.png"}
-                            width={1000}
-                            height={400}
+                            width={1200}
+                            height={180}
                             alt="Cover Image"
-                            className="z-30 object-cover w-full h-[200px] md:h-[250px] transition-opacity hover:opacity-95 border border-black/40 rounded-t-xl"
+                            className="z-30 object-cover w-full h-full transition-opacity hover:opacity-95 border border-black/40 rounded-t-xl"
                             priority
                           />
                         </DialogTrigger>
