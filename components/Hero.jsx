@@ -6,6 +6,7 @@ import { motion as m } from "framer-motion";
 import Image from "next/image";
 import { RainbowButton } from "./ui/rainbow-button";
 import { AuroraBackground } from "./ui/aurora-background";
+import Link from "next/link";
 
 const companies = [
   { name: "Company 1", logo: "/company/company1.png" },
@@ -89,25 +90,27 @@ const Hero = () => {
               Shorten, track, and organize all your Products in one place.
             </p>
             <div className="flex justify-center">
-              <RainbowButton>
-                <span className="flex items-center gap-2">
-                  Get Started
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                    <polyline points="12 5 19 12 12 19"></polyline>
-                  </svg>
-                </span>
-              </RainbowButton>
+              <Link href="/login">
+                <RainbowButton>
+                  <span className="flex items-center gap-2">
+                    Get Started
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                      <polyline points="12 5 19 12 12 19"></polyline>
+                    </svg>
+                  </span>
+                </RainbowButton>
+              </Link>
             </div>
           </div>
         </div>

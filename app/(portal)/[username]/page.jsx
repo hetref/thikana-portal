@@ -20,6 +20,7 @@ import {
   Mail,
   Info,
   Settings,
+  Home,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useGetUserPosts } from "@/hooks/useGetPosts";
@@ -56,6 +57,7 @@ import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import ShowServicesTabContent from "@/components/profile/ShowServicesTabContent";
 import { sendNotificationToUser } from "@/lib/notifications";
+import ShowBusinessProperties from "@/components/profile/ShowBusinessProperties";
 
 // Add a style element to hide scrollbars
 const scrollbarHideStyles = `
@@ -612,6 +614,19 @@ export default function UserProfile() {
                   Services
                 </TabsTrigger>
               )}
+              {userData?.business_categories?.includes("real-estate") && (
+                <TabsTrigger
+                  value="properties"
+                  className={cn(
+                    "rounded-none border-b-2 border-transparent",
+                    "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
+                    "px-6 py-3 font-medium text-sm transition-all duration-200"
+                  )}
+                >
+                  <Home className="w-4 h-4 mr-2" />
+                  Properties
+                </TabsTrigger>
+              )}
             </TabsList>
           </div>
 
@@ -720,6 +735,15 @@ export default function UserProfile() {
                   currentUserView={false}
                 />
               )}
+            </TabsContent>
+          )}
+
+          {userData?.business_categories?.includes("real-estate") && (
+            <TabsContent
+              value="properties"
+              className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+            >
+              {userData && <ShowBusinessProperties businessId={userId} />}
             </TabsContent>
           )}
         </Tabs>

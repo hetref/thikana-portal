@@ -68,6 +68,7 @@ import {
   Printer,
   Star,
   MoreHorizontal,
+  Home,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import WhoToFollow from "@/components/WhoToFollow";
@@ -141,6 +142,7 @@ import jsPDF from "jspdf";
 import { Textarea } from "@/components/ui/textarea";
 import "leaflet/dist/leaflet.css";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import ShowPropertiesTabContent from "@/components/profile/ShowPropertiesTabContent";
 
 // Add a style element to hide scrollbars
 const scrollbarHideStyles = `
@@ -1079,17 +1081,17 @@ export default function Profile() {
                             </Link>
                           </Button>
                         )}
-                        
+
                         {isCurrentUser && isBusinessUser && (
                           <WebsiteBuilderButton userId={user?.uid} />
                         )}
-                        
+
                         {/* More options dropdown */}
                         {isBusinessUser && (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button 
-                                variant="outline" 
+                              <Button
+                                variant="outline"
                                 size="sm"
                                 className="h-9 border-gray-200"
                               >
@@ -1101,27 +1103,42 @@ export default function Profile() {
                                 <MapPinIcon className="w-3.5 h-3.5 mr-2" />
                                 <span>Location</span>
                               </DropdownMenuItem>
-                              
-                              {userData && !selectedFranchiseId && !userData?.franchiseOwner && (
-                                <DropdownMenuItem onClick={() => setIsFranchiseModalOpen(true)}>
-                                  <Globe className="w-3.5 h-3.5 mr-2" />
-                                  <span>Add Franchise</span>
-                                </DropdownMenuItem>
-                              )}
-                              
+
+                              {userData &&
+                                !selectedFranchiseId &&
+                                !userData?.franchiseOwner && (
+                                  <DropdownMenuItem
+                                    onClick={() =>
+                                      setIsFranchiseModalOpen(true)
+                                    }
+                                  >
+                                    <Globe className="w-3.5 h-3.5 mr-2" />
+                                    <span>Add Franchise</span>
+                                  </DropdownMenuItem>
+                                )}
+
                               {selectedFranchiseId && (
-                                <DropdownMenuItem onClick={() => {
-                                  sessionStorage.removeItem("selectedFranchiseId");
-                                  window.location.reload();
-                                }}>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    sessionStorage.removeItem(
+                                      "selectedFranchiseId"
+                                    );
+                                    window.location.reload();
+                                  }}
+                                >
                                   <ArrowLeftIcon className="w-3.5 h-3.5 mr-2" />
-                                  <span>Return to {userData?.franchiseOwner ? "Business" : "HQ"}</span>
+                                  <span>
+                                    Return to{" "}
+                                    {userData?.franchiseOwner
+                                      ? "Business"
+                                      : "HQ"}
+                                  </span>
                                 </DropdownMenuItem>
                               )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         )}
-                        
+
                         {/* Always show the share button */}
                         {isBusinessUser && userData && (
                           <ShareBusinessDialog userData={userData} />
@@ -1301,6 +1318,21 @@ export default function Profile() {
                                 Services
                               </TabsTrigger>
                             )}
+                            {userData?.business_categories?.includes(
+                              "real-estate"
+                            ) && (
+                              <TabsTrigger
+                                value="properties"
+                                className={cn(
+                                  "rounded-none border-b-2 border-transparent",
+                                  "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
+                                  "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
+                                )}
+                              >
+                                <Home className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                                Properties
+                              </TabsTrigger>
+                            )}
                             <TabsTrigger
                               value="saved"
                               className={cn(
@@ -1411,6 +1443,17 @@ export default function Profile() {
                                 userData={userData}
                               />
                             )}
+                          </TabsContent>
+                        )}
+
+                        {userData?.business_categories?.includes(
+                          "real-estate"
+                        ) && (
+                          <TabsContent
+                            value="properties"
+                            className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                          >
+                            {userData && user && <ShowPropertiesTabContent />}
                           </TabsContent>
                         )}
 

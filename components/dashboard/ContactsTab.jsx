@@ -63,6 +63,7 @@ export default function ContactsTab() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedContact, setSelectedContact] = useState(null);
   const [isContactDetailOpen, setIsContactDetailOpen] = useState(false);
+  const [contactType, setContactType] = useState("all");
 
   // Fetch contacts (inquiries)
   useEffect(() => {
@@ -221,10 +222,11 @@ export default function ContactsTab() {
     }
   };
 
-  // Filter contacts based on status filter and search query
+  // Filter contacts based on status filter, contact type, and search query
   const filteredContacts = contacts.filter((contact) => {
     const matchesStatus =
       statusFilter === "all" || contact.status === statusFilter;
+    const matchesType = contactType === "all" || contact.type === contactType;
     const searchLower = searchQuery.toLowerCase();
     const matchesSearch =
       !searchQuery ||
@@ -232,8 +234,10 @@ export default function ContactsTab() {
         contact.customerName.toLowerCase().includes(searchLower)) ||
       (contact.serviceName &&
         contact.serviceName.toLowerCase().includes(searchLower)) ||
+      (contact.propertyTitle &&
+        contact.propertyTitle.toLowerCase().includes(searchLower)) ||
       (contact.message && contact.message.toLowerCase().includes(searchLower));
-    return matchesStatus && matchesSearch;
+    return matchesStatus && matchesType && matchesSearch;
   });
 
   // Open contact detail modal
@@ -260,11 +264,23 @@ export default function ContactsTab() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row justify-between gap-4 mb-6">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Search contacts..."
+                  className="w-full appearance-none pl-8"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filter by status" />
+                  <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
@@ -274,15 +290,17 @@ export default function ContactsTab() {
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div className="relative">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search contacts..."
-                className="pl-8 w-[250px]"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+
+              <Select value={contactType} onValueChange={setContactType}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="service">Services</SelectItem>
+                  <SelectItem value="real-estate">Real Estate</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -302,7 +320,8 @@ export default function ContactsTab() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[250px]">Customer</TableHead>
-                    <TableHead>Service</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Inquiry Details</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -342,7 +361,21 @@ export default function ContactsTab() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {contact.serviceName || "General Inquiry"}
+                        <Badge variant="outline" className="capitalize">
+                          {contact.type === "real-estate"
+                            ? "Real Estate"
+                            : "Service"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-medium line-clamp-1">
+                          {contact.type === "real-estate"
+                            ? contact.propertyTitle
+                            : contact.serviceName}
+                        </div>
+                        <div className="text-sm text-muted-foreground line-clamp-1">
+                          {contact.message?.substring(0, 50)}...
+                        </div>
                       </TableCell>
                       <TableCell>{contact.createdAtFormatted}</TableCell>
                       <TableCell>{getStatusBadge(contact.status)}</TableCell>
@@ -404,99 +437,127 @@ export default function ContactsTab() {
 
       {/* Contact Detail Dialog */}
       <Dialog open={isContactDetailOpen} onOpenChange={setIsContactDetailOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Inquiry Details</DialogTitle>
+          </DialogHeader>
           {selectedContact && (
-            <>
-              <DialogHeader>
-                <DialogTitle>Contact Detail</DialogTitle>
-                <DialogDescription>
-                  Inquiry from {selectedContact.customerName || "Customer"}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="flex items-center space-x-4">
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground">
+                  Customer Information
+                </h3>
+                <div className="flex items-center gap-3 mt-2">
                   <Avatar className="h-10 w-10">
                     <AvatarImage
-                      src={
-                        selectedContact.customerPhoto ||
-                        selectedContact.customerData?.photoURL ||
-                        selectedContact.customerData?.profilePic ||
-                        ""
-                      }
-                      alt={selectedContact.customerName || "Customer"}
+                      src={selectedContact.customerData?.profilePic || ""}
+                      alt={selectedContact.customerName}
                     />
                     <AvatarFallback>
-                      {(selectedContact.customerName || "A").charAt(0)}
+                      {selectedContact.customerName?.charAt(0) || "U"}
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <h3 className="font-medium">
-                      {selectedContact.customerName || "Anonymous"}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedContact.customerEmail || "No email provided"}
-                    </p>
-                    {selectedContact.customerPhone && (
-                      <p className="text-sm text-muted-foreground">
-                        {selectedContact.customerPhone}
-                      </p>
-                    )}
+                    <div className="font-medium">
+                      {selectedContact.customerName}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {selectedContact.email}
+                    </div>
                   </div>
                 </div>
-
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium">Service</h4>
-                  <p>{selectedContact.serviceName || "General Inquiry"}</p>
-                </div>
-
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium">Message</h4>
-                  <div className="rounded-md bg-muted p-3">
-                    <p className="text-sm whitespace-pre-wrap">
-                      {selectedContact.message}
-                    </p>
+                {selectedContact.phone && (
+                  <div className="text-sm mt-1">
+                    <span className="text-muted-foreground">Phone: </span>
+                    {selectedContact.phone}
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium">Status</h4>
-                    <div>{getStatusBadge(selectedContact.status)}</div>
-                  </div>
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium">Date</h4>
-                    <p className="text-sm">
-                      {selectedContact.createdAtFormatted}
-                    </p>
-                  </div>
-                </div>
+                )}
               </div>
 
-              <DialogFooter>
-                <div className="flex space-x-2">
-                  <Select
-                    defaultValue={selectedContact.status || "pending"}
-                    onValueChange={(value) =>
-                      handleStatusUpdate(selectedContact.id, value)
-                    }
-                  >
-                    <SelectTrigger className="w-[130px]">
-                      <SelectValue placeholder="Update status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="in-progress">In Progress</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button onClick={() => setIsContactDetailOpen(false)}>
-                    Close
-                  </Button>
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                  {selectedContact.type === "real-estate"
+                    ? "Property"
+                    : "Service"}{" "}
+                  Details
+                </h3>
+                <div className="font-medium">
+                  {selectedContact.type === "real-estate"
+                    ? selectedContact.propertyTitle
+                    : selectedContact.serviceName}
                 </div>
-              </DialogFooter>
-            </>
+                {selectedContact.propertyLocation && (
+                  <div className="text-sm text-muted-foreground">
+                    Location: {selectedContact.propertyLocation}
+                  </div>
+                )}
+                {selectedContact.budget && (
+                  <div className="text-sm text-muted-foreground">
+                    Budget: ₹{selectedContact.budget}
+                  </div>
+                )}
+                {selectedContact.timeframe && (
+                  <div className="text-sm text-muted-foreground">
+                    Time Frame: {selectedContact.timeframe}
+                  </div>
+                )}
+                {selectedContact.queryType && (
+                  <div className="text-sm text-muted-foreground">
+                    Query Type: {selectedContact.queryType}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                  Message
+                </h3>
+                <p className="text-sm">{selectedContact.message}</p>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                  Status
+                </h3>
+                {getStatusBadge(selectedContact.status)}
+              </div>
+
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                  Received On
+                </h3>
+                <p className="text-sm">
+                  {selectedContact.createdAtFormatted || "Unknown"}
+                </p>
+              </div>
+            </div>
           )}
+          <DialogFooter className="flex flex-col sm:flex-row gap-2 mt-4">
+            {selectedContact && (
+              <Select
+                value={selectedContact.status}
+                onValueChange={(value) =>
+                  handleStatusUpdate(selectedContact.id, value)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Update Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="in-progress">In Progress</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+            <Button
+              variant="outline"
+              onClick={() => setIsContactDetailOpen(false)}
+            >
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

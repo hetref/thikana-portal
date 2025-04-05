@@ -20,8 +20,85 @@ import {
   Loader2,
   ArrowDownCircleIcon,
 } from "lucide-react";
-import { useChat } from "@ai-sdk/react";
 import { motion, AnimatePresence } from "framer-motion";
+import { generateId } from "@/lib/utils";
+
+// Custom chat hook to replace @ai-sdk/react
+function useCustomChat() {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleInputChange = (e) => {
+    setInput(e.target.value);
+  };
+
+  const handleSubmit = async (e) => {
+    if (e) e.preventDefault();
+    if (!input.trim()) return;
+
+    // Add user message
+    const userMessage = {
+      id: generateId(),
+      role: "user",
+      content: input,
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setIsLoading(true);
+    setInput("");
+
+    try {
+      const response = await fetch("/api/gemini", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: input,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to get response");
+      }
+
+      const data = await response.json();
+
+      // Add AI response
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: generateId(),
+          role: "assistant",
+          content:
+            data.response || "I'm sorry, I couldn't process that request.",
+        },
+      ]);
+    } catch (err) {
+      console.error("Chat error:", err);
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const stop = () => {
+    // If we had streaming, this would abort it
+    setIsLoading(false);
+  };
+
+  return {
+    messages,
+    input,
+    handleInputChange,
+    handleSubmit,
+    isLoading,
+    error,
+    stop,
+  };
+}
 
 function SuggestionBar({ suggestions, onClickSuggestion }) {
   return (
@@ -43,6 +120,10 @@ export default function Chatbot() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [showChatIcon, setShowChatIcon] = useState(false);
   const chatIconRef = useRef(null);
+  const scrollref = useRef(null);
+  const [suggestions, setSuggestions] = useState([]);
+
+  // Use our custom hook instead of the SDK's hook
   const {
     messages,
     input,
@@ -50,11 +131,8 @@ export default function Chatbot() {
     handleSubmit,
     isLoading,
     stop,
-    reload,
     error,
-  } = useChat({ api: "/api/gemini" });
-  const scrollref = useRef(null);
-  const [suggestions, setSuggestions] = useState([]);
+  } = useCustomChat();
 
   const toggleChat = () => {
     setIsChatOpen(!isChatOpen);
@@ -92,7 +170,6 @@ export default function Chatbot() {
   }, [messages]);
 
   const handleSuggestionClick = (suggestion) => {
-    // Directly send suggestion as user input
     handleInputChange({ target: { value: suggestion } });
     handleSubmit();
   };
@@ -210,7 +287,7 @@ export default function Chatbot() {
                       <button
                         className="underline"
                         type="button"
-                        onClick={() => reload()}
+                        onClick={() => setError(null)}
                       >
                         retry
                       </button>

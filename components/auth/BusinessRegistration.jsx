@@ -328,6 +328,21 @@ const BusinessRegistration = () => {
                     Product-Based Business
                   </Label>
                 </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="realEstateBasedBusiness"
+                    checked={businessCategories.includes("real-estate")}
+                    onCheckedChange={() =>
+                      handleBusinessCategoryChange("real-estate")
+                    }
+                  />
+                  <Label
+                    htmlFor="realEstateBasedBusiness"
+                    className="cursor-pointer text-sm"
+                  >
+                    Real Estate-Based Business
+                  </Label>
+                </div>
               </div>
             </div>
 
