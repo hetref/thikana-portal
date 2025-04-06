@@ -133,13 +133,13 @@ export default function RequestCallButton({ businessId, businessName }) {
         const latestRequest = requests[0];
         const requestTime = latestRequest.requestedAt.toMillis();
         const currentTime = Date.now();
-        const sixHoursInMs = 6 * 60 * 60 * 1000;
+        const twoMinutesInMs = 2 * 60 * 1000;
 
-        if (currentTime - requestTime < sixHoursInMs) {
+        if (currentTime - requestTime < twoMinutesInMs) {
           // User is on cooldown
           setOnCooldown(true);
-          const remainingTime = sixHoursInMs - (currentTime - requestTime);
-          setCooldownTimeRemaining(Math.ceil(remainingTime / (60 * 60 * 1000)));
+          const remainingTime = twoMinutesInMs - (currentTime - requestTime);
+          setCooldownTimeRemaining(Math.ceil(remainingTime / (60 * 1000)));
         } else {
           setOnCooldown(false);
         }
@@ -278,7 +278,7 @@ export default function RequestCallButton({ businessId, businessName }) {
 
       // Immediately update cooldown status - don't wait for reload
       setOnCooldown(true);
-      setCooldownTimeRemaining(6); // 6 hours
+      setCooldownTimeRemaining(2); // 2 minutes
 
       toast.success("Call requested and will be made shortly!");
       setIsOpen(false);
@@ -304,7 +304,7 @@ export default function RequestCallButton({ businessId, businessName }) {
         >
           <Phone className="w-4 h-4" />
           {onCooldown
-            ? `Request again in ${cooldownTimeRemaining}h`
+            ? `Request again in ${cooldownTimeRemaining}m`
             : "Request AI Call"}
         </Button>
       </DialogTrigger>
