@@ -436,18 +436,18 @@ export default function UserProfile() {
                   <span className="text-sm">Joined {formattedDate}</span>
                 </div>
               )}
-              {userData?.role === "business" && userData?.phone && (
+              {/* {userData?.role === "business" && userData?.phone && (
                 <div className="flex items-center text-gray-600 gap-1">
                   <Phone className="w-4 h-4" />
                   <span className="text-sm">{userData.phone}</span>
                 </div>
-              )}
-              {userData?.role === "business" && userData?.email && (
+              )} */}
+              {/* {userData?.role === "business" && userData?.email && (
                 <div className="flex items-center text-gray-600 gap-1">
                   <Mail className="w-4 h-4" />
                   <span className="text-sm">{userData.email}</span>
                 </div>
-              )}
+              )} */}
               <p className="text-gray-700 mt-2">
                 {userData?.bio || "Amazing Bio..."}
               </p>

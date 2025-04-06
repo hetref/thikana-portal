@@ -837,55 +837,119 @@ export default function Profile() {
         userName: user.displayName || user.email,
         timestamp: serverTimestamp(),
         orderId: selectedProductForRating.orderId,
+        updatedAt: serverTimestamp(),
       };
 
-      // Add rating to user's ratings collection
-      const userRatingRef = collection(db, "users", user.uid, "ratings");
-      const newRatingDoc = await addDoc(userRatingRef, ratingData);
+      const isUpdating = productRatings[selectedProductForRating.productId];
 
-      // Also add rating to product's ratings collection
-      const productRatingRef = collection(
-        db,
-        "products",
-        selectedProductForRating.productId,
-        "ratings"
-      );
-      await addDoc(productRatingRef, ratingData);
-
-      // Update product's average rating in products collection
-      const productRef = doc(
-        db,
-        "products",
-        selectedProductForRating.productId
-      );
-      const productDoc = await getDoc(productRef);
-
-      if (productDoc.exists()) {
-        const productData = productDoc.data();
-        const currentRatingCount = productData.ratingCount || 0;
-        const currentRatingSum = productData.ratingSum || 0;
-
-        const newRatingCount = currentRatingCount + 1;
-        const newRatingSum = currentRatingSum + ratingValue;
-        const newAverageRating = newRatingSum / newRatingCount;
-
-        await updateDoc(productRef, {
-          ratingCount: newRatingCount,
-          ratingSum: newRatingSum,
-          averageRating: newAverageRating,
+      if (isUpdating) {
+        // Update existing rating
+        const ratingId = productRatings[selectedProductForRating.productId].id;
+        const userRatingRef = doc(
+          db,
+          "users",
+          user.uid,
+          "productRatings",
+          ratingId
+        );
+        await updateDoc(userRatingRef, {
+          rating: ratingValue,
+          feedback: ratingFeedback,
+          updatedAt: serverTimestamp(),
         });
+
+        // Try to update in product's ratings collection if we have the ID
+        const productRatingId =
+          productRatings[selectedProductForRating.productId].productRatingId;
+        if (productRatingId) {
+          const productRatingRef = doc(
+            db,
+            "products",
+            selectedProductForRating.productId,
+            "ratings",
+            productRatingId
+          );
+          await updateDoc(productRatingRef, {
+            rating: ratingValue,
+            feedback: ratingFeedback,
+            updatedAt: serverTimestamp(),
+          });
+        }
+
+        toast.success("Rating updated successfully");
+      } else {
+        // Add new rating to user's ratings collection
+        const userRatingRef = collection(
+          db,
+          "users",
+          user.uid,
+          "productRatings"
+        );
+        const newRatingDoc = await addDoc(userRatingRef, ratingData);
+
+        // Also add rating to product's ratings collection
+        const productRatingRef = collection(
+          db,
+          "products",
+          selectedProductForRating.productId,
+          "ratings"
+        );
+        const productRatingDoc = await addDoc(productRatingRef, ratingData);
+
+        // Update the user's rating with the product rating ID for future reference
+        await updateDoc(
+          doc(db, "users", user.uid, "productRatings", newRatingDoc.id),
+          {
+            productRatingId: productRatingDoc.id,
+          }
+        );
+
+        // Update product's average rating in products collection
+        const productRef = doc(
+          db,
+          "products",
+          selectedProductForRating.productId
+        );
+        const productDoc = await getDoc(productRef);
+
+        if (productDoc.exists()) {
+          const productData = productDoc.data();
+          const currentRatingCount = productData.ratingCount || 0;
+          const currentRatingSum = productData.ratingSum || 0;
+
+          const newRatingCount = currentRatingCount + 1;
+          const newRatingSum = currentRatingSum + ratingValue;
+          const newAverageRating = newRatingSum / newRatingCount;
+
+          await updateDoc(productRef, {
+            ratingCount: newRatingCount,
+            ratingSum: newRatingSum,
+            averageRating: newAverageRating,
+          });
+        }
+
+        // Update local state with the new rating ID
+        ratingData.id = newRatingDoc.id;
+        ratingData.productRatingId = productRatingDoc.id;
+
+        toast.success("Rating submitted successfully");
       }
 
       // Update local state
       setProductRatings((prev) => ({
         ...prev,
         [selectedProductForRating.productId]: {
-          id: newRatingDoc.id,
-          ...ratingData,
+          ...(prev[selectedProductForRating.productId] || {}),
+          id: isUpdating
+            ? productRatings[selectedProductForRating.productId].id
+            : ratingData.id,
+          productId: selectedProductForRating.productId,
+          rating: ratingValue,
+          feedback: ratingFeedback,
+          updatedAt: new Date(),
         },
       }));
 
-      toast.success("Rating submitted successfully");
       setRatingDialogOpen(false);
 
       // Reset rating form
@@ -901,26 +965,29 @@ export default function Profile() {
   };
 
   // Handle opening the rating dialog
-  const handleOpenRatingDialog = (product, order) => {
-    const productWithOrderInfo = {
-      ...product,
-      orderId: order.id,
-      businessId: order.businessId,
-      businessName: order.businessName,
-    };
-    setSelectedProductForRating(productWithOrderInfo);
+  const handleOpenRatingDialog = useCallback(
+    (product, order) => {
+      const productWithOrderInfo = {
+        ...product,
+        orderId: order.id,
+        businessId: order.businessId,
+        businessName: order.businessName,
+      };
+      setSelectedProductForRating(productWithOrderInfo);
 
-    // If product has already been rated, pre-fill the form
-    if (productRatings[product.productId]) {
-      setRatingValue(productRatings[product.productId].rating);
-      setRatingFeedback(productRatings[product.productId].feedback);
-    } else {
-      setRatingValue(0);
-      setRatingFeedback("");
-    }
+      // If product has already been rated, pre-fill the form
+      if (productRatings[product.productId]) {
+        setRatingValue(productRatings[product.productId].rating);
+        setRatingFeedback(productRatings[product.productId].feedback || "");
+      } else {
+        setRatingValue(0);
+        setRatingFeedback("");
+      }
 
-    setRatingDialogOpen(true);
-  };
+      setRatingDialogOpen(true);
+    },
+    [productRatings]
+  );
 
   // Render star rating component for selection
   const renderStarRating = (currentRating, isSelectable = false) => {
@@ -1700,9 +1767,25 @@ export default function Profile() {
                                                         product.productId
                                                       ].rating
                                                     )}
-                                                    <span className="text-xs text-green-600">
-                                                      You rated this product
-                                                    </span>
+                                                    <div className="flex items-center justify-between">
+                                                      <span className="text-xs text-green-600">
+                                                        You rated this product
+                                                      </span>
+                                                      <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="text-xs h-7 px-2 text-muted-foreground hover:text-primary"
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          handleOpenRatingDialog(
+                                                            product,
+                                                            order
+                                                          );
+                                                        }}
+                                                      >
+                                                        Edit
+                                                      </Button>
+                                                    </div>
                                                   </div>
                                                 ) : (
                                                   <Button
@@ -1813,7 +1896,11 @@ export default function Profile() {
       <Dialog open={ratingDialogOpen} onOpenChange={setRatingDialogOpen}>
         <DialogContent className="sm:max-w-[450px]">
           <DialogHeader>
-            <DialogTitle>Rate Product</DialogTitle>
+            <DialogTitle>
+              {productRatings[selectedProductForRating?.productId]
+                ? "Edit Your Rating"
+                : "Rate Product"}
+            </DialogTitle>
             <DialogDescription>
               Share your experience with {selectedProductForRating?.productName}
             </DialogDescription>
@@ -1863,7 +1950,9 @@ export default function Profile() {
               {isSubmittingRating ? (
                 <>
                   <Loader2Icon className="h-4 w-4 animate-spin mr-2" />
-                  Submitting...
+                  {productRatings[selectedProductForRating?.productId]
+                    ? "Updating..."
+                    : "Submitting..."}
                 </>
               ) : productRatings[selectedProductForRating?.productId] ? (
                 "Update Rating"
