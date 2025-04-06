@@ -13,7 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { FileUploader } from "@/components/ui/file-uploader";
+// import { FileUploader } from "@/components/ui/file-uploader";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { collection, addDoc } from "firebase/firestore";
 import { auth, db, storage } from "@/lib/firebase";
