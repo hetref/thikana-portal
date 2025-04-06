@@ -187,9 +187,11 @@ export default function IncomeTab() {
 
       const incomesData = [];
       querySnapshot.forEach((doc) => {
+        const data = doc.data();
         incomesData.push({
           id: doc.id,
-          ...doc.data(),
+          ...data,
+          amount: data.amount !== undefined ? data.amount : 0,
         });
       });
 
@@ -1314,7 +1316,10 @@ export default function IncomeTab() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        ₹{income.amount.toFixed(2)}
+                        ₹
+                        {income.amount !== undefined && income.amount !== null
+                          ? income.amount.toFixed(2)
+                          : "0.00"}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button

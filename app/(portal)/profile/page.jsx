@@ -69,6 +69,7 @@ import {
   Star,
   MoreHorizontal,
   Home,
+  PhoneCall,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import WhoToFollow from "@/components/WhoToFollow";
@@ -1197,6 +1198,14 @@ export default function Profile() {
                               <DropdownMenuItem onClick={toggleLocationIFrame}>
                                 <MapPinIcon className="w-3.5 h-3.5 mr-2" />
                                 <span>Location</span>
+                              </DropdownMenuItem>
+
+                              {/* Add Manage Calls option for business users */}
+                              <DropdownMenuItem
+                                onClick={() => router.push("/profile/calls")}
+                              >
+                                <PhoneCall className="w-3.5 h-3.5 mr-2" />
+                                <span>Manage AI Calls</span>
                               </DropdownMenuItem>
 
                               {userData &&
