@@ -1273,7 +1273,7 @@ export default function Profile() {
                     <div className="flex flex-col items-center text-center">
                       <p className="text-amber-800 mb-3">
                         Please verify your email to access all platform
-                        features.,
+                        features.
                       </p>
                       <Button
                         onClick={verifyEmailHandler}
