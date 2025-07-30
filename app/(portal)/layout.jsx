@@ -2,7 +2,6 @@
 
 import Loader from "@/components/Loader";
 import TopNavbar from "@/components/TopNavbar";
-// import TopNavbar from "@/components/TopNavbar";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { get, ref } from "firebase/database";
@@ -33,7 +32,6 @@ const layout = ({ children }) => {
   if (userData === null) {
     return (
       <div className="flex justify-center items-center h-screen">
-        {/* <h2 className="font-semibold text-xl"></h2> */}
         <Loader />
       </div>
     );

@@ -72,7 +72,6 @@ import {
   PhoneCall,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
-import WhoToFollow from "@/components/WhoToFollow";
 import { useGetUserPosts } from "@/hooks/useGetPosts";
 import useGetUser from "@/hooks/useGetUser";
 import { auth, db } from "@/lib/firebase";
@@ -1866,9 +1865,6 @@ export default function Profile() {
           </main>
 
           {/* Right sidebar */}
-          <aside className="hidden lg:block lg:w-80 space-y-6">
-            <WhoToFollow />
-          </aside>
         </div>
       </div>
 

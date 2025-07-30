@@ -52,7 +52,9 @@ export default function Map() {
         <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Location Map</DialogTitle>
-            <DialogDescription id="map-dialog-description">View the business location on the map</DialogDescription>
+            <DialogDescription id="map-dialog-description">
+              View the business location on the map
+            </DialogDescription>
           </DialogHeader>
           {/* <LoadScript googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}>
             <GoogleMap

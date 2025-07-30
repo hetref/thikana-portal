@@ -1,6 +1,5 @@
 "use client";
 import Sidebar from "@/components/Sidebar";
-import WhoToFollow from "@/components/WhoToFollow";
 import React, { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { doc, getDoc } from "firebase/firestore";
@@ -84,12 +83,6 @@ const UsernameLayout = ({ children }) => {
                 </p>
               </div>
             </main>
-
-            <aside className="hidden lg:block lg:w-80">
-              <div className="sticky top-20">
-                <WhoToFollow />
-              </div>
-            </aside>
           </div>
         </div>
       </div>
@@ -107,12 +100,6 @@ const UsernameLayout = ({ children }) => {
           </aside>
 
           <main className="flex-1">{children}</main>
-
-          <aside className="hidden lg:block lg:w-80">
-            <div className="sticky top-20">
-              <WhoToFollow />
-            </div>
-          </aside>
         </div>
       </div>
     </div>

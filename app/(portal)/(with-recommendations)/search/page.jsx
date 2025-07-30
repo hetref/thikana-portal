@@ -1,7 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import Sidebar from "@/components/Sidebar";
-import WhoToFollow from "@/components/WhoToFollow";
 import {
   Briefcase,
   MapPin,
