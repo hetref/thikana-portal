@@ -70,6 +70,12 @@ import {
   MoreHorizontal,
   Home,
   PhoneCall,
+  Building2,
+  ChevronDown,
+  Store,
+  RefreshCw,
+  Trash2,
+  PlusCircle,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import WhoToFollow from "@/components/WhoToFollow";
@@ -89,6 +95,7 @@ import {
   where,
   addDoc,
   serverTimestamp,
+  limit,
 } from "firebase/firestore";
 import ProfilePosts from "@/components/ProfilePosts";
 import Link from "next/link";
@@ -135,6 +142,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useReactToPrint } from "react-to-print";
@@ -223,6 +232,9 @@ export default function Profile() {
   const [ratingFeedback, setRatingFeedback] = useState("");
   const [isSubmittingRating, setIsSubmittingRating] = useState(false);
   const [productRatings, setProductRatings] = useState({});
+  const [franchises, setFranchises] = useState([]);
+  const [hasFranchises, setHasFranchises] = useState(false);
+  const [loadingFranchises, setLoadingFranchises] = useState(false);
 
   const billRef = useRef();
   const [isFranchiseModalOpen, setIsFranchiseModalOpen] = useState(false);
@@ -589,6 +601,135 @@ export default function Profile() {
 
     fetchProductRatings();
   }, [user?.uid, isCurrentUser]);
+
+  // Check for franchises if user is a business
+  useEffect(() => {
+    if (!user?.uid || !isBusinessUser) {
+      setHasFranchises(false);
+      return;
+    }
+
+    const fetchFranchises = async () => {
+      try {
+        setLoadingFranchises(true);
+
+        // Query franchises owned by this business
+        const franchisesQuery = query(
+          collection(db, "businesses"),
+          where("franchiseOwner", "==", user.uid)
+        );
+
+        const franchisesSnapshot = await getDocs(franchisesQuery);
+
+        if (franchisesSnapshot.empty) {
+          setFranchises([]);
+          setHasFranchises(false);
+        } else {
+          const franchisesList = franchisesSnapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+
+          setFranchises(franchisesList);
+          setHasFranchises(true);
+        }
+      } catch (error) {
+        console.error("Error fetching franchises:", error);
+        toast.error("Failed to load franchises");
+        setHasFranchises(false);
+      } finally {
+        setLoadingFranchises(false);
+      }
+    };
+
+    fetchFranchises();
+  }, [user?.uid, isBusinessUser]);
+
+  // Handle franchise switch
+  const handleSwitchFranchise = (franchiseId, shouldReload = true) => {
+    if (franchiseId === "headquarters") {
+      // Switch to main business profile
+      sessionStorage.removeItem("selectedFranchiseId");
+      setSelectedFranchiseId(null);
+      toast.success("Switched to Headquarters");
+    } else {
+      // Switch to franchise profile
+      sessionStorage.setItem("selectedFranchiseId", franchiseId);
+      setSelectedFranchiseId(franchiseId);
+      const franchise = franchises.find((f) => f.id === franchiseId);
+      toast.success(`Switched to ${franchise?.businessName || "Franchise"}`);
+    }
+
+    // Force reload to refresh data if specified
+    if (shouldReload) {
+      window.location.reload();
+    }
+  };
+
+  // Dynamically exit franchise view and load current user data
+  const exitFranchiseView = async () => {
+    try {
+      // Show loading state
+      toast.loading("Updating profile...");
+
+      // Remove franchise ID from session storage
+      sessionStorage.removeItem("selectedFranchiseId");
+      setSelectedFranchiseId(null);
+
+      // Fetch the current user's data
+      const userDocRef = doc(db, "users", user.uid);
+      const userSnapshot = await getDoc(userDocRef);
+
+      if (userSnapshot.exists()) {
+        const userDoc = userSnapshot.data();
+        setUserData(userDoc);
+        setIsBusinessUser(!!userDoc.businessName);
+      }
+
+      // Refetch posts
+      const postsRef = collection(db, "posts");
+      const q = query(
+        postsRef,
+        where("userId", "==", user.uid),
+        orderBy("timestamp", "desc"),
+        limit(10)
+      );
+
+      const querySnapshot = await getDocs(q);
+      const postsData = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      // Update posts state (assuming posts state is accessible)
+      if (typeof posts !== "undefined" && typeof setPosts === "function") {
+        setPosts(postsData);
+      }
+
+      // Fetch user photos
+      const photosRef = collection(db, "users", user.uid, "photos");
+      const photosQuery = query(photosRef, orderBy("addedOn", "desc"));
+      const photosSnapshot = await getDocs(photosQuery);
+
+      const photosData = photosSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      setUserPhotos(photosData);
+
+      // Dismiss loading toast and show success
+      toast.dismiss();
+      toast.success("Exited franchise view");
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      toast.dismiss();
+      toast.error("Failed to update profile");
+
+      // Fallback to page reload if dynamic update fails
+      window.location.reload();
+    }
+  };
 
   // Memoized UI components
   const renderPosts = useMemo(() => {
@@ -1141,6 +1282,104 @@ export default function Profile() {
                         )}
                       </div>
 
+                      {/* Franchise Selector for business users with franchises */}
+                      {isBusinessUser &&
+                        hasFranchises &&
+                        !userData?.franchiseOwner && (
+                          <div className="mt-2 mb-2 flex gap-2">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="outline" className="gap-2">
+                                  {loadingFranchises ? (
+                                    <RefreshCw className="h-4 w-4 animate-spin" />
+                                  ) : selectedFranchiseId ? (
+                                    <Store className="h-4 w-4" />
+                                  ) : (
+                                    <Building2 className="h-4 w-4" />
+                                  )}
+                                  {loadingFranchises ? (
+                                    "Loading..."
+                                  ) : selectedFranchiseId ? (
+                                    <>
+                                      {franchises.find(
+                                        (f) => f.id === selectedFranchiseId
+                                      )?.businessName || "Franchise"}
+                                      <Badge
+                                        variant="outline"
+                                        className="ml-2 bg-blue-50 text-blue-600 border-blue-200 text-xs"
+                                      >
+                                        Franchise
+                                      </Badge>
+                                    </>
+                                  ) : (
+                                    <>
+                                      Headquarters
+                                      <Badge
+                                        variant="outline"
+                                        className="ml-2 bg-primary/10 text-primary border-primary/20 text-xs"
+                                      >
+                                        HQ
+                                      </Badge>
+                                    </>
+                                  )}
+                                  <ChevronDown className="h-4 w-4 ml-1" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-56">
+                                <DropdownMenuLabel>
+                                  Switch Location
+                                </DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+
+                                {/* Main business (Headquarters) */}
+                                <DropdownMenuItem
+                                  className="flex items-center gap-2 cursor-pointer"
+                                  onClick={() =>
+                                    handleSwitchFranchise("headquarters")
+                                  }
+                                >
+                                  <HomeIcon className="h-4 w-4" />
+                                  <span>Headquarters</span>
+                                  {!selectedFranchiseId && (
+                                    <Badge className="ml-auto">Current</Badge>
+                                  )}
+                                </DropdownMenuItem>
+
+                                {/* Franchises list */}
+                                {franchises.map((franchise) => (
+                                  <DropdownMenuItem
+                                    key={franchise.id}
+                                    className="flex items-center gap-2 cursor-pointer"
+                                    onClick={() =>
+                                      handleSwitchFranchise(franchise.id)
+                                    }
+                                  >
+                                    <Store className="h-4 w-4" />
+                                    <span>
+                                      {franchise.businessName || "Franchise"}
+                                    </span>
+                                    {selectedFranchiseId === franchise.id && (
+                                      <Badge className="ml-auto">Current</Badge>
+                                    )}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+
+                            {/* Exit Franchise View button */}
+                            {selectedFranchiseId && (
+                              <Button
+                                variant="outline"
+                                className="gap-2 text-blue-600 border-blue-200 hover:bg-blue-50"
+                                onClick={exitFranchiseView}
+                              >
+                                <ArrowLeftIcon className="h-4 w-4" />
+                                Exit Franchise View
+                              </Button>
+                            )}
+                          </div>
+                        )}
+
                       {/* Action buttons - simplified layout */}
                       <div className="flex flex-wrap gap-2 mt-3 md:mt-0">
                         {/* Primary buttons - always visible */}
@@ -1222,14 +1461,7 @@ export default function Profile() {
                                 )}
 
                               {selectedFranchiseId && (
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    sessionStorage.removeItem(
-                                      "selectedFranchiseId"
-                                    );
-                                    window.location.reload();
-                                  }}
-                                >
+                                <DropdownMenuItem onClick={exitFranchiseView}>
                                   <ArrowLeftIcon className="w-3.5 h-3.5 mr-2" />
                                   <span>
                                     Return to{" "}
@@ -1371,6 +1603,22 @@ export default function Profile() {
                               Posts{" "}
                               {userData?.role === "member" && "from Business"}
                             </TabsTrigger>
+
+                            {/* Franchises Tab - Only show for business owners with franchises */}
+                            {hasFranchises && !selectedFranchiseId && (
+                              <TabsTrigger
+                                value="franchises"
+                                className={cn(
+                                  "rounded-none border-b-2 border-transparent",
+                                  "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
+                                  "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
+                                )}
+                              >
+                                <Building2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                                Franchises
+                              </TabsTrigger>
+                            )}
+
                             <TabsTrigger
                               value="likes"
                               className={cn(
@@ -1469,6 +1717,251 @@ export default function Profile() {
                         >
                           {renderPosts}
                         </TabsContent>
+
+                        {/* Franchises tab content */}
+                        {hasFranchises && !selectedFranchiseId && (
+                          <TabsContent
+                            value="franchises"
+                            className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                          >
+                            <div className="space-y-2 mb-4">
+                              <h2 className="text-xl font-semibold">
+                                Your Franchises
+                              </h2>
+                              <p className="text-muted-foreground">
+                                Manage all your franchise locations.
+                              </p>
+                            </div>
+
+                            {loadingFranchises ? (
+                              <div className="flex justify-center py-10">
+                                <Loader2Icon className="w-8 h-8 animate-spin text-gray-400" />
+                              </div>
+                            ) : franchises.length === 0 ? (
+                              <div className="text-center py-12">
+                                <Building2 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+                                <p className="text-muted-foreground">
+                                  No franchises yet. Add a franchise to expand
+                                  your business.
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {franchises.map((franchise) => (
+                                  <Card
+                                    key={franchise.id}
+                                    className="overflow-hidden"
+                                  >
+                                    <CardHeader className="p-4 bg-gray-50">
+                                      <div className="flex justify-between items-start">
+                                        <div className="flex items-center gap-3">
+                                          <Avatar className="h-10 w-10 border border-gray-200">
+                                            <AvatarImage
+                                              src={
+                                                franchise.profilePic ||
+                                                "/avatar.png"
+                                              }
+                                              alt={franchise.businessName}
+                                            />
+                                          </Avatar>
+                                          <div>
+                                            <h3 className="font-medium text-lg">
+                                              {franchise.businessName}
+                                            </h3>
+                                            <p className="text-sm text-muted-foreground">
+                                              {franchise.locations?.address ||
+                                                "No address"}
+                                            </p>
+                                          </div>
+                                        </div>
+                                        <Badge
+                                          variant="outline"
+                                          className="bg-blue-50 text-blue-600 border-blue-200"
+                                        >
+                                          Franchise
+                                        </Badge>
+                                      </div>
+                                    </CardHeader>
+                                    <CardContent className="p-4">
+                                      <div className="grid grid-cols-2 gap-3 mb-4">
+                                        <div className="flex flex-col">
+                                          <span className="text-xs text-muted-foreground">
+                                            Admin
+                                          </span>
+                                          <span className="font-medium">
+                                            {franchise.adminName}
+                                          </span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                          <span className="text-xs text-muted-foreground">
+                                            Contact
+                                          </span>
+                                          <span className="font-medium">
+                                            {franchise.phone}
+                                          </span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                          <span className="text-xs text-muted-foreground">
+                                            Email
+                                          </span>
+                                          <span className="font-medium truncate">
+                                            {franchise.email}
+                                          </span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                          <span className="text-xs text-muted-foreground">
+                                            Created
+                                          </span>
+                                          <span className="font-medium">
+                                            {franchise.createdAt?.toDate
+                                              ? format(
+                                                  new Date(
+                                                    franchise.createdAt?.toDate()
+                                                  ),
+                                                  "MMM d, yyyy"
+                                                )
+                                              : "N/A"}
+                                          </span>
+                                        </div>
+                                      </div>
+                                      <div className="flex gap-2 justify-between">
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="gap-2 text-blue-600 border-blue-200 hover:bg-blue-50 flex-1"
+                                          onClick={() =>
+                                            handleSwitchFranchise(franchise.id)
+                                          }
+                                        >
+                                          <Store className="h-4 w-4" />
+                                          <span>View Franchise</span>
+                                        </Button>
+
+                                        <AlertDialog>
+                                          <AlertDialogTrigger asChild>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              className="gap-2 text-red-600 border-red-200 hover:bg-red-50"
+                                            >
+                                              <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                          </AlertDialogTrigger>
+                                          <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                              <AlertDialogTitle>
+                                                Delete Franchise
+                                              </AlertDialogTitle>
+                                              <AlertDialogDescription>
+                                                Are you sure you want to delete
+                                                this franchise? This action
+                                                cannot be undone and will remove
+                                                the franchise administrator
+                                                account.
+                                              </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                              <AlertDialogCancel>
+                                                Cancel
+                                              </AlertDialogCancel>
+                                              <AlertDialogAction
+                                                className="bg-destructive hover:bg-destructive/90"
+                                                onClick={() => {
+                                                  // Delete franchise handler
+                                                  const deleteFranchise =
+                                                    async () => {
+                                                      try {
+                                                        toast.loading(
+                                                          "Deleting franchise..."
+                                                        );
+
+                                                        // Delete franchise documents
+                                                        await deleteDoc(
+                                                          doc(
+                                                            db,
+                                                            "users",
+                                                            franchise.id
+                                                          )
+                                                        );
+                                                        await deleteDoc(
+                                                          doc(
+                                                            db,
+                                                            "businesses",
+                                                            franchise.id
+                                                          )
+                                                        );
+
+                                                        // Delete the user from Firebase Auth via API
+                                                        const response =
+                                                          await fetch(
+                                                            `/api/delete-franchise-user?userId=${franchise.id}`,
+                                                            { method: "DELETE" }
+                                                          );
+
+                                                        if (!response.ok) {
+                                                          throw new Error(
+                                                            "Failed to delete franchise user"
+                                                          );
+                                                        }
+
+                                                        // Update local state
+                                                        setFranchises(
+                                                          franchises.filter(
+                                                            (f) =>
+                                                              f.id !==
+                                                              franchise.id
+                                                          )
+                                                        );
+                                                        if (
+                                                          franchises.length <= 1
+                                                        ) {
+                                                          setHasFranchises(
+                                                            false
+                                                          );
+                                                        }
+
+                                                        toast.dismiss();
+                                                        toast.success(
+                                                          "Franchise deleted successfully"
+                                                        );
+                                                      } catch (error) {
+                                                        console.error(
+                                                          "Error deleting franchise:",
+                                                          error
+                                                        );
+                                                        toast.dismiss();
+                                                        toast.error(
+                                                          "Failed to delete franchise"
+                                                        );
+                                                      }
+                                                    };
+
+                                                  deleteFranchise();
+                                                }}
+                                              >
+                                                Delete
+                                              </AlertDialogAction>
+                                            </AlertDialogFooter>
+                                          </AlertDialogContent>
+                                        </AlertDialog>
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                ))}
+                              </div>
+                            )}
+
+                            <div className="mt-6">
+                              <Button
+                                onClick={() => setIsFranchiseModalOpen(true)}
+                                className="gap-2"
+                              >
+                                <PlusCircle className="h-4 w-4" />
+                                Add New Franchise
+                              </Button>
+                            </div>
+                          </TabsContent>
+                        )}
 
                         <TabsContent
                           value="likes"
@@ -1576,6 +2069,200 @@ export default function Profile() {
                                   )
                                 : savedPosts.map(renderSavedPostCard)}
                           </div>
+                        </TabsContent>
+
+                        <TabsContent
+                          value="orders"
+                          className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                        >
+                          {loadingOrders ? (
+                            renderLoading()
+                          ) : orders.length === 0 ? (
+                            renderEmptyState(ShoppingCart, "No orders yet")
+                          ) : (
+                            <div className="space-y-6">
+                              <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-lg font-semibold">
+                                  Your Orders
+                                </h2>
+                              </div>
+
+                              {orders.map((order) => (
+                                <Card
+                                  key={order.id}
+                                  className="overflow-hidden"
+                                >
+                                  <CardHeader className="bg-gray-50 py-3">
+                                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                                      <div>
+                                        <div className="flex items-center">
+                                          <h3 className="font-medium text-sm sm:text-base">
+                                            Order #
+                                            {order.orderId.substring(0, 8)}
+                                            ...
+                                          </h3>
+                                          <Badge
+                                            variant={
+                                              order.status === "completed"
+                                                ? "success"
+                                                : "outline"
+                                            }
+                                            className="ml-2"
+                                          >
+                                            {order.status === "completed"
+                                              ? "Completed"
+                                              : order.status}
+                                          </Badge>
+                                        </div>
+                                        <p className="text-xs sm:text-sm text-muted-foreground">
+                                          {format(
+                                            new Date(order.timestamp),
+                                            "MMM d, yyyy · h:mm a"
+                                          )}
+                                        </p>
+                                      </div>
+                                      <div className="text-right">
+                                        <p className="font-semibold text-sm sm:text-base">
+                                          ₹{order.amount?.toFixed(2)}
+                                        </p>
+                                        <p className="text-xs sm:text-sm text-muted-foreground">
+                                          {order.businessName}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </CardHeader>
+                                  <CardContent className="p-0">
+                                    <div className="px-4 py-3 border-b">
+                                      <div className="flex justify-between items-center">
+                                        <h4 className="text-sm font-medium">
+                                          Items
+                                        </h4>
+                                        <span className="text-xs text-muted-foreground">
+                                          {order.products?.length || 0} item(s)
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <div className="divide-y">
+                                      {order.products?.map((product, idx) => (
+                                        <div
+                                          key={idx}
+                                          className="p-4 flex items-center gap-3"
+                                        >
+                                          <div className="relative w-12 h-12 bg-gray-100 rounded overflow-hidden flex-shrink-0">
+                                            {product.imageUrl ? (
+                                              <Image
+                                                src={product.imageUrl}
+                                                alt={product.productName}
+                                                fill
+                                                className="object-cover"
+                                              />
+                                            ) : (
+                                              <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                                <Package className="w-6 h-6" />
+                                              </div>
+                                            )}
+                                          </div>
+                                          <div className="flex-grow">
+                                            <h5 className="font-medium text-sm">
+                                              {product.productName}
+                                            </h5>
+                                            <div className="flex items-center text-sm text-muted-foreground">
+                                              <span>
+                                                ₹{product.amount?.toFixed(2)} ×{" "}
+                                                {product.quantity}
+                                              </span>
+                                            </div>
+                                            {order.status === "completed" && (
+                                              <div className="mt-2">
+                                                {productRatings[
+                                                  product.productId
+                                                ] ? (
+                                                  <div className="flex flex-col gap-1">
+                                                    {renderStarRating(
+                                                      productRatings[
+                                                        product.productId
+                                                      ].rating
+                                                    )}
+                                                    <div className="flex items-center justify-between">
+                                                      <span className="text-xs text-green-600">
+                                                        You rated this product
+                                                      </span>
+                                                      <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="text-xs h-7 px-2 text-muted-foreground hover:text-primary"
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          handleOpenRatingDialog(
+                                                            product,
+                                                            order
+                                                          );
+                                                        }}
+                                                      >
+                                                        Edit
+                                                      </Button>
+                                                    </div>
+                                                  </div>
+                                                ) : (
+                                                  <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="text-xs"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      handleOpenRatingDialog(
+                                                        product,
+                                                        order
+                                                      );
+                                                    }}
+                                                  >
+                                                    Rate & Review
+                                                  </Button>
+                                                )}
+                                              </div>
+                                            )}
+                                          </div>
+                                          <div className="text-right">
+                                            <p className="font-medium">
+                                              ₹
+                                              {(
+                                                product.amount *
+                                                product.quantity
+                                              ).toFixed(2)}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                    <div className="border-t p-4 bg-gray-50">
+                                      <div className="flex flex-col gap-2">
+                                        <div className="flex justify-between">
+                                          <span className="text-sm font-medium">
+                                            Total
+                                          </span>
+                                          <span className="font-semibold">
+                                            ₹{order.amount?.toFixed(2)}
+                                          </span>
+                                        </div>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="flex items-center gap-1 mt-2 w-full"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleGenerateBill(order);
+                                          }}
+                                        >
+                                          <FileText className="h-4 w-4" />
+                                          <span>Generate Bill</span>
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              ))}
+                            </div>
+                          )}
                         </TabsContent>
                       </Tabs>
                     </Card>
