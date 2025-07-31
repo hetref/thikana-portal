@@ -39,7 +39,6 @@ import {
   MoreHorizontal,
   Plus,
   Search,
-  Loader2,
   Trash,
   Edit,
   UserPlus,
@@ -58,6 +57,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import toast from "react-hot-toast";
+import Loader from "@/components/Loader";
 
 export default function MembersTab() {
   const [members, setMembers] = useState([]);
@@ -294,7 +294,7 @@ export default function MembersTab() {
 
           {loading ? (
             <div className="flex justify-center items-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <Loader/>
             </div>
           ) : members.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
@@ -449,7 +449,7 @@ export default function MembersTab() {
               </Button>
               <Button type="submit" disabled={addingMember}>
                 {addingMember && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader/>
                 )}
                 Add Member
               </Button>
@@ -536,7 +536,7 @@ export default function MembersTab() {
                 </Button>
                 <Button type="submit" disabled={updatingMember}>
                   {updatingMember && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader/>
                   )}
                   Update Member
                 </Button>
@@ -595,7 +595,7 @@ export default function MembersTab() {
                   disabled={deletingMember}
                 >
                   {deletingMember && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader/>
                   )}
                   Delete Member
                 </Button>

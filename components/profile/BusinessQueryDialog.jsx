@@ -22,7 +22,7 @@ import {
 import { auth, db } from "@/lib/firebase";
 import { addDoc, collection, serverTimestamp, doc, setDoc } from "firebase/firestore";
 import toast from "react-hot-toast";
-import { Loader2 } from "lucide-react";
+import Loader from "@/components/Loader";
 
 export default function BusinessQueryDialog({ open, onOpenChange }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -211,7 +211,7 @@ export default function BusinessQueryDialog({ open, onOpenChange }) {
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader/>
                   Submitting...
                 </>
               ) : (

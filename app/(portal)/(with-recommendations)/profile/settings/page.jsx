@@ -11,12 +11,12 @@ import {
 } from "@/components/ui/card";
 import { auth, db } from "@/lib/firebase";
 import { getDoc, doc } from "firebase/firestore";
-import { Loader2 } from "lucide-react";
 import BasicInfoForm from "@/components/BasicInfoForm";
 import PaymentForm from "@/components/PaymentForm";
 import BusinessInfoForm from "@/components/BusinessInfoForm";
 import toast from "react-hot-toast";
 import { AlertCircle, User, CreditCard, Building } from "lucide-react";
+import Loader from "@/components/Loader";
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState("basic-info");
@@ -66,7 +66,7 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div className="container mx-auto py-[30px] flex justify-center items-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader/>
       </div>
     );
   }

@@ -23,7 +23,6 @@ import {
   Maximize2,
   ChevronLeft,
   ChevronRight,
-  Loader2,
   ImageIcon,
   AlertCircle,
 } from "lucide-react";
@@ -34,6 +33,7 @@ import { db, storage } from "@/lib/firebase";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
 import useBusinessIdForMember from "@/hooks/useBusinessIdForMember";
+import Loader from "@/components/Loader";
 
 export default function PhotosGrid({ userId }) {
   const [photos, setPhotos] = useState([]);
@@ -256,7 +256,7 @@ export default function PhotosGrid({ userId }) {
   if (idLoading || loading) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
-        <Loader2 className="w-10 h-10 animate-spin text-primary/70 mb-4" />
+        <Loader/>
         <p className="text-muted-foreground">Loading photos...</p>
       </div>
     );

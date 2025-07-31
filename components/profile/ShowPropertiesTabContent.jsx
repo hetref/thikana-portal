@@ -65,7 +65,6 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
-  Loader2,
   X,
   Plus,
   Edit,
@@ -447,7 +446,7 @@ export default function ShowPropertiesTabContent() {
   if (loading) {
     return (
       <div className="flex justify-center py-10">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader/>
       </div>
     );
   }
@@ -776,7 +775,7 @@ export default function ShowPropertiesTabContent() {
               <Button type="submit" disabled={uploadingImages}>
                 {uploadingImages ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader/>
                     Uploading...
                   </>
                 ) : (

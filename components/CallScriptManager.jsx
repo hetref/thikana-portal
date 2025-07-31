@@ -41,8 +41,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Plus, Edit2, Trash2 } from "lucide-react";
+import {  Plus, Edit2, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
+import Loader from "@/components/Loader";
+
 
 export default function CallScriptManager() {
   const [scripts, setScripts] = useState([]);
@@ -328,7 +330,7 @@ Thank you for taking the time to speak with me today. If you have any further qu
   if (loading || loadingCallTypes) {
     return (
       <div className="flex justify-center items-center h-48">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader/>
       </div>
     );
   }
@@ -427,7 +429,7 @@ Thank you for taking the time to speak with me today. If you have any further qu
               <Button onClick={handleAddScript} disabled={isSubmitting}>
                 {isSubmitting ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader/>
                     Saving...
                   </>
                 ) : (
@@ -457,7 +459,7 @@ Thank you for taking the time to speak with me today. If you have any further qu
               >
                 {isSubmitting ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader/>
                     Creating...
                   </>
                 ) : (
@@ -576,7 +578,7 @@ Thank you for taking the time to speak with me today. If you have any further qu
             <Button onClick={handleEditScript} disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader/>
                   Updating...
                 </>
               ) : (

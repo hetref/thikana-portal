@@ -15,8 +15,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { auth } from "@/lib/firebase";
 import toast from "react-hot-toast";
-import { Loader2, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import Loader from "@/components/Loader";
 
 // Schema with more specific validations
 const paymentSchema = z.object({
@@ -134,7 +135,7 @@ export default function PaymentForm() {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center py-8">
-        <Loader2 className="w-6 h-6 animate-spin mr-2" />
+        <Loader/>
         <span>Loading payment settings...</span>
       </div>
     );
@@ -214,7 +215,7 @@ export default function PaymentForm() {
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader/>
                   Saving...
                 </>
               ) : (

@@ -6,7 +6,7 @@ import { Card, CardContent } from "./ui/card";
 import Image from "next/image";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Loader2, ShoppingBag, AlertCircle } from "lucide-react";
+import { ShoppingBag, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import useBusinessIdForMember from "@/hooks/useBusinessIdForMember";
 
@@ -74,7 +74,7 @@ export function ProductGrid({ userId, userData, userType = "customer" }) {
   if (idLoading || loading) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
-        <Loader2 className="w-10 h-10 animate-spin text-primary/70 mb-4" />
+        <Loader/>
         <p className="text-muted-foreground">Loading products...</p>
       </div>
     );

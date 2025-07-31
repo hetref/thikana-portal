@@ -8,7 +8,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   FileTextIcon,
   MapPinIcon,
-  Loader2Icon,
   Images,
   SquareChartGantt,
   Globe,
@@ -62,6 +61,7 @@ import { cn } from "@/lib/utils";
 import ShowServicesTabContent from "@/components/profile/ShowServicesTabContent";
 import { sendNotificationToUser } from "@/lib/notifications";
 import ShowBusinessProperties from "@/components/profile/ShowBusinessProperties";
+import Loader from "@/components/Loader";
 
 // Add a style element to hide scrollbars
 const scrollbarHideStyles = `
@@ -288,7 +288,7 @@ export default function UserProfile() {
     if (postsLoading && !posts.length) {
       return (
         <div className="flex justify-center py-8">
-          <Loader2Icon className="w-6 h-6 animate-spin text-primary/70" />
+          <Loader/>
         </div>
       );
     }
@@ -322,7 +322,7 @@ export default function UserProfile() {
             >
               {postsLoading ? (
                 <>
-                  <Loader2Icon className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader/>
                   Loading...
                 </>
               ) : (
@@ -338,7 +338,7 @@ export default function UserProfile() {
   if (loading) {
     return (
       <div className="flex justify-center items-center py-20">
-        <Loader2Icon className="w-8 h-8 animate-spin text-primary/70" />
+        <Loader/>
         <span className="ml-2">Loading profile...</span>
       </div>
     );
@@ -466,7 +466,7 @@ export default function UserProfile() {
                 >
                   {followLoading ? (
                     <>
-                      <Loader2Icon className="w-4 h-4 mr-2 animate-spin" />
+                      <Loader/>
                       {isFollowing ? "Unfollowing..." : "Following..."}
                     </>
                   ) : isFollowing ? (
@@ -662,7 +662,7 @@ export default function UserProfile() {
           >
             {loadingPhotos ? (
               <div className="flex justify-center py-10">
-                <Loader2Icon className="w-8 h-8 animate-spin text-gray-400" />
+                <Loader/>
               </div>
             ) : userPhotos.length > 0 ? (
               <div className="w-full space-y-4">

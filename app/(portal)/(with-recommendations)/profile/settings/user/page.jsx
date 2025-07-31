@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
 import { getDoc, doc } from "firebase/firestore";
-import { Loader2 } from "lucide-react";
 import UserBasicInfoForm from "@/components/UserBasicInfoForm";
+import Loader from "@/components/Loader";
 
 export default function UserSettings() {
   const [isLoading, setIsLoading] = useState(true);
@@ -38,7 +38,7 @@ export default function UserSettings() {
   if (isLoading) {
     return (
       <div className="container mx-auto py-[30px] flex justify-center items-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader/>
       </div>
     );
   }

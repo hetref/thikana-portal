@@ -42,8 +42,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Loader2, Search, MessagesSquare, Filter, ChevronDown, TicketIcon } from "lucide-react";
+import { Search, MessagesSquare, Filter, ChevronDown, TicketIcon } from "lucide-react";
 import toast from "react-hot-toast";
+import Loader from "@/components/Loader";
 
 export default function TicketsTab() {
   const [tickets, setTickets] = useState([]);
@@ -364,7 +365,7 @@ export default function TicketsTab() {
               onClick={fetchTickets}
               disabled={loading}
             >
-              {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              {loading ? <Loader/> : null}
               Refresh
             </Button>
           </CardTitle>
@@ -434,7 +435,7 @@ export default function TicketsTab() {
           {/* Tickets List */}
           {loading ? (
             <div className="flex justify-center items-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <Loader/>
             </div>
           ) : filteredTickets.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
@@ -649,7 +650,7 @@ export default function TicketsTab() {
                   >
                     {replying ? (
                       <>
-                        <Loader2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
+                        <Loader/>
                         Sending...
                       </>
                     ) : (
