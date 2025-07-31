@@ -1311,7 +1311,7 @@ export default function Profile() {
         {scrollbarHideStyles}
       </style>
 
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-[1400px] mx-auto">
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Main content */}
           <main className="flex-1 space-y-6">

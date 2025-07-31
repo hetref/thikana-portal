@@ -163,7 +163,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen">
-      <div className="max-w-7xl mx-auto py-4 sm:py-8 px-3 sm:px-4">
+      <div className="max-w-[1400px] mx-auto py-4 sm:py-8 px-3 sm:px-4">
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
           {/* Left Sidebar */}
           <aside className="hidden lg:block w-80">

@@ -7,7 +7,7 @@ import { ProgressiveBlur } from "@/components/ui/progressive-blur"
 export function LogoCloud() {
   return (
     <section className="bg-black overflow-hidden py-16">
-      <div className="group relative m-auto max-w-7xl px-6">
+      <div className="group relative m-auto max-w-[1400px] px-6">
         <div className="flex flex-col items-center md:flex-row">
           <div className="md:max-w-44 md:border-r md:pr-6">
             <p className="text-end text-xl font-bold text-white">{"Powering the best teams"}</p>

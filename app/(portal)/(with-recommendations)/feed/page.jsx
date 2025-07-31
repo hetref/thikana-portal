@@ -449,7 +449,7 @@ const FeedPage = () => {
   if (loading && posts.length === 0) {
     return (
       <div className="flex items-center justify-center w-full">
-        <div className="max-w-7xl w-full">
+        <div className="max-w-[1400px] w-full">
           <div className="container grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6 py-8">
             <aside className="hidden md:block">
               <Sidebar />
@@ -476,7 +476,7 @@ const FeedPage = () => {
   if (!loading && posts.length === 0) {
     return (
       <div className="flex items-center justify-center w-full">
-        <div className="max-w-7xl w-full">
+        <div className="max-w-[1400px] w-full">
           <div className="container grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6 py-8">
             <aside className="hidden md:block">
               <Sidebar />
@@ -509,7 +509,7 @@ const FeedPage = () => {
 
   return (
     <div className="flex items-center justify-center w-full">
-      <div className="max-w-7xl w-full">
+      <div className="max-w-[1400px] w-full">
         <div className="container grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6 py-8">
           <aside className="hidden md:block">
             <div className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto">

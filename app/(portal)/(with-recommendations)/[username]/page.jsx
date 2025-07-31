@@ -329,7 +329,7 @@ export default function UserProfile() {
     : "";
 
   return (
-    <div className="space-y-6 py-6">
+    <div className="space-y-6">
       {/* Add style element for custom CSS */}
       <style jsx global>
         {scrollbarHideStyles}

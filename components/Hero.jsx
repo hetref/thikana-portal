@@ -63,7 +63,7 @@ const Hero = () => {
         } transition-colors duration-1000 relative ${roboto.className}`}
       >
         <BackgroundCircles />
-        <div className="max-w-7xl mx-auto px-4 relative z-10">
+        <div className="max-w-[1400px] mx-auto px-4 relative z-10">
           <div className="min-h-[100vh] flex flex-col items-center justify-center pt-16 pb-32">
             <div className="z-10 flex min-h-16 items-center justify-center mb-8">
               <div

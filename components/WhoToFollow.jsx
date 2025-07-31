@@ -336,7 +336,7 @@ export default function WhoToFollow() {
                       <div className="flex flex-col justify-center w-full gap-2">
                         <div className="flex items-center gap-2">
                           <Link
-                            href={`/${business.username}?user=${business.id}`}
+                            href={`/${business.id}`}
                             className="grid gap-0.5 text-sm"
                           >
                             <span className="font-medium">

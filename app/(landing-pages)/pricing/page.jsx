@@ -372,7 +372,7 @@ export default function PricingPage() {
           ? 'bg-gradient-to-t from-blue-950 via-black to-black' 
           : 'bg-gradient-to-t from-blue-50 via-white to-gray-100'
       }`}>
-        <div className="mx-auto max-w-7xl px-6 lg:px-8 py-24">
+        <div className="mx-auto max-w-[1400px] px-6 lg:px-8 py-24">
           <motion.div
             className="mx-auto max-w-4xl text-center"
             initial="initial"

@@ -4,12 +4,7 @@ import React from "react";
 const Layout = ({ children }) => {
   return (
     <div className="flex items-center justify-center w-full">
-      <div className="max-w-7xl w-full flex justify-center gap-6 px-2 md:px-4">
-        <aside className="hidden lg:block md:w-[30%] w-full">
-          <div className="sticky top-[95px]">
-            <Sidebar />
-          </div>
-        </aside>
+      <div className="max-w-[1400px] w-full flex justify-center gap-6 px-2 md:px-4">
         <div className="w-full">{children}</div>
       </div>
     </div>

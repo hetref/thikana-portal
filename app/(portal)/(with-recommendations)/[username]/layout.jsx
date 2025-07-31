@@ -62,7 +62,7 @@ const UsernameLayout = ({ children }) => {
   if (notFound) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-[1400px] mx-auto">
           <div className="flex flex-col lg:flex-row gap-6 px-2 md:px-4">
             <aside className="hidden lg:block lg:w-80">
               <div className="sticky top-20">
@@ -88,16 +88,16 @@ const UsernameLayout = ({ children }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col lg:flex-row gap-6 px-2 md:px-4">
-          <aside className="hidden lg:block lg:w-80">
+    <div className="min-h-screen">
+      <div className="max-w-[1400px] mx-auto">
+        <div>
+          {/* <aside className="hidden lg:block lg:w-80">
             <div className="sticky top-20">
               <Sidebar />
             </div>
-          </aside>
+          </aside> */}
 
-          <main className="flex-1">{children}</main>
+          <main>{children}</main>
         </div>
       </div>
     </div>

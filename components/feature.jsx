@@ -148,7 +148,7 @@ export function AnimatedFeatureSection({
 
   return (
     <section className={`py-16 px-4 ${isDark ? 'bg-black' : 'bg-[#F5F5F5]'} ${className}`}>
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-[1400px] mx-auto">
         {/* Header */}
         <div className="text-center mb-16">
           <motion.span

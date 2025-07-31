@@ -83,7 +83,7 @@ const Pricing = () => {
 
   return (
     <div className={`${isDark ? 'bg-gradient-to-t from-blue-950 via-black to-black' : 'bg-[#F5F5F5]'} transition-colors duration-1000`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center max-w-3xl mx-auto mb-12">
           <h1 className={`text-4xl md:text-5xl lg:text-6xl font-bold ${isDark ? 'text-white' : 'text-gray-900'} mb-4 tracking-tight`}>
             Plans and Pricing
@@ -122,7 +122,7 @@ const Pricing = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-[1400px] mx-auto">
           {pricingTiers.map((tier, index) => (
             <div
               key={tier.name}
