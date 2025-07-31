@@ -18,7 +18,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogClose,
   DialogTrigger,
   DialogDescription,
   DialogFooter,
@@ -77,10 +76,8 @@ import {
   Trash2,
   PlusCircle,
 } from "lucide-react";
-import Sidebar from "@/components/Sidebar";
 import WhoToFollow from "@/components/WhoToFollow";
 import { useGetUserPosts } from "@/hooks/useGetPosts";
-import useGetUser from "@/hooks/useGetUser";
 import { auth, db } from "@/lib/firebase";
 import {
   collection,
@@ -104,7 +101,6 @@ import Image from "next/image";
 import { userEmailStatus } from "@/utils/userStatus";
 import toast from "react-hot-toast";
 import { sendEmailVerification } from "firebase/auth";
-import MoreInformationDialog from "@/components/profile/MoreInformationDialog";
 import FollowingDialog from "@/components/profile/FollowingDialog";
 import FollowerDialog from "@/components/profile/FollowerDialog";
 import PhotosGrid from "@/components/PhotosGrid";
@@ -113,26 +109,7 @@ import ShareBusinessDialog from "@/components/profile/ShareBusinessDialog";
 import { cn } from "@/lib/utils";
 import ShowServicesTabContent from "@/components/profile/ShowServicesTabContent";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { format } from "date-fns";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -151,7 +128,6 @@ import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { Textarea } from "@/components/ui/textarea";
 import "leaflet/dist/leaflet.css";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import ShowPropertiesTabContent from "@/components/profile/ShowPropertiesTabContent";
 
 // Add a style element to hide scrollbars
@@ -208,11 +184,17 @@ export default function Profile() {
   const [likedPosts, setLikedPosts] = useState([]);
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
-  const userId = selectedFranchiseId || user?.uid;
+  
+  // Fixed: Use consistent userId calculation
+  const userId = useMemo(() => selectedFranchiseId || user?.uid, [selectedFranchiseId, user?.uid]);
+  
   const [userData, setUserData] = useState(null);
   const [loadingUserData, setLoadingUserData] = useState(true);
-  const { posts, loading, fetchMorePosts, hasMore, error } =
-    useGetUserPosts(userId);
+  const [authError, setAuthError] = useState(null);
+  
+  // Fixed: Use consistent userId for posts hook
+  const { posts, loading, fetchMorePosts, hasMore, error } = useGetUserPosts(userId);
+  
   const [showLocationIFrame, setShowLocationIFrame] = useState(false);
   const [isAddPhotoModalOpen, setIsAddPhotoModalOpen] = useState(false);
   const [userPhotos, setUserPhotos] = useState([]);
@@ -225,8 +207,7 @@ export default function Profile() {
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [billDialogOpen, setBillDialogOpen] = useState(false);
-  const [selectedProductForRating, setSelectedProductForRating] =
-    useState(null);
+  const [selectedProductForRating, setSelectedProductForRating] = useState(null);
   const [ratingDialogOpen, setRatingDialogOpen] = useState(false);
   const [ratingValue, setRatingValue] = useState(0);
   const [ratingFeedback, setRatingFeedback] = useState("");
@@ -239,6 +220,9 @@ export default function Profile() {
   const billRef = useRef();
   const [isFranchiseModalOpen, setIsFranchiseModalOpen] = useState(false);
   const [isBusinessUser, setIsBusinessUser] = useState(false);
+
+  // Fixed: Add cleanup refs for listeners
+  const unsubscribeRefs = useRef([]);
 
   const franchiseFormSchema = z.object({
     adminName: z.string().min(2, { message: "Admin name is required" }),
@@ -274,8 +258,13 @@ export default function Profile() {
   }, [userId, user?.uid]);
 
   const isEmailVerified = useMemo(() => {
-    return userEmailStatus() === true;
-  }, []);
+    try {
+      return userEmailStatus() === true;
+    } catch (error) {
+      console.error("Error checking email verification:", error);
+      return false;
+    }
+  }, [user?.emailVerified]); // Fixed: Add dependency
 
   // Optimized handlers
   const handleLoadMore = useCallback(() => {
@@ -304,6 +293,9 @@ export default function Profile() {
         const savedPostRef = doc(db, "users", user.uid, "savedPosts", postId);
         await deleteDoc(savedPostRef);
         toast.success("Post unsaved successfully");
+        
+        // Fixed: Update local state immediately
+        setSavedPosts(prev => prev.filter(post => post.id !== postId));
       } catch (error) {
         console.error("Error unsaving post:", error);
         toast.error("Failed to unsave post");
@@ -321,6 +313,7 @@ export default function Profile() {
     if (postToUnsave) {
       handleUnsavePost(postToUnsave);
       setPostToUnsave(null);
+      setIsUnsaveDialogOpen(false);
     }
   }, [postToUnsave, handleUnsavePost]);
 
@@ -337,22 +330,43 @@ export default function Profile() {
     }
   }, [user]);
 
-  // Optimized effects
+  // Fixed: Cleanup function for all listeners
+  const cleanupListeners = useCallback(() => {
+    unsubscribeRefs.current.forEach(unsubscribe => {
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    });
+    unsubscribeRefs.current = [];
+  }, []);
+
+  // Fixed: Optimized main auth effect with better error handling
   useEffect(() => {
+    let mounted = true;
+    
     // Check sessionStorage for selected franchise
-    const storedFranchiseId = sessionStorage.getItem("selectedFranchiseId");
-    if (storedFranchiseId) {
-      setSelectedFranchiseId(storedFranchiseId);
+    try {
+      const storedFranchiseId = sessionStorage.getItem("selectedFranchiseId");
+      if (storedFranchiseId && mounted) {
+        setSelectedFranchiseId(storedFranchiseId);
+      }
+    } catch (error) {
+      console.error("Error reading from sessionStorage:", error);
     }
 
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (!mounted) return;
+      
       if (user) {
         setUser(user);
         setLoadingUserData(true);
+        setAuthError(null);
 
         try {
           const userDocRef = doc(db, "users", user.uid);
           const userSnapshot = await getDoc(userDocRef);
+
+          if (!mounted) return;
 
           if (userSnapshot.exists()) {
             const userDoc = userSnapshot.data();
@@ -362,6 +376,8 @@ export default function Profile() {
               // Fetch the business data
               const businessDocRef = doc(db, "businesses", userDoc.businessId);
               const businessSnapshot = await getDoc(businessDocRef);
+
+              if (!mounted) return;
 
               if (businessSnapshot.exists()) {
                 const businessData = businessSnapshot.data();
@@ -399,31 +415,60 @@ export default function Profile() {
           }
         } catch (error) {
           console.error("Error fetching user data:", error);
-          toast.error("Failed to load user profile");
+          setAuthError("Failed to load user profile");
+          if (mounted) {
+            toast.error("Failed to load user profile");
+          }
         } finally {
-          setLoadingUserData(false);
+          if (mounted) {
+            setLoadingUserData(false);
+          }
         }
       } else {
-        router.push("/login");
+        if (mounted) {
+          router.push("/login");
+        }
       }
     });
 
-    return () => unsubscribe();
-  }, [router]);
+    // Store unsubscribe function
+    unsubscribeRefs.current.push(unsubscribe);
 
+    return () => {
+      mounted = false;
+      cleanupListeners();
+    };
+  }, [router, cleanupListeners]);
+
+  // Fixed: Followers/Following listener with proper cleanup
   useEffect(() => {
     if (!userId) return;
 
     const followersRef = collection(db, "users", userId, "followers");
     const followingRef = collection(db, "users", userId, "following");
 
-    const unsubscribeFollowers = onSnapshot(followersRef, (snapshot) => {
-      setFollowersCount(snapshot.size);
-    });
+    const unsubscribeFollowers = onSnapshot(
+      followersRef,
+      (snapshot) => {
+        setFollowersCount(snapshot.size);
+      },
+      (error) => {
+        console.error("Error fetching followers:", error);
+      }
+    );
 
-    const unsubscribeFollowing = onSnapshot(followingRef, (snapshot) => {
-      setFollowingCount(snapshot.size);
-    });
+    const unsubscribeFollowing = onSnapshot(
+      followingRef,
+      (snapshot) => {
+        setFollowingCount(snapshot.size);
+      },
+      (error) => {
+        console.error("Error fetching following:", error);
+      }
+    );
+
+    // Store unsubscribe functions
+    unsubscribeRefs.current.push(unsubscribeFollowers, unsubscribeFollowing);
 
     return () => {
       unsubscribeFollowers();
@@ -431,7 +476,7 @@ export default function Profile() {
     };
   }, [userId]);
 
-  // User photos listener
+  // Fixed: User photos listener with proper error handling
   useEffect(() => {
     if (!userId) {
       setLoadingPhotos(false);
@@ -460,40 +505,59 @@ export default function Profile() {
       (error) => {
         console.error("Error fetching user photos:", error);
         setLoadingPhotos(false);
+        setUserPhotos([]); // Fixed: Set empty array on error
       }
     );
+
+    unsubscribeRefs.current.push(unsubscribe);
 
     return () => unsubscribe();
   }, [userId, userData?.businessId]);
 
-  // Liked posts listener
+  // Fixed: Liked posts listener with better error handling
   useEffect(() => {
     if (!user?.uid) return;
 
     const unsubscribe = onSnapshot(
       collection(db, "users", user.uid, "postlikes"),
       async (querySnapshot) => {
-        const postIds = querySnapshot.docs.map((doc) => doc.id);
-        const postDocs = await Promise.all(
-          postIds.map((id) => getDoc(doc(db, "posts", id)))
-        );
-        const tempLikedPosts = postDocs
-          .filter((doc) => doc.exists())
-          .map((doc) => ({ ...doc.data(), id: doc.id }));
-        setLikedPosts(tempLikedPosts);
+        try {
+          const postIds = querySnapshot.docs.map((doc) => doc.id);
+          if (postIds.length === 0) {
+            setLikedPosts([]);
+            return;
+          }
+          
+          const postDocs = await Promise.all(
+            postIds.map((id) => getDoc(doc(db, "posts", id)).catch(() => null))
+          );
+          
+          const tempLikedPosts = postDocs
+            .filter((doc) => doc && doc.exists())
+            .map((doc) => ({ ...doc.data(), id: doc.id }));
+          setLikedPosts(tempLikedPosts);
+        } catch (error) {
+          console.error("Error fetching liked posts:", error);
+          setLikedPosts([]);
+        }
       },
       (error) => {
-        console.error("Error fetching liked posts:", error);
+        console.error("Error with liked posts listener:", error);
+        setLikedPosts([]);
       }
     );
+
+    unsubscribeRefs.current.push(unsubscribe);
 
     return () => unsubscribe();
   }, [user?.uid]);
 
-  // Saved posts listener
+  // Fixed: Saved posts effect with better error handling
   useEffect(() => {
     // Skip if not the current user
     if (!user || !isCurrentUser) {
+      setSavedPosts([]);
+      setLoadingSavedPosts(false);
       return;
     }
 
@@ -506,43 +570,54 @@ export default function Profile() {
 
         const postsData = [];
 
-        for (const doc of savedPostsSnap.docs) {
-          const postRef = doc.ref;
-          const postData = doc.data();
+        for (const docSnapshot of savedPostsSnap.docs) {
+          try {
+            const postData = docSnapshot.data();
 
-          // If postData has a reference to the original post
-          if (postData.postId) {
-            const postDoc = await getDoc(doc(db, "posts", postData.postId));
+            // If postData has a reference to the original post
+            if (postData.postId) {
+              const postDoc = await getDoc(doc(db, "posts", postData.postId));
 
-            if (postDoc.exists()) {
-              postsData.push({
-                id: postDoc.id,
-                ...postDoc.data(),
-                savedAt: postData.timestamp,
-                savedId: doc.id,
-              });
+              if (postDoc.exists()) {
+                postsData.push({
+                  id: postDoc.id,
+                  ...postDoc.data(),
+                  savedAt: postData.timestamp,
+                  savedId: docSnapshot.id,
+                });
+              }
             }
+          } catch (error) {
+            console.error("Error processing saved post:", error);
           }
         }
 
         // Sort by savedAt timestamp
-        postsData.sort((a, b) => b.savedAt - a.savedAt);
+        postsData.sort((a, b) => {
+          const aTime = a.savedAt?.toDate ? a.savedAt.toDate() : new Date(a.savedAt || 0);
+          const bTime = b.savedAt?.toDate ? b.savedAt.toDate() : new Date(b.savedAt || 0);
+          return bTime - aTime;
+        });
 
         setSavedPosts(postsData);
       } catch (error) {
         console.error("Error fetching saved posts:", error);
+        setSavedPosts([]);
+        toast.error("Failed to load saved posts");
       } finally {
         setLoadingSavedPosts(false);
       }
     };
 
     fetchSavedPosts();
-  }, [user, isCurrentUser]);
+  }, [user?.uid, isCurrentUser]); // Fixed: Remove user dependency to avoid infinite loop
 
-  // Orders listener
+  // Fixed: Orders effect with better error handling
   useEffect(() => {
     // Skip if not the current user
     if (!user?.uid || !isCurrentUser) {
+      setOrders([]);
+      setLoadingOrders(false);
       return;
     }
 
@@ -563,6 +638,7 @@ export default function Profile() {
         setOrders(ordersData);
       } catch (error) {
         console.error("Error fetching orders:", error);
+        setOrders([]);
         toast.error("Failed to load orders");
       } finally {
         setLoadingOrders(false);
@@ -572,9 +648,10 @@ export default function Profile() {
     fetchOrders();
   }, [user?.uid, isCurrentUser]);
 
-  // Load product ratings
+  // Fixed: Product ratings effect with better error handling
   useEffect(() => {
     if (!user?.uid || !isCurrentUser) {
+      setProductRatings({});
       return;
     }
 
@@ -587,25 +664,30 @@ export default function Profile() {
 
         ratingsSnap.docs.forEach((doc) => {
           const data = doc.data();
-          ratingsData[data.productId] = {
-            id: doc.id,
-            ...data,
-          };
+          if (data.productId) {
+            ratingsData[data.productId] = {
+              id: doc.id,
+              ...data,
+            };
+          }
         });
 
         setProductRatings(ratingsData);
       } catch (error) {
         console.error("Error fetching product ratings:", error);
+        setProductRatings({});
       }
     };
 
     fetchProductRatings();
   }, [user?.uid, isCurrentUser]);
 
-  // Check for franchises if user is a business
+  // Fixed: Franchises effect with better error handling
   useEffect(() => {
     if (!user?.uid || !isBusinessUser) {
       setHasFranchises(false);
+      setFranchises([]);
+      setLoadingFranchises(false);
       return;
     }
 
@@ -637,6 +719,7 @@ export default function Profile() {
         console.error("Error fetching franchises:", error);
         toast.error("Failed to load franchises");
         setHasFranchises(false);
+        setFranchises([]);
       } finally {
         setLoadingFranchises(false);
       }
@@ -645,32 +728,37 @@ export default function Profile() {
     fetchFranchises();
   }, [user?.uid, isBusinessUser]);
 
-  // Handle franchise switch
-  const handleSwitchFranchise = (franchiseId, shouldReload = true) => {
-    if (franchiseId === "headquarters") {
-      // Switch to main business profile
-      sessionStorage.removeItem("selectedFranchiseId");
-      setSelectedFranchiseId(null);
-      toast.success("Switched to Headquarters");
-    } else {
-      // Switch to franchise profile
-      sessionStorage.setItem("selectedFranchiseId", franchiseId);
-      setSelectedFranchiseId(franchiseId);
-      const franchise = franchises.find((f) => f.id === franchiseId);
-      toast.success(`Switched to ${franchise?.businessName || "Franchise"}`);
-    }
+  // Fixed: Handle franchise switch with better state management
+  const handleSwitchFranchise = useCallback((franchiseId, shouldReload = true) => {
+    try {
+      if (franchiseId === "headquarters") {
+        // Switch to main business profile
+        sessionStorage.removeItem("selectedFranchiseId");
+        setSelectedFranchiseId(null);
+        toast.success("Switched to Headquarters");
+      } else {
+        // Switch to franchise profile
+        sessionStorage.setItem("selectedFranchiseId", franchiseId);
+        setSelectedFranchiseId(franchiseId);
+        const franchise = franchises.find((f) => f.id === franchiseId);
+        toast.success(`Switched to ${franchise?.businessName || "Franchise"}`);
+      }
 
-    // Force reload to refresh data if specified
-    if (shouldReload) {
-      window.location.reload();
+      // Force reload to refresh data if specified
+      if (shouldReload) {
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error("Error switching franchise:", error);
+      toast.error("Failed to switch franchise");
     }
-  };
+  }, [franchises]);
 
-  // Dynamically exit franchise view and load current user data
-  const exitFranchiseView = async () => {
+  // Fixed: Dynamically exit franchise view with better error handling
+  const exitFranchiseView = useCallback(async () => {
     try {
       // Show loading state
-      toast.loading("Updating profile...");
+      const loadingToast = toast.loading("Updating profile...");
 
       // Remove franchise ID from session storage
       sessionStorage.removeItem("selectedFranchiseId");
@@ -686,26 +774,6 @@ export default function Profile() {
         setIsBusinessUser(!!userDoc.businessName);
       }
 
-      // Refetch posts
-      const postsRef = collection(db, "posts");
-      const q = query(
-        postsRef,
-        where("userId", "==", user.uid),
-        orderBy("timestamp", "desc"),
-        limit(10)
-      );
-
-      const querySnapshot = await getDocs(q);
-      const postsData = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-
-      // Update posts state (assuming posts state is accessible)
-      if (typeof posts !== "undefined" && typeof setPosts === "function") {
-        setPosts(postsData);
-      }
-
       // Fetch user photos
       const photosRef = collection(db, "users", user.uid, "photos");
       const photosQuery = query(photosRef, orderBy("addedOn", "desc"));
@@ -719,7 +787,7 @@ export default function Profile() {
       setUserPhotos(photosData);
 
       // Dismiss loading toast and show success
-      toast.dismiss();
+      toast.dismiss(loadingToast);
       toast.success("Exited franchise view");
     } catch (error) {
       console.error("Error updating profile:", error);
@@ -729,10 +797,26 @@ export default function Profile() {
       // Fallback to page reload if dynamic update fails
       window.location.reload();
     }
-  };
+  }, [user?.uid]);
 
-  // Memoized UI components
+  // Fixed: Memoized UI components with error handling
   const renderPosts = useMemo(() => {
+    if (error) {
+      return (
+        <div className="text-center py-12">
+          <FileTextIcon className="w-12 h-12 text-red-300 mx-auto mb-4" />
+          <p className="text-red-600 mb-2">Failed to load posts</p>
+          <Button 
+            variant="outline" 
+            onClick={() => window.location.reload()}
+            className="rounded-full px-6"
+          >
+            Try Again
+          </Button>
+        </div>
+      );
+    }
+
     if (loading && !posts.length) {
       return (
         <div className="flex justify-center py-8">
@@ -785,7 +869,7 @@ export default function Profile() {
         )}
       </div>
     );
-  }, [posts, loading, hasMore, handleLoadMore, userData]);
+  }, [posts, loading, hasMore, handleLoadMore, userData, error]);
 
   const renderEmptyState = useCallback((icon, message) => {
     const Icon = icon;
@@ -852,6 +936,9 @@ export default function Profile() {
                       src={post.mediaUrl}
                       alt="Post content"
                       className="object-cover w-full h-full"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
                     />
                   </div>
                 </div>
@@ -887,7 +974,7 @@ export default function Profile() {
     [prepareUnsave, router]
   );
 
-  // Handle printing functionality
+  // Fixed: Handle printing functionality with better error handling
   const handlePrint = useReactToPrint({
     content: () => billRef.current,
     documentTitle: `Invoice_${selectedOrder?.orderId || "order"}`,
@@ -903,26 +990,31 @@ export default function Profile() {
     },
     removeAfterPrint: false,
     print: async (printIframe) => {
-      const document = printIframe.contentDocument;
-      if (document) {
-        const html = document.getElementsByTagName("html")[0];
+      try {
+        const document = printIframe.contentDocument;
+        if (document) {
+          const html = document.getElementsByTagName("html")[0];
 
-        // Try to force PDF to be an option
-        document.body.style.width = "210mm";
-        document.body.style.height = "297mm"; // A4 dimensions
+          // Try to force PDF to be an option
+          document.body.style.width = "210mm";
+          document.body.style.height = "297mm"; // A4 dimensions
 
-        html.style.width = "210mm";
-        html.style.height = "297mm";
+          html.style.width = "210mm";
+          html.style.height = "297mm";
 
-        setTimeout(() => {
-          window.print();
-        }, 500);
+          setTimeout(() => {
+            window.print();
+          }, 500);
+        }
+      } catch (error) {
+        console.error("Error printing:", error);
+        toast.error("Failed to print invoice");
       }
     },
   });
 
-  // Function to download PDF directly
-  const handleDownloadPDF = async () => {
+  // Fixed: Function to download PDF directly with better error handling
+  const handleDownloadPDF = useCallback(async () => {
     if (!billRef.current) return;
 
     try {
@@ -955,17 +1047,24 @@ export default function Profile() {
       toast.dismiss();
       toast.error("Failed to generate PDF");
     }
-  };
+  }, [selectedOrder?.orderId]);
 
-  // Function to handle bill generation
-  const handleGenerateBill = (order) => {
+  // Fixed: Function to handle bill generation with validation
+  const handleGenerateBill = useCallback((order) => {
+    if (!order) {
+      toast.error("Invalid order data");
+      return;
+    }
     setSelectedOrder(order);
     setBillDialogOpen(true);
-  };
+  }, []);
 
-  // Handle rating submission
-  const handleSubmitRating = async () => {
-    if (!selectedProductForRating || !user?.uid || ratingValue === 0) return;
+  // Fixed: Handle rating submission with better error handling
+  const handleSubmitRating = useCallback(async () => {
+    if (!selectedProductForRating || !user?.uid || ratingValue === 0) {
+      toast.error("Please provide a rating");
+      return;
+    }
 
     setIsSubmittingRating(true);
 
@@ -1104,11 +1203,16 @@ export default function Profile() {
     } finally {
       setIsSubmittingRating(false);
     }
-  };
+  }, [selectedProductForRating, user?.uid, ratingValue, ratingFeedback, productRatings]);
 
-  // Handle opening the rating dialog
+  // Fixed: Handle opening the rating dialog with validation
   const handleOpenRatingDialog = useCallback(
     (product, order) => {
+      if (!product || !order) {
+        toast.error("Invalid product or order data");
+        return;
+      }
+
       const productWithOrderInfo = {
         ...product,
         orderId: order.id,
@@ -1131,8 +1235,8 @@ export default function Profile() {
     [productRatings]
   );
 
-  // Render star rating component for selection
-  const renderStarRating = (currentRating, isSelectable = false) => {
+  // Fixed: Render star rating component for selection with proper key handling
+  const renderStarRating = useCallback((currentRating, isSelectable = false) => {
     return (
       <div className="flex items-center">
         {[1, 2, 3, 4, 5].map((star) => (
@@ -1154,7 +1258,22 @@ export default function Profile() {
         ))}
       </div>
     );
-  };
+  }, []);
+
+  // Fixed: Add error boundary for auth errors
+  if (authError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-600 mb-4">Error Loading Profile</h1>
+          <p className="text-gray-600 mb-4">{authError}</p>
+          <Button onClick={() => window.location.reload()} className="rounded-full px-6">
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">
@@ -1590,70 +1709,85 @@ export default function Profile() {
                     <Card className="border-0 shadow-sm overflow-hidden bg-white">
                       <Tabs defaultValue="posts" className="w-full">
                         <div className="border-b overflow-x-auto scrollbar-hide">
-                          <TabsList className="justify-start h-auto p-0 bg-transparent overflow-x-auto scrollbar-hide whitespace-nowrap w-max min-w-full">
+                          <TabsList className="justify-between h-auto p-0 bg-transparent w-full flex">
                             <TabsTrigger
                               value="posts"
                               className={cn(
-                                "rounded-none border-b-2 border-transparent",
+                                "rounded-none border-b-2 border-transparent flex-1",
                                 "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
+                                "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
                               )}
+                              title="View Posts"
                             >
-                              <FileTextIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                              Posts{" "}
-                              {userData?.role === "member" && "from Business"}
+                              <FileTextIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="hidden data-[state=active]:block">
+                                Posts{" "}
+                                {userData?.role === "member" && "from Business"}
+                              </span>
                             </TabsTrigger>
 
                             {/* Franchises Tab - Only show for business owners with franchises */}
                             {hasFranchises && !selectedFranchiseId && (
                               <TabsTrigger
                                 value="franchises"
+                                title="Your Franchises"
                                 className={cn(
-                                  "rounded-none border-b-2 border-transparent",
+                                  "rounded-none border-b-2 border-transparent flex-1",
                                   "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                  "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
+                                  "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
                                 )}
                               >
-                                <Building2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                                Franchises
+                                <Building2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                                <span className="hidden data-[state=active]:block">
+                                  Franchises
+                                </span>
                               </TabsTrigger>
                             )}
 
                             <TabsTrigger
                               value="likes"
+                              title="Liked Posts"
                               className={cn(
-                                "rounded-none border-b-2 border-transparent",
+                                "rounded-none border-b-2 border-transparent flex-1",
                                 "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
+                                "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
                               )}
                             >
-                              <HeartIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                              Likes
+                              <HeartIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="hidden data-[state=active]:block">
+                                Likes
+                              </span>
                             </TabsTrigger>
                             <TabsTrigger
                               value="photos"
+                              title="Photos"
                               className={cn(
-                                "rounded-none border-b-2 border-transparent",
+                                "rounded-none border-b-2 border-transparent flex-1",
                                 "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
+                                "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
                               )}
                             >
-                              <Images className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                              Photos
+                              <Images className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="hidden data-[state=active]:block">
+                                Photos
+                              </span>
                             </TabsTrigger>
                             {userData?.business_categories?.includes(
                               "product"
                             ) && (
                               <TabsTrigger
+                              title="Products"
                                 value="products"
                                 className={cn(
-                                  "rounded-none border-b-2 border-transparent",
+                                  "rounded-none border-b-2 border-transparent flex-1",
                                   "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                  "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
+                                  "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
                                 )}
                               >
-                                <SquareChartGantt className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                                Products
+                                <SquareChartGantt className="w-3 h-3 sm:w-4 sm:h-4" />
+                                <span className="hidden data-[state=active]:block">
+                                  Products
+                                </span>
                               </TabsTrigger>
                             )}
                             {userData?.business_categories?.includes(
@@ -1661,14 +1795,17 @@ export default function Profile() {
                             ) && (
                               <TabsTrigger
                                 value="services"
+                                title="Services"
                                 className={cn(
-                                  "rounded-none border-b-2 border-transparent",
+                                  "rounded-none border-b-2 border-transparent flex-1",
                                   "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                  "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
+                                  "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
                                 )}
                               >
-                                <Settings className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                                Services
+                                <Settings className="w-3 h-3 sm:w-4 sm:h-4" />
+                                <span className="hidden data-[state=active]:block">
+                                  Services
+                                </span>
                               </TabsTrigger>
                             )}
                             {userData?.business_categories?.includes(
@@ -1676,37 +1813,46 @@ export default function Profile() {
                             ) && (
                               <TabsTrigger
                                 value="properties"
+                                title="Properties"
                                 className={cn(
-                                  "rounded-none border-b-2 border-transparent",
+                                  "rounded-none border-b-2 border-transparent flex-1",
                                   "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                  "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
+                                  "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
                                 )}
                               >
-                                <Home className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                                Properties
+                                <Home className="w-3 h-3 sm:w-4 sm:h-4" />
+                                <span className="hidden data-[state=active]:block">
+                                  Properties
+                                </span>
                               </TabsTrigger>
                             )}
                             <TabsTrigger
                               value="saved"
+                              title="Saved Posts"
                               className={cn(
-                                "rounded-none border-b-2 border-transparent",
+                                "rounded-none border-b-2 border-transparent flex-1",
                                 "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
+                                "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
                               )}
                             >
-                              <Bookmark className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                              Saved
+                              <Bookmark className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="hidden data-[state=active]:block">
+                                Saved Posts
+                              </span>
                             </TabsTrigger>
                             <TabsTrigger
                               value="orders"
+                              title="Your Orders"
                               className={cn(
-                                "rounded-none border-b-2 border-transparent",
+                                "rounded-none border-b-2 border-transparent flex-1",
                                 "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
+                                "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
                               )}
                             >
-                              <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                              Orders
+                              <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="hidden data-[state=active]:block">
+                                Orders
+                              </span>
                             </TabsTrigger>
                           </TabsList>
                         </div>
@@ -2275,39 +2421,48 @@ export default function Profile() {
                     <Card className="border-0 shadow-sm overflow-hidden bg-white">
                       <Tabs defaultValue="saved" className="w-full">
                         <div className="border-b overflow-x-auto scrollbar-hide">
-                          <TabsList className="justify-start h-auto p-0 bg-transparent overflow-x-auto scrollbar-hide whitespace-nowrap w-max min-w-full">
+                          <TabsList className="justify-between h-auto p-0 bg-transparent w-full flex">
                             <TabsTrigger
+                            title="Saved Posts"
                               value="saved"
                               className={cn(
-                                "rounded-none border-b-2 border-transparent",
+                                "rounded-none border-b-2 border-transparent flex-1",
                                 "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
+                                "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
                               )}
                             >
-                              <Bookmark className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                              Saved Posts
+                              <Bookmark className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="hidden data-[state=active]:block">
+                                Saved Posts
+                              </span>
                             </TabsTrigger>
                             <TabsTrigger
+                            title="Liked Posts"
                               value="likes"
                               className={cn(
-                                "rounded-none border-b-2 border-transparent",
+                                "rounded-none border-b-2 border-transparent flex-1",
                                 "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
+                                "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
                               )}
                             >
-                              <HeartIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                              Likes
+                              <HeartIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="hidden data-[state=active]:block">
+                                Likes
+                              </span>
                             </TabsTrigger>
                             <TabsTrigger
+                            title="Your Orders"
                               value="orders"
                               className={cn(
-                                "rounded-none border-b-2 border-transparent",
+                                "rounded-none border-b-2 border-transparent flex-1",
                                 "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
+                                "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
                               )}
                             >
-                              <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                              Orders
+                              <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="hidden data-[state=active]:block">
+                                Orders
+                              </span>
                             </TabsTrigger>
                           </TabsList>
                         </div>
