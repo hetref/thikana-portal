@@ -20,6 +20,10 @@ import {
   Mail,
   Info,
   Settings,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Home,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useGetUserPosts } from "@/hooks/useGetPosts";
@@ -43,6 +47,7 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogHeader,
+  DialogClose,
 } from "@/components/ui/dialog";
 import Link from "next/link";
 import ShowProductsTabContent from "@/components/profile/ShowProductsTabContent";
@@ -56,6 +61,7 @@ import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import ShowServicesTabContent from "@/components/profile/ShowServicesTabContent";
 import { sendNotificationToUser } from "@/lib/notifications";
+import ShowBusinessProperties from "@/components/profile/ShowBusinessProperties";
 
 // Add a style element to hide scrollbars
 const scrollbarHideStyles = `
@@ -87,6 +93,15 @@ export default function UserProfile() {
   const paramUserId = searchParams.get("user");
   const [userId, setUserId] = useState(paramUserId);
   const userData = useGetUser(userId);
+
+  // Log user data for debugging
+  useEffect(() => {
+    if (userData) {
+      console.log("User data loaded:", userData);
+      console.log("Business categories:", userData.business_categories);
+    }
+  }, [userData]);
+
   const {
     posts,
     loading: postsLoading,
@@ -346,15 +361,15 @@ export default function UserProfile() {
       {/* Profile Card */}
       <Card className="overflow-hidden bg-white border-0 shadow-sm">
         {/* Cover Image */}
-        <div className="relative h-full w-full">
+        <div className="relative h-[180px] w-full">
           <Dialog>
             <DialogTrigger className="z-30 w-full h-full">
               <Image
                 src={userData?.coverPic || "/coverimg.png"}
-                width={1000}
-                height={1000}
+                width={1200}
+                height={180}
                 alt="Cover Image"
-                className=" z-30 object-cover transition-opacity hover:opacity-95 border border-black/40 rounded-t-xl"
+                className="z-30 object-cover w-full h-full transition-opacity hover:opacity-95 border border-black/40 rounded-t-xl"
                 priority
               />
             </DialogTrigger>
@@ -421,18 +436,18 @@ export default function UserProfile() {
                   <span className="text-sm">Joined {formattedDate}</span>
                 </div>
               )}
-              {userData?.role === "business" && userData?.phone && (
+              {/* {userData?.role === "business" && userData?.phone && (
                 <div className="flex items-center text-gray-600 gap-1">
                   <Phone className="w-4 h-4" />
                   <span className="text-sm">{userData.phone}</span>
                 </div>
-              )}
-              {userData?.role === "business" && userData?.email && (
+              )} */}
+              {/* {userData?.role === "business" && userData?.email && (
                 <div className="flex items-center text-gray-600 gap-1">
                   <Mail className="w-4 h-4" />
                   <span className="text-sm">{userData.email}</span>
                 </div>
-              )}
+              )} */}
               <p className="text-gray-700 mt-2">
                 {userData?.bio || "Amazing Bio..."}
               </p>
@@ -588,17 +603,23 @@ export default function UserProfile() {
                 <Images className="w-4 h-4 mr-2" />
                 Photos
               </TabsTrigger>
-              <TabsTrigger
-                value="products"
-                className={cn(
-                  "rounded-none border-b-2 border-transparent",
-                  "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                  "px-6 py-3 font-medium text-sm transition-all duration-200"
-                )}
-              >
-                <SquareChartGantt className="w-4 h-4 mr-2" />
-                Products
-              </TabsTrigger>
+
+              {/* Conditionally show Product tab based on business categories */}
+              {userData?.business_categories?.includes("product") && (
+                <TabsTrigger
+                  value="products"
+                  className={cn(
+                    "rounded-none border-b-2 border-transparent",
+                    "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
+                    "px-6 py-3 font-medium text-sm transition-all duration-200"
+                  )}
+                >
+                  <SquareChartGantt className="w-4 h-4 mr-2" />
+                  Products
+                </TabsTrigger>
+              )}
+
+              {/* Conditionally show Service tab based on business categories */}
               {userData?.business_categories?.includes("service") && (
                 <TabsTrigger
                   value="services"
@@ -610,6 +631,19 @@ export default function UserProfile() {
                 >
                   <Settings className="w-4 h-4 mr-2" />
                   Services
+                </TabsTrigger>
+              )}
+              {userData?.business_categories?.includes("real-estate") && (
+                <TabsTrigger
+                  value="properties"
+                  className={cn(
+                    "rounded-none border-b-2 border-transparent",
+                    "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
+                    "px-6 py-3 font-medium text-sm transition-all duration-200"
+                  )}
+                >
+                  <Home className="w-4 h-4 mr-2" />
+                  Properties
                 </TabsTrigger>
               )}
             </TabsList>
@@ -631,57 +665,158 @@ export default function UserProfile() {
                 <Loader2Icon className="w-8 h-8 animate-spin text-gray-400" />
               </div>
             ) : userPhotos.length > 0 ? (
-              <div className="grid grid-cols-2 gap-4">
-                {userPhotos?.map((photo) => (
-                  <Dialog key={photo.id}>
-                    <DialogTrigger asChild>
-                      <div className="rounded-lg overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer group">
-                        <div className="relative">
-                          <Image
-                            src={photo.photoUrl}
-                            alt={photo.caption || "Business photo"}
-                            width={500}
-                            height={350}
-                            className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-300"
-                          />
-                        </div>
-                        {photo.caption && (
-                          <div className="p-2 bg-white">
-                            <p className="text-sm font-medium truncate">
-                              {photo.caption}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {photo.timestamp
-                                ? new Date(photo.timestamp).toLocaleDateString()
-                                : ""}
-                            </p>
+              <div className="w-full space-y-4">
+                {/* Photos Grid Header */}
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-medium">
+                    Photos ({userPhotos.length})
+                  </h3>
+                </div>
+
+                {/* Enhanced Photo Grid */}
+                <div className="grid grid-cols-2 gap-4">
+                  {userPhotos.map((photo, index) => (
+                    <Dialog key={photo.id}>
+                      <DialogTrigger asChild>
+                        <div
+                          className="relative group overflow-hidden rounded-xl shadow-md hover:shadow-lg transition-all duration-300 bg-black/5 border border-gray-200 hover:border-gray-300 cursor-pointer"
+                          style={{ height: "240px" }}
+                        >
+                          <div className="relative w-full h-full">
+                            <Image
+                              src={photo.photoUrl}
+                              alt={photo.caption || "Business photo"}
+                              fill
+                              sizes="(max-width: 768px) 50vw, 50vw"
+                              className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
+                              priority={index < 4} // Prioritize loading first 4 images
+                            />
                           </div>
-                        )}
-                      </div>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-xl">
-                      <DialogHeader>
-                        <DialogTitle>
-                          {photo.caption || "Business Photo"}
-                        </DialogTitle>
-                        <DialogDescription>
-                          {photo.timestamp
-                            ? new Date(photo.timestamp).toLocaleDateString()
-                            : ""}
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="mt-2 rounded-md overflow-hidden">
-                        <Image
-                          src={photo.photoUrl}
-                          width={800}
-                          height={800}
-                          alt={photo.caption || "Business photo"}
-                          className="w-full object-contain max-h-[70vh]"
-                        />
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                ))}
+
+                          {/* Overlay with date */}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3">
+                            {photo.caption && (
+                              <div className="bg-black/50 backdrop-blur-sm rounded-lg px-3 py-1.5 w-fit">
+                                <p className="text-white text-xs font-medium truncate">
+                                  {photo.caption}
+                                </p>
+                                <p className="text-white/70 text-xs">
+                                  {photo.timestamp
+                                    ? new Date(
+                                        photo.timestamp
+                                      ).toLocaleDateString("en-US", {
+                                        day: "numeric",
+                                        month: "short",
+                                        year: "numeric",
+                                      })
+                                    : ""}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </DialogTrigger>
+
+                      {/* Enhanced Photo View Dialog */}
+                      <DialogContent className="sm:max-w-6xl max-h-[95vh] p-0 overflow-hidden bg-black border-border/20 shadow-2xl">
+                        <div className="relative w-full h-full flex flex-col">
+                          {/* Top controls bar */}
+                          <div className="absolute top-0 left-0 right-0 z-20 p-4 bg-gradient-to-b from-black/80 to-transparent">
+                            <div className="flex items-center justify-between">
+                              <div className="text-white/90">
+                                <p className="text-sm font-medium">
+                                  {index + 1} / {userPhotos.length}
+                                </p>
+                                <p className="text-xs text-white/70">
+                                  {photo.timestamp
+                                    ? new Date(
+                                        photo.timestamp
+                                      ).toLocaleDateString("en-US", {
+                                        day: "numeric",
+                                        month: "long",
+                                        year: "numeric",
+                                      })
+                                    : ""}
+                                </p>
+                              </div>
+                              <DialogClose asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="rounded-full bg-white/10 text-white hover:bg-white/20 h-9 w-9"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </DialogClose>
+                            </div>
+                          </div>
+
+                          {/* Navigation buttons when multiple photos */}
+                          {userPhotos.length > 1 && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const prevIndex =
+                                    (index - 1 + userPhotos.length) %
+                                    userPhotos.length;
+                                  document
+                                    .querySelectorAll(
+                                      '[role="dialog"] [role="button"]'
+                                    )
+                                    [prevIndex].click();
+                                }}
+                                className="absolute left-4 top-1/2 -translate-y-1/2 z-20 rounded-full bg-black/30 text-white hover:bg-black/50 h-12 w-12"
+                              >
+                                <ChevronLeft className="h-8 w-8" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const nextIndex =
+                                    (index + 1) % userPhotos.length;
+                                  document
+                                    .querySelectorAll(
+                                      '[role="dialog"] [role="button"]'
+                                    )
+                                    [nextIndex].click();
+                                }}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 z-20 rounded-full bg-black/30 text-white hover:bg-black/50 h-12 w-12"
+                              >
+                                <ChevronRight className="h-8 w-8" />
+                              </Button>
+                            </>
+                          )}
+
+                          {/* Image Container */}
+                          <div className="flex-1 flex items-center justify-center pt-16 pb-4 overflow-auto">
+                            <div className="relative flex items-center justify-center">
+                              <img
+                                src={photo.photoUrl}
+                                alt={photo.caption || "Business photo"}
+                                className="max-w-full max-h-[85vh] object-contain"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Large Close Button at the bottom */}
+                          <div className="absolute bottom-6 left-0 right-0 flex justify-center z-20">
+                            <DialogClose asChild>
+                              <Button className="bg-white/10 hover:bg-white/20 backdrop-blur-md text-white px-6 py-2 rounded-full shadow-lg transition-all duration-300">
+                                <X className="h-4 w-4 mr-2" />
+                                Close
+                              </Button>
+                            </DialogClose>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  ))}
+                </div>
               </div>
             ) : (
               <div className="text-center py-12">
@@ -691,6 +826,7 @@ export default function UserProfile() {
             )}
           </TabsContent>
 
+          {/* Products tab - only shown for businesses with product category */}
           {userData?.business_categories?.includes("product") && (
             <TabsContent
               value="products"
@@ -707,6 +843,7 @@ export default function UserProfile() {
             </TabsContent>
           )}
 
+          {/* Services tab - only shown for businesses with service category */}
           {userData?.business_categories?.includes("service") && (
             <TabsContent
               value="services"
@@ -720,6 +857,15 @@ export default function UserProfile() {
                   currentUserView={false}
                 />
               )}
+            </TabsContent>
+          )}
+
+          {userData?.business_categories?.includes("real-estate") && (
+            <TabsContent
+              value="properties"
+              className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+            >
+              {userData && <ShowBusinessProperties businessId={userId} />}
             </TabsContent>
           )}
         </Tabs>

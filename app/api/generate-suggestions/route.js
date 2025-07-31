@@ -3,29 +3,30 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { suggestionPrompt } from "@/data/thikana";
 
 const google = createGoogleGenerativeAI({
-  apiKey: 'AIzaSyDOmYsvQ8Vci4swqN5kFvJh0bJPxl8OXAU',
+  apiKey: "AIzaSyDOmYsvQ8Vci4swqN5kFvJh0bJPxl8OXAU",
 });
 
 export const runtime = "edge";
 
 const generateId = () => Math.random().toString(36).slice(2, 15);
 
-const buildGoogleGenAIPrompt = (question) => [
-  {
-    id: generateId(),
-    role: "user",
-    content: suggestionPrompt.content
-  },
-  {
-    id: question.id || generateId(),
-    role: question.role,
-    content: question.content,
-  },
-].map(msg => ({
-  id: msg.id,
-  role: msg.role,
-  content: msg.content,
-}));
+const buildGoogleGenAIPrompt = (question) =>
+  [
+    {
+      id: generateId(),
+      role: "user",
+      content: suggestionPrompt.content,
+    },
+    {
+      id: question.id || generateId(),
+      role: question.role,
+      content: question.content,
+    },
+  ].map((msg) => ({
+    id: msg.id,
+    role: msg.role,
+    content: msg.content,
+  }));
 
 export async function POST(request) {
   const { question } = await request.json();
@@ -37,7 +38,7 @@ export async function POST(request) {
   });
 
   const response = stream?.toDataStreamResponse();
-  const result = Array.isArray(response) ? response.join(' ') : response;
+  const result = Array.isArray(response) ? response.join(" ") : response;
 
   return new Response(result);
 }

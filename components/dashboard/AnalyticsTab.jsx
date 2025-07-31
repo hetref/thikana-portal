@@ -986,72 +986,62 @@ export default function AnalyticsTab() {
         <TabsContent value="recommendations" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Cost Optimization Recommendations</CardTitle>
+              <CardTitle>Expense Optimization Recommendations</CardTitle>
               <CardDescription>
-                AI-generated recommendations to optimize your business expenses
+                AI-powered suggestions to optimize your business expenses
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
                 {!showDemoData &&
-                analyticsData &&
-                analyticsData.recommendations ? (
+                analyticsData?.recommendations?.recommendations ? (
                   <>
-                    {analyticsData.recommendations.budget_suggestions &&
-                    analyticsData.recommendations.budget_suggestions.length >
-                      0 ? (
-                      analyticsData.recommendations.budget_suggestions.map(
-                        (suggestion, index) => (
-                          <div
-                            key={index}
-                            className="border rounded-lg p-4 bg-green-50"
-                          >
-                            <div className="flex items-start gap-3">
-                              <Activity className="h-5 w-5 text-green-600 mt-0.5" />
-                              <div>
-                                <h4 className="font-medium text-green-800">
-                                  {suggestion.category} Budget Optimization
-                                </h4>
-                                <p className="text-sm text-green-700 mt-1">
-                                  Current monthly: ₹
-                                  {suggestion.current_monthly.toFixed(2)}.
-                                  Suggested monthly: ₹
-                                  {suggestion.suggested_monthly.toFixed(2)}.
-                                  Potential savings: ₹
-                                  {suggestion.potential_savings.toFixed(2)}.
-                                  Priority: {suggestion.priority}.
-                                </p>
+                    {/* Budget Suggestions */}
+                    {analyticsData.recommendations.recommendations
+                      .budget_suggestions?.length > 0 && (
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-semibold">
+                          Budget Optimization
+                        </h3>
+                        {analyticsData.recommendations.recommendations.budget_suggestions.map(
+                          (suggestion, index) => (
+                            <div
+                              key={index}
+                              className="border rounded-lg p-4 bg-green-50"
+                            >
+                              <div className="flex items-start gap-3">
+                                <Activity className="h-5 w-5 text-green-600 mt-0.5" />
+                                <div>
+                                  <h4 className="font-medium text-green-800">
+                                    {suggestion.category} Budget Optimization
+                                  </h4>
+                                  <p className="text-sm text-green-700 mt-1">
+                                    Current monthly: ₹
+                                    {suggestion.current_monthly.toFixed(2)}.
+                                    Suggested monthly: ₹
+                                    {suggestion.suggested_monthly.toFixed(2)}.
+                                    Potential savings: ₹
+                                    {suggestion.potential_savings.toFixed(2)}.
+                                    Priority: {suggestion.priority}.
+                                  </p>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        )
-                      )
-                    ) : (
-                      <div className="border rounded-lg p-4">
-                        <div className="flex items-start gap-3">
-                          <Lightbulb className="h-5 w-5 text-blue-500 mt-0.5" />
-                          <div>
-                            <h4 className="font-medium">Not Enough Data</h4>
-                            <p className="text-sm text-gray-500 mt-1">
-                              We need more transaction data to provide
-                              personalized cost optimization recommendations.
-                              Continue recording your transactions for better
-                              insights.
-                            </p>
-                          </div>
-                        </div>
+                          )
+                        )}
                       </div>
                     )}
 
-                    {analyticsData.recommendations.timing_optimization &&
-                      analyticsData.recommendations.timing_optimization.length >
-                        0 && (
+                    {/* Timing Optimization */}
+                    {analyticsData.recommendations.recommendations
+                      .timing_optimization?.length > 0 && (
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-semibold">
+                          Timing Optimization
+                        </h3>
                         <div className="border rounded-lg p-4 bg-blue-50">
-                          <h4 className="font-medium text-blue-800 mb-3">
-                            Timing Optimization
-                          </h4>
                           <div className="space-y-3">
-                            {analyticsData.recommendations.timing_optimization.map(
+                            {analyticsData.recommendations.recommendations.timing_optimization.map(
                               (tip, index) => (
                                 <div
                                   key={index}
@@ -1066,9 +1056,7 @@ export default function AnalyticsTab() {
                                       Best day is {tip.best_day} around{" "}
                                       {tip.best_hour}.
                                       {tip.average_savings_potential > 0 &&
-                                        ` Potential savings: ₹${tip.average_savings_potential.toFixed(
-                                          2
-                                        )}.`}
+                                        ` Potential savings: ₹${tip.average_savings_potential.toFixed(2)}.`}
                                     </p>
                                   </div>
                                 </div>
@@ -1076,41 +1064,159 @@ export default function AnalyticsTab() {
                             )}
                           </div>
                         </div>
-                      )}
+                      </div>
+                    )}
 
-                    {analyticsData.recommendations.category_specific_tips &&
-                      analyticsData.recommendations.category_specific_tips
-                        .length > 0 && (
+                    {/* Category Analysis */}
+                    {analyticsData.recommendations.category_analysis && (
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-semibold">
+                          Category Analysis
+                        </h3>
+                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                          {Object.entries(
+                            analyticsData.recommendations.category_analysis
+                          ).map(([category, data]) => (
+                            <div
+                              key={category}
+                              className="border rounded-lg p-4 bg-purple-50"
+                            >
+                              <div className="flex items-start gap-3">
+                                <BarChart3 className="h-5 w-5 text-purple-600 mt-0.5" />
+                                <div>
+                                  <h4 className="font-medium text-purple-800">
+                                    {category}
+                                  </h4>
+                                  <p className="text-sm text-purple-700 mt-1">
+                                    Total spent: ₹{data.total_spent.toFixed(2)}
+                                    <br />
+                                    Average transaction: ₹
+                                    {data.average_transaction.toFixed(2)}
+                                    <br />
+                                    {data.transaction_count} transactions
+                                    <br />
+                                    {data.percentage_of_total.toFixed(1)}% of
+                                    total spending
+                                    <br />
+                                    Status: {data.status}
+                                    <br />
+                                    Trend: {data.trend}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* High Value Transactions */}
+                    {analyticsData.recommendations.spending_patterns
+                      ?.high_value_transactions?.length > 0 && (
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-semibold">
+                          High Value Transactions
+                        </h3>
                         <div className="border rounded-lg p-4 bg-amber-50">
-                          <h4 className="font-medium text-amber-800 mb-3">
-                            Category Specific Tips
-                          </h4>
                           <div className="space-y-3">
-                            {analyticsData.recommendations.category_specific_tips.map(
-                              (tipGroup, index) => (
-                                <div key={index}>
-                                  <h5 className="font-medium text-amber-700">
-                                    {tipGroup.category}
-                                  </h5>
-                                  <ul className="list-disc pl-5 mt-1 space-y-1">
-                                    {tipGroup.tips.map((tip, tipIndex) => (
-                                      <li
-                                        key={tipIndex}
-                                        className="text-sm text-amber-700"
-                                      >
-                                        {tip}
-                                      </li>
-                                    ))}
-                                  </ul>
+                            {analyticsData.recommendations.spending_patterns.high_value_transactions.map(
+                              (transaction, index) => (
+                                <div
+                                  key={index}
+                                  className="flex items-start gap-2"
+                                >
+                                  <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5" />
+                                  <div>
+                                    <p className="text-sm text-amber-700">
+                                      <span className="font-medium">
+                                        {transaction.category}:
+                                      </span>{" "}
+                                      ₹{transaction.amount.toFixed(2)} on{" "}
+                                      {transaction.date}
+                                      <br />
+                                      {transaction.percentage_above_average.toFixed(
+                                        1
+                                      )}
+                                      % above average
+                                    </p>
+                                  </div>
                                 </div>
                               )
                             )}
                           </div>
                         </div>
-                      )}
+                      </div>
+                    )}
+
+                    {/* Saving Opportunities */}
+                    {analyticsData.spending_insights?.saving_opportunities
+                      ?.length > 0 && (
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-semibold">
+                          Saving Opportunities
+                        </h3>
+                        {analyticsData.spending_insights.saving_opportunities.map(
+                          (opportunity, index) => (
+                            <div
+                              key={index}
+                              className="border rounded-lg p-4 bg-amber-50"
+                            >
+                              <div className="flex items-start gap-3">
+                                <Lightbulb className="h-5 w-5 text-amber-600 mt-0.5" />
+                                <div>
+                                  <h4 className="font-medium text-amber-800">
+                                    {opportunity.category} Savings
+                                  </h4>
+                                  <p className="text-sm text-amber-700 mt-1">
+                                    {opportunity.description}
+                                    <br />
+                                    Potential savings: ₹
+                                    {opportunity.potential_savings.toFixed(2)}
+                                    <br />
+                                    Current variance: ₹
+                                    {opportunity.current_variance.toFixed(2)}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        )}
+                      </div>
+                    )}
+
+                    {/* Category Specific Tips */}
+                    {analyticsData.future_predictions?.saving_tips && (
+                      <div className="space-y-4">
+                        <h3 className="text-lg font-semibold">
+                          Category-Specific Tips
+                        </h3>
+                        <div className="border rounded-lg p-4 bg-purple-50">
+                          <div className="space-y-3">
+                            {Object.entries(
+                              analyticsData.future_predictions.saving_tips
+                            ).map(([category, tip], index) => (
+                              <div
+                                key={index}
+                                className="flex items-start gap-2"
+                              >
+                                <Lightbulb className="h-4 w-4 text-purple-600 mt-0.5" />
+                                <div>
+                                  <p className="text-sm text-purple-700">
+                                    <span className="font-medium">
+                                      {category}:
+                                    </span>{" "}
+                                    {tip}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </>
                 ) : (
-                  <>
+                  <div className="space-y-4">
                     <div className="border rounded-lg p-4 bg-green-50">
                       <div className="flex items-start gap-3">
                         <Activity className="h-5 w-5 text-green-600 mt-0.5" />
@@ -1161,7 +1267,7 @@ export default function AnalyticsTab() {
                         </div>
                       </div>
                     </div>
-                  </>
+                  </div>
                 )}
               </div>
             </CardContent>

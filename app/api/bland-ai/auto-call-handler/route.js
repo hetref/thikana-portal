@@ -100,6 +100,7 @@ export async function POST(req) {
     const callerNumber =
       requestData.callerNumber || businessData.twilioNumber || "+12344145236";
 
+    // Update payload with enhanced voice settings and slots for booking information
     const payload = {
       phone_number: requestData.userPhone,
       task: processedScript, // Bland AI uses 'task' for the script
@@ -109,10 +110,33 @@ export async function POST(req) {
       reduce_latency: true,
       caller_id: callerNumber, // Always include the caller_id to ensure proper number is used
       transfer_phone_number: callerNumber, // Add this for additional caller ID reinforcement
+
+      // Enhanced voice settings for better quality
       voice_settings: {
         stability: 0.7, // Stability helps ensure consistent voice quality
-        similarity_boost: 0.7, // Enhances voice consistency
+        similarity_boost: 0.75, // Enhances voice consistency
+        style: 0.3, // Add some style variation for more natural speech
+        use_voice_enhancement: true, // Enable voice enhancement
       },
+
+      // Add settings for better call quality and noise cancellation
+      asr_settings: {
+        endpointing: 500, // Shorter endpointing for more responsive conversation
+        denoise: true, // Enable noise cancellation
+        diarize: true, // Better speaker separation
+      },
+
+      // Define slots to extract structured booking data
+      slots: [
+        { name: "customer_name", entity_type: "any", required: true },
+        { name: "phone_number", entity_type: "phone_number", required: true },
+        { name: "email", entity_type: "email", required: false },
+        { name: "booking_date", entity_type: "date", required: true },
+        { name: "booking_time", entity_type: "time", required: true },
+        { name: "number_of_people", entity_type: "number", required: true },
+        { name: "special_requests", entity_type: "any", required: false },
+        { name: "address", entity_type: "any", required: false },
+      ],
     };
 
     // Log all request details for debugging

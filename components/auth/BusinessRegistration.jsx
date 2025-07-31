@@ -237,13 +237,15 @@ const BusinessRegistration = () => {
         {/* Business Information Section */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="animate-element animate-delay-300">
-            <label className="text-sm font-medium text-gray-600">Business Name</label>
+            <label className="text-sm font-medium text-gray-600">
+              Business Name
+            </label>
             <GlassInputWrapper>
-              <input 
-                name="businessname" 
-                type="text" 
-                placeholder="Enter your business name" 
-                className="w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none text-gray-900" 
+              <input
+                name="businessname"
+                type="text"
+                placeholder="Enter your business name"
+                className="w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none text-gray-900"
                 required
                 value={businessName}
                 onChange={(e) => setBusinessName(e.target.value)}
@@ -252,7 +254,9 @@ const BusinessRegistration = () => {
           </div>
 
           <div className="animate-element animate-delay-400">
-            <label className="text-sm font-medium text-gray-600">Business Type</label>
+            <label className="text-sm font-medium text-gray-600">
+              Business Type
+            </label>
             <Select
               value={businessType}
               onValueChange={handleBusinessTypeChange}
@@ -274,13 +278,15 @@ const BusinessRegistration = () => {
         {/* Custom Business Type - Full Width */}
         {businessType === "Other" && (
           <div className="animate-element animate-delay-450">
-            <label className="text-sm font-medium text-gray-600">Custom Business Type</label>
+            <label className="text-sm font-medium text-gray-600">
+              Custom Business Type
+            </label>
             <GlassInputWrapper>
-              <input 
-                name="customBusinessType" 
-                type="text" 
-                placeholder="Specify your business type" 
-                className="w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none text-gray-900" 
+              <input
+                name="customBusinessType"
+                type="text"
+                placeholder="Specify your business type"
+                className="w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none text-gray-900"
                 required
                 value={customBusinessType}
                 onChange={(e) => setCustomBusinessType(e.target.value)}
@@ -291,15 +297,15 @@ const BusinessRegistration = () => {
 
         {/* Business Category - Full Width */}
         <div className="animate-element animate-delay-500">
-          <label className="text-sm font-medium text-gray-600 mb-2">Business Category</label>
+          <label className="text-sm font-medium text-gray-600 mb-2">
+            Business Category
+          </label>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border border-gray-200 rounded-2xl bg-gray-50/50">
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="serviceBasedBusiness"
                 checked={businessCategories.includes("service")}
-                onCheckedChange={() =>
-                  handleBusinessCategoryChange("service")
-                }
+                onCheckedChange={() => handleBusinessCategoryChange("service")}
               />
               <Label
                 htmlFor="serviceBasedBusiness"
@@ -312,9 +318,7 @@ const BusinessRegistration = () => {
               <Checkbox
                 id="productBasedBusiness"
                 checked={businessCategories.includes("product")}
-                onCheckedChange={() =>
-                  handleBusinessCategoryChange("product")
-                }
+                onCheckedChange={() => handleBusinessCategoryChange("product")}
               />
               <Label
                 htmlFor="productBasedBusiness"
@@ -323,19 +327,36 @@ const BusinessRegistration = () => {
                 Product-Based Business
               </Label>
             </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="realEstateBasedBusiness"
+                checked={businessCategories.includes("real-estate")}
+                onCheckedChange={() =>
+                  handleBusinessCategoryChange("real-estate")
+                }
+              />
+              <Label
+                htmlFor="realEstateBasedBusiness"
+                className="cursor-pointer text-sm"
+              >
+                Real Estate-Based Business
+              </Label>
+            </div>
           </div>
         </div>
 
         {/* Contact Information Section */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="animate-element animate-delay-600">
-            <label className="text-sm font-medium text-gray-600">Mobile Number</label>
+            <label className="text-sm font-medium text-gray-600">
+              Mobile Number
+            </label>
             <GlassInputWrapper>
-              <input 
-                name="phone" 
-                type="tel" 
-                placeholder="Enter your mobile number" 
-                className="w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none text-gray-900" 
+              <input
+                name="phone"
+                type="tel"
+                placeholder="Enter your mobile number"
+                className="w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none text-gray-900"
                 required
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
@@ -344,13 +365,15 @@ const BusinessRegistration = () => {
           </div>
 
           <div className="animate-element animate-delay-700">
-            <label className="text-sm font-medium text-gray-600">Email Address</label>
+            <label className="text-sm font-medium text-gray-600">
+              Email Address
+            </label>
             <GlassInputWrapper>
-              <input 
-                name="email" 
-                type="email" 
-                placeholder="Enter your email address" 
-                className="w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none text-gray-900" 
+              <input
+                name="email"
+                type="email"
+                placeholder="Enter your email address"
+                className="w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none text-gray-900"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -366,11 +389,11 @@ const BusinessRegistration = () => {
           </label>
           <div className="flex gap-2">
             <GlassInputWrapper>
-              <input 
-                name="panCard" 
-                type="text" 
-                placeholder="ABCDE1234F" 
-                className={`w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none text-gray-900 ${panVerified ? "border-green-500" : ""}`} 
+              <input
+                name="panCard"
+                type="text"
+                placeholder="ABCDE1234F"
+                className={`w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none text-gray-900 ${panVerified ? "border-green-500" : ""}`}
                 required
                 value={panCard}
                 onChange={(e) => {
@@ -384,8 +407,8 @@ const BusinessRegistration = () => {
               type="button"
               onClick={handlePanCheck}
               className={`px-4 py-4 rounded-2xl font-medium transition-colors ${
-                panVerified 
-                  ? "border border-green-500 text-green-600 bg-green-50" 
+                panVerified
+                  ? "border border-green-500 text-green-600 bg-green-50"
                   : "bg-black text-white hover:bg-gray-800"
               }`}
               disabled={isPanVerifying || !panCard || panCard.length !== 10}
@@ -405,13 +428,15 @@ const BusinessRegistration = () => {
         {/* Personal Information Section */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="animate-element animate-delay-900">
-            <label className="text-sm font-medium text-gray-600">First Name</label>
+            <label className="text-sm font-medium text-gray-600">
+              First Name
+            </label>
             <GlassInputWrapper>
-              <input 
-                name="firstname" 
-                type="text" 
-                placeholder="Enter your first name" 
-                className="w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none text-gray-900" 
+              <input
+                name="firstname"
+                type="text"
+                placeholder="Enter your first name"
+                className="w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none text-gray-900"
                 required
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
@@ -420,13 +445,15 @@ const BusinessRegistration = () => {
           </div>
 
           <div className="animate-element animate-delay-1000">
-            <label className="text-sm font-medium text-gray-600">Last Name</label>
+            <label className="text-sm font-medium text-gray-600">
+              Last Name
+            </label>
             <GlassInputWrapper>
-              <input 
-                name="lastname" 
-                type="text" 
-                placeholder="Enter your last name" 
-                className="w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none text-gray-900" 
+              <input
+                name="lastname"
+                type="text"
+                placeholder="Enter your last name"
+                className="w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none text-gray-900"
                 required
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
@@ -440,28 +467,32 @@ const BusinessRegistration = () => {
           <label className="text-sm font-medium text-gray-600">Password</label>
           <GlassInputWrapper>
             <div className="relative">
-              <input 
-                name="password" 
-                type={passwordShow ? 'text' : 'password'} 
-                placeholder="Enter your password" 
-                className="w-full bg-transparent text-sm p-4 pr-12 rounded-2xl focus:outline-none text-gray-900" 
+              <input
+                name="password"
+                type={passwordShow ? "text" : "password"}
+                placeholder="Enter your password"
+                className="w-full bg-transparent text-sm p-4 pr-12 rounded-2xl focus:outline-none text-gray-900"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
-              <button 
-                type="button" 
-                onClick={() => setPasswordShow(!passwordShow)} 
+              <button
+                type="button"
+                onClick={() => setPasswordShow(!passwordShow)}
                 className="absolute inset-y-0 right-3 flex items-center"
               >
-                {passwordShow ? <EyeOff className="w-5 h-5 text-gray-400 hover:text-gray-600 transition-colors" /> : <Eye className="w-5 h-5 text-gray-400 hover:text-gray-600 transition-colors" />}
+                {passwordShow ? (
+                  <EyeOff className="w-5 h-5 text-gray-400 hover:text-gray-600 transition-colors" />
+                ) : (
+                  <Eye className="w-5 h-5 text-gray-400 hover:text-gray-600 transition-colors" />
+                )}
               </button>
             </div>
           </GlassInputWrapper>
         </div>
 
-        <button 
-          type="submit" 
+        <button
+          type="submit"
           className="animate-element animate-delay-1200 w-full rounded-2xl bg-black py-4 font-medium text-white hover:bg-gray-800 transition-colors"
           disabled={
             !businessName ||
@@ -508,8 +539,8 @@ const BusinessRegistration = () => {
       </div>
 
       <div className="text-balance text-center text-xs text-gray-500 [&_a]:underline [&_a]:underline-offset-4 [&_a]:hover:text-violet-600">
-        By clicking continue, you agree to our{" "}
-        <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.
+        By clicking continue, you agree to our <a href="#">Terms of Service</a>{" "}
+        and <a href="#">Privacy Policy</a>.
       </div>
     </div>
   );

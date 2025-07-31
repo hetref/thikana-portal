@@ -21,7 +21,9 @@ export default function ProfileTabs() {
         const userDoc = await getDoc(doc(db, "users", user.uid));
         if (userDoc.exists()) {
           const userData = userDoc.data();
-          setCategories(userData.businessCategories || []);
+          setCategories(
+            userData.business_categories || userData.businessCategories || []
+          );
         }
       } catch (error) {
         console.error("Error fetching user categories:", error);
@@ -38,6 +40,7 @@ export default function ProfileTabs() {
   const getActiveTab = () => {
     if (pathname.includes("/profile/services")) return "services";
     if (pathname.includes("/profile/inventory")) return "inventory";
+    if (pathname.includes("/profile/properties")) return "properties";
     return "profile";
   };
 
@@ -52,6 +55,9 @@ export default function ProfileTabs() {
       case "inventory":
         router.push("/profile/inventory");
         break;
+      case "properties":
+        router.push("/profile/properties");
+        break;
     }
   };
 
@@ -65,7 +71,7 @@ export default function ProfileTabs() {
         className="grid w-full max-w-2xl mx-auto"
         style={{
           gridTemplateColumns:
-            `1fr ${categories.includes("service") ? "1fr" : ""} ${categories.includes("product") ? "1fr" : ""}`.trim(),
+            `1fr ${categories.includes("service") ? "1fr" : ""} ${categories.includes("product") ? "1fr" : ""} ${categories.includes("real-estate") ? "1fr" : ""}`.trim(),
         }}
       >
         <TabsTrigger value="profile">Profile</TabsTrigger>
@@ -74,6 +80,9 @@ export default function ProfileTabs() {
         )}
         {categories.includes("product") && (
           <TabsTrigger value="inventory">Products</TabsTrigger>
+        )}
+        {categories.includes("real-estate") && (
+          <TabsTrigger value="properties">Properties</TabsTrigger>
         )}
       </TabsList>
     </Tabs>

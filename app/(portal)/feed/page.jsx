@@ -26,6 +26,7 @@ import toast from "react-hot-toast";
 import Loader from "@/components/Loader";
 import PostCardSkeleton from "@/components/PostCardSkeleton";
 import NearbyBusinessMap from "@/components/NearbyBusinessMap";
+import WhoToFollowSkeleton from "@/components/WhoToFollowSkeleton";
 
 const FeedPage = () => {
   const [posts, setPosts] = useState([]);
@@ -460,7 +461,7 @@ const FeedPage = () => {
                 ))}
             </main>
             <aside className="hidden lg:block">
-              <WhoToFollow />
+              <WhoToFollowSkeleton />
             </aside>
           </div>
         </div>

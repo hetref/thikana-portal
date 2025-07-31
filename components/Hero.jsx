@@ -52,14 +52,14 @@ const Hero = () => {
   if (!mounted) {
     return null;
   }
-  
+
   return (
     <>
       <div
         className={`${
-          isDark 
-            ? 'bg-gradient-to-tl from-blue-950 via-black to-black' 
-            : 'bg-[#F5F5F5] duration-1000'
+          isDark
+            ? "bg-gradient-to-tl from-blue-950 via-black to-black"
+            : "bg-[#F5F5F5] duration-1000"
         } transition-colors duration-1000 relative ${roboto.className}`}
       >
         <BackgroundCircles />
@@ -78,17 +78,21 @@ const Hero = () => {
               </div>
             </div>
             <div className="text-black max-w-5xl text-center">
-              <h1 className={`text-4xl md:text-7xl lg:text-8xl font-semibold mb-8 ${
-                isDark ? 'text-white' : 'text-gray-900'
-              }`}>
+              <h1
+                className={`text-4xl md:text-7xl lg:text-8xl font-semibold mb-8 ${
+                  isDark ? "text-white" : "text-gray-900"
+                }`}
+              >
                 Smart Business with <br />
                 <span className="bg-clip-text text-transparent font-semibold bg-gradient-to-r from-blue-950 to-teal-700 inline-block mt-2">
                   Thikana
                 </span>
               </h1>
-              <p className={`text-lg md:text-xl max-w-2xl mx-auto mb-12 font-normal ${
-                isDark ? 'text-white' : 'text-gray-700'
-              }`}>
+              <p
+                className={`text-lg md:text-xl max-w-2xl mx-auto mb-12 font-normal ${
+                  isDark ? "text-white" : "text-gray-700"
+                }`}
+              >
                 Effortlessly streamline your Business management with Thikana.
                 <br />
                 Shorten, track, and organize all your Products in one place.

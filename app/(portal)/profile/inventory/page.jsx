@@ -24,6 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import toast from "react-hot-toast";
@@ -54,6 +55,11 @@ const InventoryPage = () => {
   const [userId, setUserId] = useState(null);
   const [selectedProducts, setSelectedProducts] = useState([]);
   const [imageFile, setImageFile] = useState(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [currentProduct, setCurrentProduct] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleSelectProduct = (productId) => {
     setSelectedProducts(
@@ -171,6 +177,68 @@ const InventoryPage = () => {
       toast.error("Failed to add product. Please try again.");
     }
   }
+
+  const handleEditClick = (product) => {
+    setCurrentProduct(product);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleDeleteClick = (product) => {
+    setCurrentProduct(product);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleEditProduct = async (e) => {
+    e.preventDefault();
+    setIsEditing(true);
+    toast.loading("Updating product...", { id: "editProduct" });
+
+    const formData = new FormData(e.currentTarget);
+
+    const updatedProduct = {
+      id: currentProduct.id,
+      name: formData.get("name"),
+      description: formData.get("description"),
+      price: Number.parseFloat(formData.get("price")),
+      quantity: Number.parseInt(formData.get("quantity"), 10),
+      category: formData.get("category"),
+      imageUrl: currentProduct.imageUrl, // Keep the existing image URL
+    };
+
+    try {
+      // Pass null for imageFile parameter to keep existing image
+      await updateProduct(userId, updatedProduct, null);
+      toast.success("Product updated successfully.", { id: "editProduct" });
+      setIsEditDialogOpen(false);
+    } catch (error) {
+      console.error("Error updating product:", error);
+      toast.error("Failed to update product. Please try again.", {
+        id: "editProduct",
+      });
+    } finally {
+      setIsEditing(false);
+    }
+  };
+
+  const handleDeleteProduct = async () => {
+    if (!currentProduct || !userId) return;
+
+    setIsDeleting(true);
+    toast.loading("Deleting product...", { id: "deleteProduct" });
+
+    try {
+      await deleteProduct(userId, currentProduct.id);
+      toast.success("Product deleted successfully.", { id: "deleteProduct" });
+      setIsDeleteDialogOpen(false);
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      toast.error("Failed to delete product. Please try again.", {
+        id: "deleteProduct",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <div className="container mx-auto p-4">
@@ -305,8 +373,16 @@ const InventoryPage = () => {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent>
-                      <DropdownMenuItem>Edit</DropdownMenuItem>
-                      <DropdownMenuItem>Delete</DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleEditClick(product)}
+                      >
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleDeleteClick(product)}
+                      >
+                        Delete
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
@@ -316,6 +392,7 @@ const InventoryPage = () => {
         </Table>
       )}
 
+      {/* Bulk Edit Dialog */}
       <Dialog
         open={isBulkEditDialogOpen}
         onOpenChange={setIsBulkEditDialogOpen}
@@ -367,6 +444,108 @@ const InventoryPage = () => {
 
             <Button type="submit">Update Products</Button>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Product Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Product</DialogTitle>
+          </DialogHeader>
+          {currentProduct && (
+            <form onSubmit={handleEditProduct} className="space-y-4">
+              <div>
+                <Label htmlFor="edit-name">Name</Label>
+                <Input
+                  id="edit-name"
+                  name="name"
+                  defaultValue={currentProduct.name}
+                  required
+                  disabled={isEditing}
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-description">Description</Label>
+                <Input
+                  id="edit-description"
+                  name="description"
+                  defaultValue={currentProduct.description}
+                  required
+                  disabled={isEditing}
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-price">Price</Label>
+                <Input
+                  id="edit-price"
+                  name="price"
+                  type="number"
+                  step="0.01"
+                  defaultValue={currentProduct.price}
+                  required
+                  disabled={isEditing}
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-quantity">Quantity</Label>
+                <Input
+                  id="edit-quantity"
+                  name="quantity"
+                  type="number"
+                  defaultValue={currentProduct.quantity}
+                  required
+                  disabled={isEditing}
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-category">Category</Label>
+                <Input
+                  id="edit-category"
+                  name="category"
+                  defaultValue={currentProduct.category}
+                  required
+                  disabled={isEditing}
+                />
+              </div>
+              <Button type="submit" disabled={isEditing}>
+                {isEditing ? "Updating..." : "Update Product"}
+              </Button>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Deletion</DialogTitle>
+          </DialogHeader>
+          {currentProduct && (
+            <>
+              <p>Are you sure you want to delete "{currentProduct.name}"?</p>
+              <p className="text-sm text-muted-foreground">
+                This will also delete all analytics data for this product.
+              </p>
+              <DialogFooter className="flex space-x-2 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsDeleteDialogOpen(false)}
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleDeleteProduct}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? "Deleting..." : "Delete"}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
