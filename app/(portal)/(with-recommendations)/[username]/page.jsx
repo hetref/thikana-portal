@@ -493,11 +493,13 @@ export default function UserProfile() {
               followingCount={followingCount}
               userId={userId}
               className="flex flex-col items-center"
+              viewOnly={true}
             />
             <FollowerDialog
               followerCount={followersCount}
               userId={userId}
               className="flex flex-col items-center pl-4"
+              viewOnly={true}
             />
             <div className="flex flex-col items-center pl-4">
               <div className="font-semibold text-gray-900">{posts.length}</div>

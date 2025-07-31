@@ -21,6 +21,7 @@ import {
   UserMinus,
   Building2,
   User,
+  Users,
 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
@@ -152,7 +153,7 @@ const FollowingDialog = ({ followingCount }) => {
                     <div className="flex items-center justify-between w-full gap-2">
                       <div className="flex items-center gap-2">
                         <Link
-                          href={`/${business?.username}?user=${business?.uid}`}
+                          href={`/${business?.uid}`}
                           className="grid gap-0.5 text-sm"
                         >
                           <span className="font-medium">
@@ -190,7 +191,7 @@ const FollowingDialog = ({ followingCount }) => {
   );
 };
 
-const FollowerDialog = ({ followerCount, userId, className }) => {
+const FollowerDialog = ({ followerCount, userId, className, viewOnly = false }) => {
   const [followers, setFollowers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -201,6 +202,7 @@ const FollowerDialog = ({ followerCount, userId, className }) => {
   const currentUser = auth.currentUser;
 
   const isOwner = currentUser && currentUser.uid === userId;
+  const canView = viewOnly || isOwner; // Allow viewing if viewOnly is true or if user is owner
 
   useEffect(() => {
     const fetchFollowers = async () => {
@@ -294,145 +296,155 @@ const FollowerDialog = ({ followerCount, userId, className }) => {
   };
 
   return (
-    <Dialog open={open} onOpenChange={isOwner ? setOpen : undefined}>
-      <DialogTrigger className={className} disabled={!isOwner}>
+    <Dialog open={open} onOpenChange={canView ? setOpen : undefined}>
+      <DialogTrigger className={className} disabled={!canView}>
         <div
-          className={`flex flex-col items-center ${isOwner ? "hover:text-primary transition-colors" : ""}`}
-          style={{ cursor: isOwner ? "pointer" : "default" }}
+          className={`flex flex-col items-center transition-colors duration-200 ${
+            canView ? "hover:text-blue-600 cursor-pointer" : "cursor-default"
+          }`}
         >
-          <div className="font-semibold text-lg">{followerCount}</div>
-          <div className="text-sm text-muted-foreground">Followers</div>
+          <div className="font-semibold text-lg text-gray-900">{followerCount}</div>
+          <div className="text-sm text-gray-500">Followers</div>
         </div>
       </DialogTrigger>
-      {isOwner && (
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader className="space-y-1">
-            <DialogTitle className="text-xl font-bold">Followers</DialogTitle>
-            <DialogDescription className="text-sm flex flex-col gap-1">
-              <div>People and businesses who follow you</div>
+      {canView && (
+        <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col p-0">
+          {/* Header */}
+          <div className="p-6 pb-4 border-b border-gray-100">
+            <DialogHeader className="space-y-2">
+              <DialogTitle className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                <Users className="h-5 w-5 text-blue-600" />
+                Followers
+              </DialogTitle>
+              <DialogDescription className="text-sm text-gray-600">
+                {isOwner ? "People and businesses who follow you" : "People and businesses who follow this profile"}
+              </DialogDescription>
               {!loading && !error && (
-                <div className="text-xs flex items-center gap-2 mt-1">
-                  <Badge
-                    variant="secondary"
-                    className="font-normal py-0.5 px-2"
-                  >
+                <div className="flex items-center gap-2 pt-2">
+                  <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-200 font-medium">
                     <Building2 className="h-3 w-3 mr-1" />
                     {businessCount} Businesses
                   </Badge>
-                  <Badge
-                    variant="secondary"
-                    className="font-normal py-0.5 px-2"
-                  >
+                  <Badge variant="secondary" className="bg-green-50 text-green-700 border-green-200 font-medium">
                     <User className="h-3 w-3 mr-1" />
                     {followerCount - businessCount} Users
                   </Badge>
                 </div>
               )}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="relative mt-2">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search followers..."
-              className="pl-8"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+            </DialogHeader>
           </div>
 
-          <div className="mt-2 max-h-[60vh] overflow-y-auto pr-1">
+          {/* Search */}
+          <div className="px-6 py-3 border-b border-gray-50">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search followers..."
+                className="pl-10 border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto px-6 py-4">
             {loading ? (
-              <div className="flex flex-col items-center justify-center py-8 space-y-2">
-                <Loader/>
-                <p className="text-sm text-muted-foreground">
-                  Loading followers...
-                </p>
+              <div className="flex flex-col items-center justify-center py-12 space-y-3">
+                <Loader />
+                <p className="text-sm text-gray-500">Loading followers...</p>
               </div>
             ) : error ? (
-              <div className="text-center py-6 text-rose-500">
-                <p>Could not load followers list</p>
+              <div className="text-center py-12">
+                <div className="text-red-500 mb-2">
+                  <UserX className="h-12 w-12 mx-auto opacity-50" />
+                </div>
+                <p className="text-red-600 font-medium">Could not load followers</p>
+                <p className="text-sm text-gray-500 mt-1">Please try again later</p>
               </div>
             ) : filteredFollowers.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <UserX className="h-10 w-10 mx-auto mb-3 opacity-30" />
+              <div className="text-center py-12">
+                <div className="text-gray-300 mb-3">
+                  <Users className="h-12 w-12 mx-auto" />
+                </div>
                 {searchQuery.trim() ? (
-                  <p>No results match your search</p>
+                  <div>
+                    <p className="text-gray-600 font-medium">No results found</p>
+                    <p className="text-sm text-gray-500 mt-1">Try adjusting your search</p>
+                  </div>
                 ) : (
-                  <p>You don't have any followers yet</p>
+                  <div>
+                    <p className="text-gray-600 font-medium">{isOwner ? "No followers yet" : "No followers"}</p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {isOwner ? "Share your profile to gain followers" : "This profile has no followers yet"}
+                    </p>
+                  </div>
                 )}
               </div>
             ) : (
-              <div className="space-y-3 mt-3">
+              <div className="space-y-3">
                 {filteredFollowers.map((user) => {
                   const isBusiness = isBusinessAccount(user);
 
                   return (
                     <div
                       key={user?.uid}
-                      className="flex items-center justify-between p-3 rounded-lg border border-border/60 bg-background hover:bg-accent/5 transition-colors"
+                      className="flex items-center justify-between p-4 rounded-xl border border-gray-100 hover:border-gray-200 hover:bg-gray-50/50 transition-all duration-200"
                     >
                       {isBusiness ? (
                         <Link
-                          href={`/${user?.username}?user=${user?.uid}`}
-                          className="flex items-center gap-3 flex-1"
+                          href={`/${user?.uid}`}
+                          className="flex items-center gap-3 flex-1 min-w-0"
                         >
-                          <Avatar className="h-10 w-10 border border-border/50">
+                          <Avatar className="h-12 w-12 border-2 border-white shadow-sm">
                             <AvatarImage
                               src={user?.profilePic || "/avatar.png"}
                               alt={user?.businessName}
                             />
-                            <AvatarFallback>
+                            <AvatarFallback className="bg-blue-100 text-blue-600 font-semibold">
                               {user?.businessName?.charAt(0) || "B"}
                             </AvatarFallback>
                           </Avatar>
-                          <div className="flex flex-col min-w-0">
-                            <div className="font-medium truncate">
+                          <div className="flex flex-col min-w-0 flex-1">
+                            <div className="font-semibold text-gray-900 truncate">
                               {user?.businessName || "Business"}
                             </div>
-                            <div className="text-xs text-muted-foreground flex items-center gap-2">
-                              <span>@{user?.username || "username"}</span>
-                              <div className="flex items-center gap-1">
-                                <Badge
-                                  variant="outline"
-                                  className="text-xs font-normal py-0 h-5 flex items-center"
-                                >
-                                  <Building2 className="h-3 w-3 mr-1" />
-                                  Business
+                            <div className="text-sm text-gray-500 truncate">
+                              @{user?.username || "username"}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                                <Building2 className="h-3 w-3 mr-1" />
+                                Business
+                              </Badge>
+                              {user?.business_type && (
+                                <Badge variant="outline" className="text-xs bg-gray-50 text-gray-600 border-gray-200">
+                                  {user.business_type}
                                 </Badge>
-                                {user?.business_type && (
-                                  <Badge
-                                    variant="outline"
-                                    className="text-xs font-normal py-0 h-5"
-                                  >
-                                    {user.business_type}
-                                  </Badge>
-                                )}
-                              </div>
+                              )}
                             </div>
                           </div>
                         </Link>
                       ) : (
-                        <div className="flex items-center gap-3 flex-1">
-                          <Avatar className="h-10 w-10 border border-border/50">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <Avatar className="h-12 w-12 border-2 border-white shadow-sm">
                             <AvatarImage
                               src={user?.profilePic || "/avatar.png"}
                               alt={user?.displayName || "User"}
                             />
-                            <AvatarFallback>
+                            <AvatarFallback className="bg-green-100 text-green-600 font-semibold">
                               {user?.displayName?.charAt(0) || "U"}
                             </AvatarFallback>
                           </Avatar>
-                          <div className="flex flex-col min-w-0">
-                            <div className="font-medium truncate">
+                          <div className="flex flex-col min-w-0 flex-1">
+                            <div className="font-semibold text-gray-900 truncate">
                               {user?.displayName || "User"}
                             </div>
-                            <div className="text-xs text-muted-foreground flex items-center gap-2">
-                              <span>@{user?.username || "username"}</span>
-                              <Badge
-                                variant="outline"
-                                className="text-xs font-normal py-0 h-5 flex items-center"
-                              >
+                            <div className="text-sm text-gray-500 truncate">
+                              @{user?.username || "username"}
+                            </div>
+                            <div className="mt-1">
+                              <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
                                 <User className="h-3 w-3 mr-1" />
                                 User
                               </Badge>
@@ -440,25 +452,28 @@ const FollowerDialog = ({ followerCount, userId, className }) => {
                           </div>
                         </div>
                       )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-9 px-3 ml-2 border-gray-200 text-gray-700 hover:bg-gray-100"
-                        onClick={() => handleRemoveFollower(user?.uid)}
-                        disabled={loadingId === user?.uid}
-                      >
-                        {loadingId === user?.uid ? (
-                          <>
-                            <Loader/>
-                            <span>Removing...</span>
-                          </>
-                        ) : (
-                          <>
-                            <UserMinus className="h-4 w-4 mr-1.5" />
-                            <span>Remove</span>
-                          </>
-                        )}
-                      </Button>
+                      {/* Only show remove button for owners */}
+                      {isOwner && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="ml-3 h-9 px-3 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 hover:text-red-700 transition-colors"
+                          onClick={() => handleRemoveFollower(user?.uid)}
+                          disabled={loadingId === user?.uid}
+                        >
+                          {loadingId === user?.uid ? (
+                            <div className="flex items-center gap-2">
+                              <Loader />
+                              <span className="hidden sm:inline">Removing...</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <UserMinus className="h-4 w-4" />
+                              <span className="hidden sm:inline">Remove</span>
+                            </div>
+                          )}
+                        </Button>
+                      )}
                     </div>
                   );
                 })}
