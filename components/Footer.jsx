@@ -1,217 +1,92 @@
-"use client";
+"use client"
 
-import { motion } from "framer-motion";
-import { Facebook, Instagram, Linkedin, Twitter } from "lucide-react";
-import Link from "next/link";
-import { TextHoverEffect } from "./ui/text-hover-effect";
+import { Instagram, Linkedin, Twitter, Youtube } from "lucide-react"
+import Image from "next/image"
 
-const fadeIn = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0 },
-};
-
-const footerLinks = {
-  product: {
-    title: "Product",
-    links: [
-      { name: "Features", href: "#" },
-      { name: "Pricing", href: "#" },
-      { name: "Testimonials", href: "#" },
-      { name: "Integration", href: "#" },
-    ],
+const footerColumns = [
+  {
+    title: "Solutions",
+    links: ["Features", "Pricing", "Search", "Contact Us"],
   },
-  integrations: {
-    title: "Integrations",
-    links: [
-      { name: "Facebook", href: "#" },
-      { name: "Instagram", href: "#" },
-      { name: "Twitter", href: "#" },
-      { name: "LinkedIn", href: "#" },
-    ],
-  },
-  resources: {
+  {
     title: "Resources",
-    links: [
-      { name: "Blog", href: "#" },
-      { name: "Support", href: "#" },
-    ],
+    links: ["Documentation", "Blog", "Support"],
   },
-  company: {
+  {
     title: "Company",
-    links: [
-      { name: "About Us", href: "#" },
-      { name: "Privacy Policy", href: "#" },
-      { name: "Terms & Conditions", href: "#" },
-    ],
+    links: ["About Us", "Privacy Policy", "Terms of Service"],
   },
-};
+]
 
-const TextSpan = ({ children }) => {
+const legalLinks = ["Privacy Policy", "Terms of Service"]
+
+const socialIcons = [
+  { icon: <Instagram className="h-5 w-5" />, href: "#" },
+  { icon: <Twitter className="h-5 w-5" />, href: "#" },
+  { icon: <Linkedin className="h-5 w-5" />, href: "#" },
+  { icon: <Youtube className="h-5 w-5" />, href: "#" },
+]
+
+export default function Footer() {
   return (
-    <motion.span
-      whileHover={{ scale: 1.2 }}
-      className="inline-block hover:text-purple-500 transition-colors cursor-default"
-    >
-      {children}
-    </motion.span>
-  );
-};
-
-const AnimatedText = ({ text }) => {
-  return (
-    <div className="flex items-center justify-center">
-      {text.split("").map((letter, index) => (
-        <span
-          key={index}
-          className="text-[20vw] font-bold text-white/[0.02] hover:text-transparent hover:bg-clip-text hover:bg-gradient-to-r from-purple-500 to-pink-500 hover:drop-shadow-[0_0_30px_rgba(168,85,247,0.5)] transition-all duration-300"
-        >
-          {letter}
-        </span>
-      ))}
-    </div>
-  );
-};
-
-const Footer = () => {
-  return (
-    <footer className="relative bg-black text-white overflow-hidden">
-      <div className="mx-auto max-w-7xl px-6 pb-8 pt-16 sm:pt-24 lg:px-8 lg:pt-32">
-        <div className="xl:grid xl:grid-cols-3 xl:gap-8">
-          <motion.div
-            className="space-y-4"
-            initial="initial"
-            whileInView="animate"
-            viewport={{ once: true }}
-            variants={fadeIn}
-          >
-            <Link href="/" className="flex items-center space-x-2">
-              <div className="rounded bg-purple-500/10 p-2">
-                <div className="h-6 w-6 text-purple-500">
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path d="M12 19l7-7 3 3-7 7-3-3z" />
-                    <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
-                    <path d="M2 2l7.586 7.586" />
-                    <path d="M11 11l4 4" />
-                  </svg>
-                </div>
-              </div>
-            </Link>
-            <p className="text-sm leading-6 text-gray-400">
-              Manage your links with ease.
-            </p>
-            <p className="text-sm leading-6 text-gray-400">
-              Developed by Aryan, Yash, Prathmesh and Ayushi
-            </p>
-          </motion.div>
-
-          <motion.div
-            className="mt-16 grid grid-cols-2 gap-8 xl:col-span-2 xl:mt-0"
-            initial="initial"
-            whileInView="animate"
-            viewport={{ once: true }}
-            variants={fadeIn}
-          >
-            <div className="md:grid md:grid-cols-2 md:gap-8">
-              <div>
-                <h3 className="text-sm font-semibold leading-6 text-white">
-                  {footerLinks.product.title}
-                </h3>
-                <ul role="list" className="mt-6 space-y-4">
-                  {footerLinks.product.links.map((item) => (
-                    <li key={item.name}>
-                      <Link
-                        href={item.href}
-                        className="text-sm leading-6 text-gray-400 hover:text-white transition-colors"
-                      >
-                        {item.name}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="mt-10 md:mt-0">
-                <h3 className="text-sm font-semibold leading-6 text-white">
-                  {footerLinks.integrations.title}
-                </h3>
-                <ul role="list" className="mt-6 space-y-4">
-                  {footerLinks.integrations.links.map((item) => (
-                    <li key={item.name}>
-                      <Link
-                        href={item.href}
-                        className="text-sm leading-6 text-gray-400 hover:text-white transition-colors"
-                      >
-                        {item.name}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+    <footer className="bg-black text-white relative w-full pt-20 pb-10">
+      <div className="pointer-events-none absolute top-0 left-0 z-0 h-full w-full overflow-hidden">
+        <div className="bg-white/5 absolute top-1/3 left-1/4 h-64 w-64 rounded-full opacity-10 blur-3xl" />
+        <div className="bg-white/5 absolute right-1/4 bottom-1/4 h-80 w-80 rounded-full opacity-10 blur-3xl" />
+      </div>
+      <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        
+        <div className="mb-16 grid grid-cols-2 gap-8 md:grid-cols-4 lg:grid-cols-5">
+          <div className="col-span-2 lg:col-span-1">
+            <div className="mb-6 flex items-center space-x-2">
+              <Image 
+                src="/logo/white-logo.png" 
+                alt="logo" 
+                width={100} 
+                height={100} 
+              />
             </div>
-            <div className="md:grid md:grid-cols-2 md:gap-8">
-              <div>
-                <h3 className="text-sm font-semibold leading-6 text-white">
-                  {footerLinks.resources.title}
-                </h3>
-                <ul role="list" className="mt-6 space-y-4">
-                  {footerLinks.resources.links.map((item) => (
-                    <li key={item.name}>
-                      <Link
-                        href={item.href}
-                        className="text-sm leading-6 text-gray-400 hover:text-white transition-colors"
-                      >
-                        {item.name}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="mt-10 md:mt-0">
-                <h3 className="text-sm font-semibold leading-6 text-white">
-                  {footerLinks.company.title}
-                </h3>
-                <ul role="list" className="mt-6 space-y-4">
-                  {footerLinks.company.links.map((item) => (
-                    <li key={item.name}>
-                      <Link
-                        href={item.href}
-                        className="text-sm leading-6 text-gray-400 hover:text-white transition-colors"
-                      >
-                        {item.name}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+            <p className="text-gray-300 mb-6">
+              Empowering businesses with reliable, scalable, and innovative solutions.
+            </p>
+            <div className="flex space-x-4">
+              {socialIcons.map((item, i) => (
+                <a
+                  key={i}
+                  href={item.href}
+                  className="glass-effect hover:bg-white/10 flex h-10 w-10 items-center justify-center rounded-full transition text-white"
+                >
+                  {item.icon}
+                </a>
+              ))}
             </div>
-          </motion.div>
+          </div>
+          {footerColumns.map((col) => (
+            <div key={col.title}>
+              <h4 className="mb-4 text-lg font-semibold text-white">{col.title}</h4>
+              <ul className="space-y-3">
+                {col.links.map((text) => (
+                  <li key={text}>
+                    <a href="#" className="text-gray-300 hover:text-white transition">
+                      {text}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
-
-        <motion.div
-          className="mt-16 border-t border-white/10 pt-8 sm:mt-20 lg:mt-24"
-          initial="initial"
-          whileInView="animate"
-          viewport={{ once: true }}
-          variants={fadeIn}
-        >
-          <p className="text-sm leading-5 text-gray-400">
-            © 2025 Thikana INC. All rights reserved.
-          </p>
-        </motion.div>
-
-        {/* Updated Watermark */}
-        <div className="pointer-events-none absolute bottom-0 left-0 right-0 select-none">
-          <div className="pointer-events-auto">
-            <AnimatedText text="Thikana" />
+        <div className="border-white/10 flex flex-col items-center justify-between border-t pt-8 md:flex-row">
+          <p className="text-gray-300 mb-4 text-sm md:mb-0">© 2025 Thikana INC. All rights reserved.</p>
+          <div className="flex flex-wrap justify-center gap-6">
+            {legalLinks.map((text) => (
+              <a key={text} href="#" className="text-gray-300 hover:text-white text-sm">
+                {text}
+              </a>
+            ))}
           </div>
         </div>
       </div>
     </footer>
-  );
-};
-
-export default Footer;
+  )
+}

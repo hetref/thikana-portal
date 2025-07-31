@@ -1,8 +1,7 @@
 "use client";
 
 import Loader from "@/components/Loader";
-import TopNavbar from "@/components/TopNavbar";
-// import TopNavbar from "@/components/TopNavbar";
+import MainNav from "@/components/main_nav";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { get, ref } from "firebase/database";
@@ -43,7 +42,7 @@ const layout = ({ children }) => {
       <ToastProvider>
         <LocationAlertProvider>
           <GlobalLocationAlert />
-          <TopNavbar type="authenticated" />
+          <MainNav />
           <div className="mt-[80px]">{children}</div>
           <Toaster />
         </LocationAlertProvider>

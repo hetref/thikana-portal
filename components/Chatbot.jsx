@@ -29,7 +29,7 @@ function SuggestionBar({ suggestions, onClickSuggestion }) {
       {suggestions.map((suggestion, index) => (
         <Badge
           key={index}
-          className="cursor-pointer hover:bg-gray-200"
+          className="cursor-pointer bg-white/20 hover:bg-white/30 text-white border-white/20 backdrop-blur-sm"
           onClick={() => onClickSuggestion(suggestion)}
         >
           {suggestion}
@@ -118,16 +118,16 @@ export default function Chatbot() {
       <AnimatePresence>
         {isChatOpen && (
           <motion.div className="fixed bottom-20 right-4 z-50 w-[95%] md:w-[500px]">
-            <Card className="border-2">
+            <Card className="border-2 bg-white/10 backdrop-blur-md border-white/20 shadow-xl">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                <CardTitle className="text-lg font-bold">
+                <CardTitle className="text-lg font-bold text-white">
                   Chat with Thikana AI
                 </CardTitle>
                 <Button
                   onClick={toggleChat}
                   size="sm"
                   variant="ghost"
-                  className="px-2 py-0"
+                  className="px-2 py-0 text-white hover:bg-white/10"
                 >
                   <X className="size-4" />
                   <span className="sr-only">Close Chat</span>
@@ -150,8 +150,8 @@ export default function Chatbot() {
                       <div
                         className={`inline-block rounded-lg p-2 ${
                           message.role === "user"
-                            ? "bg-black text-white"
-                            : "bg-muted"
+                            ? "bg-white/20 text-white backdrop-blur-sm"
+                            : "bg-black/20 text-white backdrop-blur-sm"
                         }`}
                       >
                         <ReactMarkdown
@@ -234,12 +234,12 @@ export default function Chatbot() {
                     <Input
                       value={input}
                       onChange={handleInputChange}
-                      className="flex-1 w-[380px] p-5 ml-5"
+                      className="flex-1 w-[380px] p-5 ml-5 bg-white/10 border-white/20 text-white placeholder-gray-300 rounded-2xl"
                       placeholder="Type your message here..."
                     />
                     <Button
                       type="submit"
-                      className="size-10"
+                      className="size-10 bg-white/20 hover:bg-white/30 text-white border-white/20 rounded-2xl"
                       disabled={isLoading}
                       size="icon"
                     >

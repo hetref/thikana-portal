@@ -45,8 +45,13 @@ nextjs-portal {
     --color-4: 195 100% 63%;
     --color-5: 90 100% 63%;
   }
+
+
   html {
     scroll-behavior: smooth;
+  }
+  .theme {
+    --animate-shiny-text: shiny-text 8s infinite;
   }
 }
 
@@ -104,4 +109,15 @@ button:hover {
 .text-2xs {
   font-size: 0.65rem;
   line-height: 1rem;
+}
+
+@theme inline {
+  @keyframes shiny-text {
+  0%, 90%, 100% {
+    background-position: calc(-100% - var(--shiny-width)) 0;
+    }
+  30%, 60% {
+    background-position: calc(100% + var(--shiny-width)) 0;
+    }
+  }
 }

@@ -1,6 +1,7 @@
 "use client";
 import { cn } from "@/lib/utils";
 import React from "react";
+import { useTheme } from "@/context/ThemeContext";
 
 export const AuroraBackground = ({
   className,
@@ -8,11 +9,17 @@ export const AuroraBackground = ({
   showRadialGradient = true,
   ...props
 }) => {
+  const { isDark } = useTheme();
+
   return (
     <main>
       <div
         className={cn(
-          "relative flex flex-col  h-[100vh] items-center justify-center bg-zinc-50  text-slate-950 transition-bg",
+            `relative flex flex-col h-[100vh] items-center justify-center transition-colors duration-1000 ${
+              isDark 
+                ? 'bg-gradient-to-tl from-blue-950 via-black to-black text-slate-950'
+                : 'bg-gradient-to-tl from-blue-50 via-white to-gray-100 text-slate-900'
+            }`,
           className
         )}
         {...props}
