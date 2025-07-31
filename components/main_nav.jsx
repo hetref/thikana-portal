@@ -9,7 +9,7 @@ import Image from "next/image"
 import { onAuthStateChanged, signOut } from "firebase/auth"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
-import { Menu, X, Plus, MapPin, Search, Globe, Bell, User, Home } from "lucide-react"
+import { Menu, X, Plus, MapPin, Search, Globe, Bell, User, Home, Settings } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -319,7 +319,14 @@ const MainNav = () => {
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
+                      <Link href="/map" className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4" />
+                        <span>Set Location</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
                       <Link href="/profile/settings" className="flex items-center gap-2">
+                      <Settings className="h-4 w-4" />
                         <span>Settings</span>
                       </Link>
                     </DropdownMenuItem>
