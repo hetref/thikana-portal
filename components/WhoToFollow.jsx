@@ -28,7 +28,8 @@ import Link from "next/link";
 import { userEmailStatus } from "@/utils/userStatus";
 import { sendEmailVerification } from "firebase/auth";
 import { toast } from "react-hot-toast";
-import { Loader2, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
+import Loader from "@/components/Loader";
 
 export default function WhoToFollow() {
   const [businesses, setBusinesses] = useState([]);
@@ -289,7 +290,7 @@ export default function WhoToFollow() {
             </div>
           ) : loading && businesses.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 space-y-3">
-              <Loader2 className="h-8 w-8 animate-spin text-primary/50" />
+              <Loader/>
               <p className="text-sm text-muted-foreground">
                 Loading recommendations...
               </p>
@@ -422,7 +423,7 @@ export default function WhoToFollow() {
                 >
                   {loading ? (
                     <>
-                      <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                      <Loader/>
                       Loading...
                     </>
                   ) : (

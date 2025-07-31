@@ -39,7 +39,6 @@ import {
   FileTextIcon,
   HeartIcon,
   MapPinIcon,
-  Loader2Icon,
   Images,
   SquareChartGantt,
   Globe,
@@ -129,6 +128,8 @@ import jsPDF from "jspdf";
 import { Textarea } from "@/components/ui/textarea";
 import "leaflet/dist/leaflet.css";
 import ShowPropertiesTabContent from "@/components/profile/ShowPropertiesTabContent";
+import Loader from "@/components/Loader";
+
 
 // Add a style element to hide scrollbars
 const scrollbarHideStyles = `
@@ -145,7 +146,7 @@ const scrollbarHideStyles = `
 const MapComponent = dynamic(() => import("@/components/MapComponent"), {
   loading: () => (
     <div className="h-[300px] flex justify-center items-center bg-gray-100">
-      <Loader2Icon className="w-8 h-8 animate-spin text-primary" />
+      <Loader/>
     </div>
   ),
   ssr: false,
@@ -157,7 +158,7 @@ const FranchiseModal = dynamic(
   {
     loading: () => (
       <div className="flex justify-center items-center h-[400px]">
-        <Loader2Icon className="w-8 h-8 animate-spin text-primary" />
+        <Loader/>
       </div>
     ),
   }
@@ -166,7 +167,7 @@ const FranchiseModal = dynamic(
 // Memoized components
 const LoadingSpinner = () => (
   <div className="flex justify-center items-center h-[400px]">
-    <Loader2Icon className="w-10 h-10 animate-spin text-primary" />
+    <Loader/>
   </div>
 );
 
@@ -820,7 +821,7 @@ export default function Profile() {
     if (loading && !posts.length) {
       return (
         <div className="flex justify-center py-8">
-          <Loader2Icon className="w-6 h-6 animate-spin" />
+          <Loader/>
         </div>
       );
     }
@@ -858,7 +859,7 @@ export default function Profile() {
             >
               {loading ? (
                 <>
-                  <Loader2Icon className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader />
                   Loading...
                 </>
               ) : (
@@ -884,7 +885,7 @@ export default function Profile() {
   const renderLoading = useCallback(
     () => (
       <div className="flex justify-center py-10">
-        <Loader2Icon className="w-8 h-8 animate-spin text-gray-400" />
+        <Loader/>
       </div>
     ),
     []
@@ -1881,7 +1882,7 @@ export default function Profile() {
 
                             {loadingFranchises ? (
                               <div className="flex justify-center py-10">
-                                <Loader2Icon className="w-8 h-8 animate-spin text-gray-400" />
+                                <Loader/>
                               </div>
                             ) : franchises.length === 0 ? (
                               <div className="text-center py-12">
@@ -2800,7 +2801,7 @@ export default function Profile() {
             >
               {isSubmittingRating ? (
                 <>
-                  <Loader2Icon className="h-4 w-4 animate-spin mr-2" />
+                  <Loader/>
                   {productRatings[selectedProductForRating?.productId]
                     ? "Updating..."
                     : "Submitting..."}

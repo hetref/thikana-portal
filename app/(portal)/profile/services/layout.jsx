@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import Loader from "@/components/Loader";
 
 export default function ServicesLayout({ children }) {
   const [loading, setLoading] = useState(true);
@@ -44,7 +44,7 @@ export default function ServicesLayout({ children }) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-2">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <Loader/>
           <p className="text-sm text-muted-foreground">Loading...</p>
         </div>
       </div>

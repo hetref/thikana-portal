@@ -62,6 +62,8 @@ import { useReactToPrint } from "react-to-print";
 import { Textarea } from "@/components/ui/textarea";
 import { Timestamp } from "firebase/firestore";
 import { toast } from "react-hot-toast";
+import Loader from "@/components/Loader";
+
 
 export default function OrdersTab() {
   const [orders, setOrders] = useState([]);

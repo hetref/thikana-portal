@@ -34,7 +34,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Plus, Edit2, Trash2, Tag } from "lucide-react";
+import {  Plus, Edit2, Trash2, Tag } from "lucide-react";
 import toast from "react-hot-toast";
 import {
   Table,
@@ -45,6 +45,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import Loader from "@/components/Loader";
 
 export default function CallTypeManager() {
   const [callTypes, setCallTypes] = useState([]);
@@ -360,7 +361,7 @@ Thank you for speaking with me today. If you have any further questions, please 
   if (loading) {
     return (
       <div className="flex justify-center items-center h-48">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader/>
       </div>
     );
   }
@@ -441,7 +442,7 @@ Thank you for speaking with me today. If you have any further questions, please 
               <Button onClick={handleAddType} disabled={isSubmitting}>
                 {isSubmitting ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader/>
                     Saving...
                   </>
                 ) : (
@@ -471,7 +472,7 @@ Thank you for speaking with me today. If you have any further questions, please 
               >
                 {isSubmitting ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader/>
                     Creating...
                   </>
                 ) : (
@@ -597,7 +598,7 @@ Thank you for speaking with me today. If you have any further questions, please 
             <Button onClick={handleEditType} disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader/>
                   Updating...
                 </>
               ) : (

@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { getDoc, doc } from "firebase/firestore";
-import { Loader2 } from "lucide-react";
+import Loader from "@/components/Loader";
 import toast from "react-hot-toast";
 
 export default function DashboardLayout({ children }) {
@@ -52,7 +52,7 @@ export default function DashboardLayout({ children }) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <Loader/>
           <p className="text-lg text-muted-foreground">Loading dashboard...</p>
         </div>
       </div>

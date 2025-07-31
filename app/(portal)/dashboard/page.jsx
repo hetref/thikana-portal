@@ -77,7 +77,7 @@ import {
   orderBy,
   Timestamp,
 } from "firebase/firestore";
-import { Loader2 } from "lucide-react";
+import Loader from "@/components/Loader";
 import toast from "react-hot-toast";
 import Sidebar from "@/components/Sidebar";
 import ContactsTab from "@/components/dashboard/ContactsTab";
@@ -156,7 +156,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <Loader/>
       </div>
     );
   }

@@ -26,7 +26,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Loader2,
   Upload,
   Download,
   ArrowRight,
@@ -69,6 +68,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import Loader from "@/components/Loader";
 
 // Predefined expense categories
 const expenseCategories = [
@@ -828,7 +828,7 @@ export default function ExpenseTab() {
                 </div>
 
                 <Button type="submit" disabled={loading}>
-                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {loading && <Loader/>}
                   Add Expense
                 </Button>
               </form>
@@ -925,7 +925,7 @@ export default function ExpenseTab() {
                   className="w-full"
                 >
                   {isUploading ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader/>
                   ) : (
                     <Upload className="mr-2 h-4 w-4" />
                   )}
@@ -1250,7 +1250,7 @@ export default function ExpenseTab() {
             >
               {savingData ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader/>
                   Saving...
                 </>
               ) : (
@@ -1271,7 +1271,7 @@ export default function ExpenseTab() {
         <CardContent>
           {loadingExpenses ? (
             <div className="flex justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin" />
+              <Loader/>
             </div>
           ) : expenses.length === 0 ? (
             <p className="text-center py-8 text-muted-foreground">

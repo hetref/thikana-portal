@@ -37,7 +37,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
-  Loader2,
   PlusCircle,
   ClockIcon,
   AlertCircle,
@@ -85,6 +84,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import Loader from "@/components/Loader";
 
 // Schema for subscription plan
 const planSchema = z.object({
@@ -414,7 +414,7 @@ export default function PlansTab() {
   if (loading) {
     return (
       <div className="flex justify-center items-center py-16">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <Loader/>
       </div>
     );
   }
@@ -794,7 +794,7 @@ export default function PlansTab() {
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader/>
                       Creating...
                     </>
                   ) : (

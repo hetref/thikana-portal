@@ -23,8 +23,8 @@ import {
 import { Label } from "@/components/ui/label";
 import { auth, db } from "@/lib/firebase";
 import { doc, setDoc, Timestamp, collection, addDoc } from "firebase/firestore";
-import { Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
+import Loader from "@/components/Loader";
 
 export default function PropertyContactModal({ property, businessId }) {
   const [open, setOpen] = useState(false);
@@ -243,7 +243,7 @@ export default function PropertyContactModal({ property, businessId }) {
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader/>
                   Sending...
                 </>
               ) : (

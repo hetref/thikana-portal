@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { auth } from "@/lib/firebase";
-import { Loader2 } from "lucide-react";
 import ShowPropertiesTabContent from "@/components/profile/ShowPropertiesTabContent";
 import { useRouter } from "next/navigation";
+import Loader from "@/components/Loader";
 
 export default function PropertiesPage() {
   const [loading, setLoading] = useState(true);
@@ -32,7 +32,7 @@ export default function PropertiesPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <Loader/>
       </div>
     );
   }
