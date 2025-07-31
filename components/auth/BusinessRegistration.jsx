@@ -19,6 +19,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+// --- SUB-COMPONENTS ---
+
+const GlassInputWrapper = ({ children }) => (
+  <div className="rounded-2xl border border-gray-200 bg-gray-50/50 backdrop-blur-sm transition-colors focus-within:border-violet-400/70 focus-within:bg-violet-500/10">
+    {children}
+  </div>
+);
+
 const BusinessRegistration = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isPanVerifying, setIsPanVerifying] = useState(false);
@@ -224,298 +232,315 @@ const BusinessRegistration = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="w-full space-y-8 bg-white p-8 rounded-xl shadow-lg">
-        <div>
-          <h2 className="mt-6 text-center text-xl md:text-3xl font-extrabold text-gray-900">
-            Business Registration
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Register your business with Thikana
-          </p>
-        </div>
-        <form className="mt-8 space-y-6">
-          <div className="rounded-md shadow-sm space-y-4">
-            {/* Business Name */}
-            <div>
-              <Label
-                htmlFor="businessname"
-                className="block text-sm font-medium"
-              >
-                Business Name
-              </Label>
-              <Input
-                id="businessname"
+    <div className="space-y-5">
+      <form className="space-y-5" onSubmit={handleSignUp}>
+        {/* Business Information Section */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="animate-element animate-delay-300">
+            <label className="text-sm font-medium text-gray-600">
+              Business Name
+            </label>
+            <GlassInputWrapper>
+              <input
+                name="businessname"
                 type="text"
                 placeholder="Enter your business name"
+                className="w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none text-gray-900"
                 required
                 value={businessName}
                 onChange={(e) => setBusinessName(e.target.value)}
-                className="mt-1"
               />
-            </div>
+            </GlassInputWrapper>
+          </div>
 
-            {/* Business Type with Dropdown */}
-            <div>
+          <div className="animate-element animate-delay-400">
+            <label className="text-sm font-medium text-gray-600">
+              Business Type
+            </label>
+            <Select
+              value={businessType}
+              onValueChange={handleBusinessTypeChange}
+            >
+              <SelectTrigger className="w-full rounded-2xl border border-gray-200 bg-gray-50/50 backdrop-blur-sm transition-colors focus-within:border-violet-400/70 focus-within:bg-violet-500/10 p-4">
+                <SelectValue placeholder="Select business type" />
+              </SelectTrigger>
+              <SelectContent>
+                {businessTypes.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Custom Business Type - Full Width */}
+        {businessType === "Other" && (
+          <div className="animate-element animate-delay-450">
+            <label className="text-sm font-medium text-gray-600">
+              Custom Business Type
+            </label>
+            <GlassInputWrapper>
+              <input
+                name="customBusinessType"
+                type="text"
+                placeholder="Specify your business type"
+                className="w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none text-gray-900"
+                required
+                value={customBusinessType}
+                onChange={(e) => setCustomBusinessType(e.target.value)}
+              />
+            </GlassInputWrapper>
+          </div>
+        )}
+
+        {/* Business Category - Full Width */}
+        <div className="animate-element animate-delay-500">
+          <label className="text-sm font-medium text-gray-600 mb-2">
+            Business Category
+          </label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border border-gray-200 rounded-2xl bg-gray-50/50">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="serviceBasedBusiness"
+                checked={businessCategories.includes("service")}
+                onCheckedChange={() => handleBusinessCategoryChange("service")}
+              />
               <Label
-                htmlFor="businessType"
-                className="block text-sm font-medium"
+                htmlFor="serviceBasedBusiness"
+                className="cursor-pointer text-sm text-gray-700"
               >
-                Business Type
+                Service-Based Business
               </Label>
-              <Select
-                value={businessType}
-                onValueChange={handleBusinessTypeChange}
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="productBasedBusiness"
+                checked={businessCategories.includes("product")}
+                onCheckedChange={() => handleBusinessCategoryChange("product")}
+              />
+              <Label
+                htmlFor="productBasedBusiness"
+                className="cursor-pointer text-sm text-gray-700"
               >
-                <SelectTrigger className="w-full mt-1">
-                  <SelectValue placeholder="Select business type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {businessTypes.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {businessType === "Other" && (
-                <Input
-                  id="customBusinessType"
-                  type="text"
-                  placeholder="Specify your business type"
-                  required
-                  value={customBusinessType}
-                  onChange={(e) => setCustomBusinessType(e.target.value)}
-                  className="mt-2"
-                />
-              )}
-            </div>
-
-            {/* Business Category */}
-            <div>
-              <Label className="block text-sm font-medium mb-2">
-                Business Category
+                Product-Based Business
               </Label>
-              <div className="space-y-2 p-4 border rounded-md">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="serviceBasedBusiness"
-                    checked={businessCategories.includes("service")}
-                    onCheckedChange={() =>
-                      handleBusinessCategoryChange("service")
-                    }
-                  />
-                  <Label
-                    htmlFor="serviceBasedBusiness"
-                    className="cursor-pointer text-sm"
-                  >
-                    Service-Based Business
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="productBasedBusiness"
-                    checked={businessCategories.includes("product")}
-                    onCheckedChange={() =>
-                      handleBusinessCategoryChange("product")
-                    }
-                  />
-                  <Label
-                    htmlFor="productBasedBusiness"
-                    className="cursor-pointer text-sm"
-                  >
-                    Product-Based Business
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="realEstateBasedBusiness"
-                    checked={businessCategories.includes("real-estate")}
-                    onCheckedChange={() =>
-                      handleBusinessCategoryChange("real-estate")
-                    }
-                  />
-                  <Label
-                    htmlFor="realEstateBasedBusiness"
-                    className="cursor-pointer text-sm"
-                  >
-                    Real Estate-Based Business
-                  </Label>
-                </div>
-              </div>
             </div>
-
-            {/* Mobile Number */}
-            <div>
-              <Label htmlFor="phone" className="block text-sm font-medium">
-                Mobile Number
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="realEstateBasedBusiness"
+                checked={businessCategories.includes("real-estate")}
+                onCheckedChange={() =>
+                  handleBusinessCategoryChange("real-estate")
+                }
+              />
+              <Label
+                htmlFor="realEstateBasedBusiness"
+                className="cursor-pointer text-sm"
+              >
+                Real Estate-Based Business
               </Label>
-              <Input
-                id="phone"
+            </div>
+          </div>
+        </div>
+
+        {/* Contact Information Section */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="animate-element animate-delay-600">
+            <label className="text-sm font-medium text-gray-600">
+              Mobile Number
+            </label>
+            <GlassInputWrapper>
+              <input
+                name="phone"
                 type="tel"
-                placeholder="+91 1234567890"
+                placeholder="Enter your mobile number"
+                className="w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none text-gray-900"
                 required
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="mt-1"
               />
-            </div>
+            </GlassInputWrapper>
+          </div>
 
-            {/* PAN Number with Check Button */}
-            <div>
-              <Label htmlFor="panCard" className="block text-sm font-medium">
-                PAN Number <span className="text-red-500">*</span>
-              </Label>
-              <div className="flex gap-2">
-                <Input
-                  id="panCard"
-                  type="text"
-                  placeholder="ABCDE1234F"
-                  required
-                  value={panCard}
-                  onChange={(e) => {
-                    setPanCard(e.target.value.toUpperCase());
-                    setPanVerified(false);
-                  }}
-                  maxLength={10}
-                  className={`mt-1 ${panVerified ? "border-green-500" : ""}`}
-                />
-                <Button
-                  type="button"
-                  onClick={handlePanCheck}
-                  className="mt-1 whitespace-nowrap"
-                  variant={panVerified ? "outline" : "default"}
-                  disabled={isPanVerifying || !panCard || panCard.length !== 10}
-                >
-                  {isPanVerifying
-                    ? "Verifying..."
-                    : panVerified
-                      ? "Verified"
-                      : "CHECK"}
-                </Button>
-              </div>
-              <p className="text-xs text-gray-500 mt-1">
-                Please enter your 10-character PAN Card number
-              </p>
-            </div>
-
-            {/* First Name */}
-            <div>
-              <Label htmlFor="firstname" className="block text-sm font-medium">
-                First Name
-              </Label>
-              <Input
-                id="firstname"
-                type="text"
-                placeholder="Enter your first name"
-                required
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-
-            {/* Last Name */}
-            <div>
-              <Label htmlFor="lastname" className="block text-sm font-medium">
-                Last Name
-              </Label>
-              <Input
-                id="lastname"
-                type="text"
-                placeholder="Enter your last name"
-                required
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-
-            {/* Email */}
-            <div>
-              <Label htmlFor="email" className="block text-sm font-medium">
-                Email
-              </Label>
-              <Input
-                id="email"
+          <div className="animate-element animate-delay-700">
+            <label className="text-sm font-medium text-gray-600">
+              Email Address
+            </label>
+            <GlassInputWrapper>
+              <input
+                name="email"
                 type="email"
-                placeholder="Enter your email"
+                placeholder="Enter your email address"
+                className="w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none text-gray-900"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-1"
               />
-            </div>
-
-            {/* Password */}
-            <div>
-              <Label htmlFor="password" className="block text-sm font-medium">
-                Password
-              </Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={passwordShow ? "text" : "password"}
-                  placeholder="Enter your password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="mt-1 pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setPasswordShow(!passwordShow)}
-                  className="absolute right-2 top-[6px] p-1"
-                >
-                  {passwordShow ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
-              </div>
-            </div>
+            </GlassInputWrapper>
           </div>
+        </div>
 
-          <div>
-            <Button
-              type="submit"
-              onClick={handleSignUp}
-              className="w-full"
-              disabled={
-                !businessName ||
-                !firstName ||
-                !lastName ||
-                !phone ||
-                !email ||
-                !password ||
-                !panCard ||
-                panCard.length !== 10 ||
-                isLoading
-              }
+        {/* PAN Number Section - Full Width */}
+        <div className="animate-element animate-delay-800">
+          <label className="text-sm font-medium text-gray-600">
+            PAN Number <span className="text-red-500">*</span>
+          </label>
+          <div className="flex gap-2">
+            <GlassInputWrapper>
+              <input
+                name="panCard"
+                type="text"
+                placeholder="ABCDE1234F"
+                className={`w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none text-gray-900 ${panVerified ? "border-green-500" : ""}`}
+                required
+                value={panCard}
+                onChange={(e) => {
+                  setPanCard(e.target.value.toUpperCase());
+                  setPanVerified(false);
+                }}
+                maxLength={10}
+              />
+            </GlassInputWrapper>
+            <button
+              type="button"
+              onClick={handlePanCheck}
+              className={`px-4 py-4 rounded-2xl font-medium transition-colors ${
+                panVerified
+                  ? "border border-green-500 text-green-600 bg-green-50"
+                  : "bg-black text-white hover:bg-gray-800"
+              }`}
+              disabled={isPanVerifying || !panCard || panCard.length !== 10}
             >
-              {isLoading ? "Registering..." : "Register Business"}
-            </Button>
+              {isPanVerifying
+                ? "Verifying..."
+                : panVerified
+                  ? "Verified"
+                  : "CHECK"}
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            Please enter your 10-character PAN Card number
+          </p>
+        </div>
+
+        {/* Personal Information Section */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="animate-element animate-delay-900">
+            <label className="text-sm font-medium text-gray-600">
+              First Name
+            </label>
+            <GlassInputWrapper>
+              <input
+                name="firstname"
+                type="text"
+                placeholder="Enter your first name"
+                className="w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none text-gray-900"
+                required
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+              />
+            </GlassInputWrapper>
           </div>
 
-          <div className="text-center space-y-2">
-            <p className="text-sm text-gray-600">
-              Want to join as User?{" "}
-              <Link
-                href="/register"
-                className="font-medium text-primary hover:text-primary/80"
-              >
-                Register as User
-              </Link>
-            </p>
-            <p className="text-sm text-gray-600">
-              Already have an account?{" "}
-              <Link
-                href="/login"
-                className="font-medium text-primary hover:text-primary/80"
-              >
-                Login
-              </Link>
-            </p>
+          <div className="animate-element animate-delay-1000">
+            <label className="text-sm font-medium text-gray-600">
+              Last Name
+            </label>
+            <GlassInputWrapper>
+              <input
+                name="lastname"
+                type="text"
+                placeholder="Enter your last name"
+                className="w-full bg-transparent text-sm p-4 rounded-2xl focus:outline-none text-gray-900"
+                required
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+              />
+            </GlassInputWrapper>
           </div>
-        </form>
+        </div>
+
+        {/* Password Section - Full Width */}
+        <div className="animate-element animate-delay-1100">
+          <label className="text-sm font-medium text-gray-600">Password</label>
+          <GlassInputWrapper>
+            <div className="relative">
+              <input
+                name="password"
+                type={passwordShow ? "text" : "password"}
+                placeholder="Enter your password"
+                className="w-full bg-transparent text-sm p-4 pr-12 rounded-2xl focus:outline-none text-gray-900"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <button
+                type="button"
+                onClick={() => setPasswordShow(!passwordShow)}
+                className="absolute inset-y-0 right-3 flex items-center"
+              >
+                {passwordShow ? (
+                  <EyeOff className="w-5 h-5 text-gray-400 hover:text-gray-600 transition-colors" />
+                ) : (
+                  <Eye className="w-5 h-5 text-gray-400 hover:text-gray-600 transition-colors" />
+                )}
+              </button>
+            </div>
+          </GlassInputWrapper>
+        </div>
+
+        <button
+          type="submit"
+          className="animate-element animate-delay-1200 w-full rounded-2xl bg-black py-4 font-medium text-white hover:bg-gray-800 transition-colors"
+          disabled={
+            !businessName ||
+            !firstName ||
+            !lastName ||
+            !phone ||
+            !email ||
+            !password ||
+            !panCard ||
+            panCard.length !== 10 ||
+            isLoading
+          }
+        >
+          {isLoading ? (
+            <div className="flex items-center justify-center gap-2">
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              Registering...
+            </div>
+          ) : (
+            "Register Business"
+          )}
+        </button>
+      </form>
+
+      <div className="animate-element animate-delay-1300 text-center space-y-2">
+        <p className="text-sm text-gray-600">
+          Want to join as User?{" "}
+          <Link
+            href="/register"
+            className="text-violet-600 hover:underline transition-colors"
+          >
+            Register as User
+          </Link>
+        </p>
+        <p className="text-sm text-gray-600">
+          Already have an account?{" "}
+          <Link
+            href="/login"
+            className="text-violet-600 hover:underline transition-colors"
+          >
+            Login
+          </Link>
+        </p>
+      </div>
+
+      <div className="text-balance text-center text-xs text-gray-500 [&_a]:underline [&_a]:underline-offset-4 [&_a]:hover:text-violet-600">
+        By clicking continue, you agree to our <a href="#">Terms of Service</a>{" "}
+        and <a href="#">Privacy Policy</a>.
       </div>
     </div>
   );

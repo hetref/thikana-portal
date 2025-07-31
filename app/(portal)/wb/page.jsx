@@ -9,7 +9,7 @@ import '@grapesjs/studio-sdk/style';
 import { auth, db } from '../../../lib/firebase';
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { collection, query, where, orderBy, limit, getDocs, addDoc, serverTimestamp, setDoc, doc } from 'firebase/firestore';
-import TopNavbar from '@/components/TopNavbar';
+import MainNav from '@/components/main_nav';
 import { useRouter } from 'next/navigation';
 
 // Add keyframes for toast animations
@@ -998,9 +998,9 @@ export default function Home() {
       {/* Add animation styles */}
       <style dangerouslySetInnerHTML={{ __html: toastAnimationStyles }} />
       
-      {/* TopNavbar - fixed at top */}
+      {/* MainNav - fixed at top */}
       <div className="fixed top-0 left-0 right-0 z-50 w-full">
-        <TopNavbar type="authenticated" />
+        <MainNav />
       </div>
       
       {/* Custom Toast Container */}

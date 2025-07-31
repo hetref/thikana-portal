@@ -1,44 +1,86 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { RainbowButton } from "@/components/ui/rainbow-button";
 import { AuroraBackground } from "@/components/ui/aurora-background";
+import { useTheme } from "@/context/ThemeContext";
 
 const ContactCard = () => {
+  const { isDark } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  // Ensure component is mounted before rendering to prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Don't render until mounted to prevent hydration issues
+  if (!mounted) {
+    return null;
+  }
+
   return (
-    <div className="relative bg-background text-foreground pt-32 pb-44 overflow-hidden">
+      <div className={`relative text-foreground pt-32 pb-44 overflow-hidden ${
+        isDark 
+          ? 'bg-gradient-to-t from-blue-950 via-black to-black' 
+          : 'bg-gradient-to-t from-blue-50 via-white to-gray-100'
+      }`}>
       {/* Aurora Background */}
       <div className="absolute inset-0 z-0">
         <AuroraBackground />
       </div>
 
       {/* Card on Top */}
-      <Card className="relative z-10 max-w-4xl mx-auto">
+      <Card className={`relative z-10 max-w-4xl mx-auto border-t ${
+        isDark 
+          ? 'bg-black/80 border-white/10' 
+          : 'bg-white/80 border-gray-200'
+      }`}>
         <div className="grid grid-cols-2">
           <div className="p-6 space-y-4">
-            <h2 className="text-2xl font-bold">Contact Us</h2>
+            <h2 className={`text-4xl font-bold ${
+              isDark ? 'text-white' : 'text-gray-900'
+            }`}>Contact Us</h2>
             <form className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Name</label>
+                <label className={`block text-lg font-medium mb-1 ${
+                  isDark ? 'text-white' : 'text-gray-900'
+                }`}>Name</label>
                 <input
                   type="text"
-                  className="w-full rounded-md border p-2"
+                  className={`w-full rounded-md border p-2 ${
+                    isDark 
+                      ? 'border-white/10 bg-white/10 text-white placeholder-gray-400' 
+                      : 'border-gray-300 bg-white text-gray-900 placeholder-gray-500'
+                  }`}
                   placeholder="Enter your name"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Email</label>
+                <label className={`block text-lg font-medium mb-1 ${
+                  isDark ? 'text-white' : 'text-gray-900'
+                }`}>Email</label>
                 <input
                   type="email"
-                  className="w-full rounded-md border p-2"
+                  className={`w-full rounded-md border p-2 ${
+                    isDark 
+                      ? 'border-white/10 bg-white/10 text-white placeholder-gray-400' 
+                      : 'border-gray-300 bg-white text-gray-900 placeholder-gray-500'
+                  }`}
                   placeholder="Enter your email"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Message</label>
+                <label className={`block text-lg font-medium mb-1 ${
+                  isDark ? 'text-white' : 'text-gray-900'
+                }`}>Message</label>
                 <textarea
-                  className="w-full rounded-md border p-2 h-32"
+                  className={`w-full rounded-md border p-2 h-32 ${
+                    isDark 
+                      ? 'border-white/10 bg-white/10 text-white placeholder-gray-400' 
+                      : 'border-gray-300 bg-white text-gray-900 placeholder-gray-500'
+                  }`}
                   placeholder="Your message..."
                 />
               </div>

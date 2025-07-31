@@ -1,38 +1,24 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { motion } from "framer-motion";
-import { Check, CreditCard } from "lucide-react";
-import { HoverBorderGradient } from "./ui/hover-border-gradient";
-
-const fadeIn = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: 20 },
-};
-
-const container = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-    },
-  },
-};
-
-const Feature = ({ children }) => {
-  return (
-    <motion.li variants={fadeIn} className="flex gap-x-3">
-      <Check className="h-6 w-5 flex-none text-purple-500" />
-      {children}
-    </motion.li>
-  );
-};
+import { Check } from "lucide-react";
+import { useTheme } from "@/context/ThemeContext";
 
 const Pricing = () => {
   const [isMonthly, setIsMonthly] = useState(true);
+  const [mounted, setMounted] = useState(false);
+  const { isDark } = useTheme();
+
+  // Ensure component is mounted before rendering to prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Don't render until mounted to prevent hydration issues
+  if (!mounted) {
+    return null;
+  }
 
   const pricingTiers = [
     {
@@ -57,8 +43,8 @@ const Pricing = () => {
     {
       name: "Standard",
       price: {
-        monthly: 199,
-        yearly: 1990,
+        monthly: 259,
+        yearly: 2590,
       },
       description: "For growing organizations",
       features: [
@@ -77,8 +63,8 @@ const Pricing = () => {
     {
       name: "Premium",
       price: {
-        monthly: 299,
-        yearly: 2990,
+        monthly: 499,
+        yearly: 4990,
       },
       description: "For large institutions",
       features: [
@@ -96,128 +82,114 @@ const Pricing = () => {
   ];
 
   return (
-    <div className="mx-auto max-w-7xl px-6 lg:px-8 py-24">
-      <motion.div
-        className="mx-auto max-w-4xl text-center"
-        initial="initial"
-        animate="animate"
-        variants={fadeIn}
-      >
-        <div className="text-sm mb-4 flex justify-center">
-          <HoverBorderGradient>
-            <span className="px-4">Pricing</span>
-          </HoverBorderGradient>
-        </div>
-
-        <h1 className="mt-8 text-4xl font-bold tracking-tight text-black sm:text-6xl">
-          Simple, transparent pricing
-        </h1>
-        <p className="mt-6 text-lg leading-8 text-gray-600">
+    <div className={`${isDark ? 'bg-gradient-to-t from-blue-950 via-black to-black' : 'bg-[#F5F5F5]'} transition-colors duration-1000`}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="text-center max-w-3xl mx-auto mb-12">
+          <h1 className={`text-4xl md:text-5xl lg:text-6xl font-bold ${isDark ? 'text-white' : 'text-gray-900'} mb-4 tracking-tight`}>
+            Plans and Pricing
+          </h1>
+          <p className={`text-lg ${isDark ? 'text-zinc-400' : 'text-gray-600'} mb-6`}>
           Choose the plan that's right for you
-        </p>
+          </p>
 
-        <div className="mt-10 flex items-center justify-center gap-x-6">
-          <motion.div
-            className="flex items-center gap-4 rounded-lg p-1 bg-gray-100 ring-1 ring-purple-500/20"
-            whileHover={{ scale: 1.02 }}
-          >
+          <div className={`inline-flex items-center ${isDark ? 'bg-white/[0.03]' : 'bg-gray-900/[0.03]'} rounded-full p-1`}>
             <button
+              className={`px-6 py-2.5 rounded-full text-sm font-medium transition-colors ${isMonthly
+                ? isDark 
+                  ? 'bg-white/[0.07] text-white'
+                  : 'bg-gray-900/[0.07] text-gray-900'
+                : isDark
+                  ? 'text-zinc-400 hover:text-white'
+                  : 'text-gray-500 hover:text-gray-900'
+                }`}
               onClick={() => setIsMonthly(true)}
-              className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
-                isMonthly ? "bg-white text-black" : "text-gray-600"
-              }`}
             >
               Monthly
             </button>
             <button
+              className={`px-6 py-2.5 rounded-full text-sm font-medium transition-colors ${!isMonthly
+                ? isDark 
+                  ? 'bg-white/[0.07] text-white'
+                  : 'bg-gray-900/[0.07] text-gray-900'
+                : isDark
+                  ? 'text-zinc-400 hover:text-white'
+                  : 'text-gray-500 hover:text-gray-900'
+                }`}
               onClick={() => setIsMonthly(false)}
-              className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
-                !isMonthly ? "bg-white text-black" : "text-gray-600"
-              }`}
             >
               Yearly
             </button>
-          </motion.div>
+          </div>
         </div>
-      </motion.div>
 
-      <motion.div
-        className="isolate mx-auto mt-16 grid max-w-sm grid-cols-1 gap-8 lg:mx-auto lg:max-w-5xl lg:grid-cols-3"
-        variants={container}
-        initial="hidden"
-        animate="show"
-      >
-        {pricingTiers.map((tier) => (
-          <motion.div
-            key={tier.name}
-            variants={fadeIn}
-            whileHover={{ scale: 1.02 }}
-            className={`rounded-xl p-6 ring-1 h-fit transition-colors duration-300 ${
-              tier.highlight
-                ? "ring-2 ring-purple-500 bg-white relative"
-                : "ring-gray-200 bg-white hover:bg-gray-50"
-            }`}
-          >
-            {tier.highlight && (
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                <div className="rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 px-4 py-1 text-sm font-semibold text-white shadow-lg">
-                  Popular
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-7xl mx-auto">
+          {pricingTiers.map((tier, index) => (
+            <div
+              key={tier.name}
+              className={`relative rounded-2xl border ${tier.highlight
+                ? isDark
+                  ? 'border-white/10 bg-white/[0.02] scale-[1.02] shadow-xl'
+                  : 'border-gray-900/10 bg-gray-900/[0.02] scale-[1.02] shadow-xl'
+                : isDark
+                  ? 'border-white/[0.08] hover:border-white/10'
+                  : 'border-gray-900/[0.08] hover:border-gray-900/10'
+                } p-6 transition-all duration-300`}
+            >
+              {tier.highlight && (
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                  <div className="relative">
+                    <div className={`absolute inset-0 ${isDark ? 'bg-white/10' : 'bg-gray-900/10'} rounded-full blur-[2px]`} />
+                    <div className={`relative px-4 py-1.5 ${isDark ? 'bg-white/[0.03]' : 'bg-gray-900/[0.03]'} backdrop-blur-sm rounded-full border ${isDark ? 'border-white/10' : 'border-gray-900/10'}`}>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`inline-block w-1 h-1 rounded-full ${isDark ? 'bg-white/60' : 'bg-gray-900/60'} animate-pulse`} />
+                        <span className={`text-xs font-medium ${isDark ? 'text-white/80' : 'text-gray-900/80'}`}>Most Popular</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
+              )}
+
+              <div className="mb-6">
+                <h3 className={`text-xl font-medium ${isDark ? 'text-white' : 'text-gray-900'} mb-2`}>{tier.name}</h3>
+                <div className="flex items-baseline gap-2">
+                  <span className={`text-4xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    ₹{isMonthly ? tier.price.monthly : tier.price.yearly}
+                  </span>
+                  {tier.price.monthly !== 0 || tier.price.yearly !== 0 ? (
+                    <span className={`text-sm ${isDark ? 'text-zinc-400' : 'text-gray-600'}`}>
+                      /{isMonthly ? 'month' : 'year'}
+                    </span>
+                  ) : null}
+                </div>
+                <p className={`text-sm ${isDark ? 'text-zinc-400' : 'text-gray-600'} mt-4`}>{tier.description}</p>
               </div>
-            )}
-            <h3 className="text-lg font-semibold leading-8 text-purple-600">
-              {tier.name}
-            </h3>
-            <p className="mt-1 text-sm leading-6 text-gray-600">
-              {tier.description}
-            </p>
-            <p className="mt-6 flex items-baseline gap-x-1">
-              <span className="text-4xl font-bold tracking-tight text-black">
-                ₹{isMonthly ? tier.price.monthly : tier.price.yearly}
-              </span>
-              <span className="text-sm font-semibold leading-6 text-gray-600">
-                /{isMonthly ? "month" : "year"}
-              </span>
-            </p>
-            <motion.ul
-              variants={container}
-              initial="hidden"
-              animate="show"
-              className="mt-8 space-y-3 text-sm leading-6 text-gray-600"
-            >
-              {tier.features.map((feature, featureIndex) => (
-                <Feature key={featureIndex}>{feature}</Feature>
-              ))}
-            </motion.ul>
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="mt-8"
-            >
+
+              <div className="space-y-3 mb-6">
+                {tier.features.map((feature, i) => (
+                  <div key={i} className="flex items-center gap-2.5">
+                    <Check className={`h-4 w-4 ${isDark ? 'text-white/30' : 'text-gray-900/30'}`} />
+                    <span className={`text-sm ${isDark ? 'text-zinc-300' : 'text-gray-700'}`}>{feature}</span>
+                  </div>
+                ))}
+              </div>
+
               <Button
-                className={`w-full ${
-                  tier.highlight
-                    ? "bg-gradient-to-r from-purple-500 to-pink-500 hover:opacity-90 text-white"
-                    : "bg-white text-black ring-1 ring-gray-200 hover:bg-gray-50"
-                }`}
+                className={`w-full py-2.5 px-4 rounded-xl text-sm font-medium transition-colors ${tier.highlight
+                  ? isDark
+                    ? 'bg-white text-black hover:bg-white/90'
+                    : 'bg-gray-900 text-white hover:bg-gray-900/90'
+                  : isDark
+                    ? 'border border-white/10 text-white bg-transparent hover:bg-white/[0.03]'
+                    : 'border border-gray-900/10 text-gray-900 bg-transparent hover:bg-gray-900/[0.03]'
+                  }`}
                 variant={tier.highlight ? "default" : "outline"}
               >
                 {tier.cta.text}
               </Button>
-            </motion.div>
-          </motion.div>
-        ))}
-      </motion.div>
-
-      <motion.div
-        className="mt-16 flex items-center justify-center gap-2 text-gray-500"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-      >
-        <CreditCard className="h-5 w-5 text-purple-500" />
-        <span className="text-sm">No credit card required</span>
-      </motion.div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 };
