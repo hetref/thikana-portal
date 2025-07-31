@@ -6,7 +6,7 @@ import {
   limit,
   startAfter,
   getDocs,
-  onSnapshot,
+  where,
   doc,
   getDoc,
 } from "firebase/firestore";
@@ -62,11 +62,12 @@ export const useGetUserPosts = (userId, initialLimit = 5) => {
         // Use businessId if user is a member, otherwise use userId
         const targetUserId = businessId || userId;
 
+        // Fixed: Use correct field names - 'uid' and 'createdAt' as per Firestore schema
         const postsRef = collection(db, "posts");
         const firstQuery = query(
           postsRef,
-          orderBy("authorId"),
-          orderBy("timestamp", "desc"),
+          where("uid", "==", targetUserId), // Fixed: Use 'uid' instead of 'authorId'
+          orderBy("createdAt", "desc"), // Fixed: Use 'createdAt' instead of 'timestamp'
           limit(postLimit)
         );
 
@@ -79,12 +80,11 @@ export const useGetUserPosts = (userId, initialLimit = 5) => {
           return;
         }
 
-        const userPosts = querySnapshot.docs
-          .filter((doc) => doc.data().authorId === targetUserId)
-          .map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          }));
+        // Fixed: No need for filtering since we're using where clause
+        const userPosts = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
 
         setPosts(userPosts);
         setLastVisible(querySnapshot.docs[querySnapshot.docs.length - 1]);
@@ -107,11 +107,13 @@ export const useGetUserPosts = (userId, initialLimit = 5) => {
 
     try {
       const targetUserId = businessId || userId;
+      
+      // Fixed: Use correct field names - 'uid' and 'createdAt' as per Firestore schema
       const postsRef = collection(db, "posts");
       const nextQuery = query(
         postsRef,
-        orderBy("authorId"),
-        orderBy("timestamp", "desc"),
+        where("uid", "==", targetUserId), // Fixed: Use 'uid' instead of 'authorId'
+        orderBy("createdAt", "desc"), // Fixed: Use 'createdAt' instead of 'timestamp'
         startAfter(lastVisible),
         limit(postLimit)
       );
@@ -124,14 +126,19 @@ export const useGetUserPosts = (userId, initialLimit = 5) => {
         return;
       }
 
-      const userPosts = querySnapshot.docs
-        .filter((doc) => doc.data().authorId === targetUserId)
-        .map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
+      // Fixed: No need for filtering since we're using where clause
+      const userPosts = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
 
-      setPosts((prevPosts) => [...prevPosts, ...userPosts]);
+      // Fixed: Prevent duplicate posts
+      setPosts((prevPosts) => {
+        const existingIds = new Set(prevPosts.map(post => post.id));
+        const uniqueNewPosts = userPosts.filter(post => !existingIds.has(post.id));
+        return [...prevPosts, ...uniqueNewPosts];
+      });
+      
       setLastVisible(querySnapshot.docs[querySnapshot.docs.length - 1]);
       setHasMore(userPosts.length >= postLimit);
     } catch (err) {

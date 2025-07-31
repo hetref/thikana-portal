@@ -18,7 +18,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogClose,
   DialogTrigger,
   DialogDescription,
   DialogFooter,
@@ -70,10 +69,15 @@ import {
   MoreHorizontal,
   Home,
   PhoneCall,
+  Building2,
+  ChevronDown,
+  Store,
+  RefreshCw,
+  Trash2,
+  PlusCircle,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import { useGetUserPosts } from "@/hooks/useGetPosts";
-import useGetUser from "@/hooks/useGetUser";
 import { auth, db } from "@/lib/firebase";
 import {
   collection,
@@ -88,6 +92,7 @@ import {
   where,
   addDoc,
   serverTimestamp,
+  limit,
 } from "firebase/firestore";
 import ProfilePosts from "@/components/ProfilePosts";
 import Link from "next/link";
@@ -96,7 +101,6 @@ import Image from "next/image";
 import { userEmailStatus } from "@/utils/userStatus";
 import toast from "react-hot-toast";
 import { sendEmailVerification } from "firebase/auth";
-import MoreInformationDialog from "@/components/profile/MoreInformationDialog";
 import FollowingDialog from "@/components/profile/FollowingDialog";
 import FollowerDialog from "@/components/profile/FollowerDialog";
 import PhotosGrid from "@/components/PhotosGrid";
@@ -105,26 +109,7 @@ import ShareBusinessDialog from "@/components/profile/ShareBusinessDialog";
 import { cn } from "@/lib/utils";
 import ShowServicesTabContent from "@/components/profile/ShowServicesTabContent";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { format } from "date-fns";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -134,6 +119,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useReactToPrint } from "react-to-print";
@@ -141,7 +128,6 @@ import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { Textarea } from "@/components/ui/textarea";
 import "leaflet/dist/leaflet.css";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import ShowPropertiesTabContent from "@/components/profile/ShowPropertiesTabContent";
 
 // Add a style element to hide scrollbars
@@ -198,11 +184,21 @@ export default function Profile() {
   const [likedPosts, setLikedPosts] = useState([]);
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
-  const userId = selectedFranchiseId || user?.uid;
+
+  // Fixed: Use consistent userId calculation
+  const userId = useMemo(
+    () => selectedFranchiseId || user?.uid,
+    [selectedFranchiseId, user?.uid]
+  );
+
   const [userData, setUserData] = useState(null);
   const [loadingUserData, setLoadingUserData] = useState(true);
+  const [authError, setAuthError] = useState(null);
+
+  // Fixed: Use consistent userId for posts hook
   const { posts, loading, fetchMorePosts, hasMore, error } =
     useGetUserPosts(userId);
+
   const [showLocationIFrame, setShowLocationIFrame] = useState(false);
   const [isAddPhotoModalOpen, setIsAddPhotoModalOpen] = useState(false);
   const [userPhotos, setUserPhotos] = useState([]);
@@ -222,10 +218,16 @@ export default function Profile() {
   const [ratingFeedback, setRatingFeedback] = useState("");
   const [isSubmittingRating, setIsSubmittingRating] = useState(false);
   const [productRatings, setProductRatings] = useState({});
+  const [franchises, setFranchises] = useState([]);
+  const [hasFranchises, setHasFranchises] = useState(false);
+  const [loadingFranchises, setLoadingFranchises] = useState(false);
 
   const billRef = useRef();
   const [isFranchiseModalOpen, setIsFranchiseModalOpen] = useState(false);
   const [isBusinessUser, setIsBusinessUser] = useState(false);
+
+  // Fixed: Add cleanup refs for listeners
+  const unsubscribeRefs = useRef([]);
 
   const franchiseFormSchema = z.object({
     adminName: z.string().min(2, { message: "Admin name is required" }),
@@ -261,8 +263,13 @@ export default function Profile() {
   }, [userId, user?.uid]);
 
   const isEmailVerified = useMemo(() => {
-    return userEmailStatus() === true;
-  }, []);
+    try {
+      return userEmailStatus() === true;
+    } catch (error) {
+      console.error("Error checking email verification:", error);
+      return false;
+    }
+  }, [user?.emailVerified]); // Fixed: Add dependency
 
   // Optimized handlers
   const handleLoadMore = useCallback(() => {
@@ -291,6 +298,9 @@ export default function Profile() {
         const savedPostRef = doc(db, "users", user.uid, "savedPosts", postId);
         await deleteDoc(savedPostRef);
         toast.success("Post unsaved successfully");
+
+        // Fixed: Update local state immediately
+        setSavedPosts((prev) => prev.filter((post) => post.id !== postId));
       } catch (error) {
         console.error("Error unsaving post:", error);
         toast.error("Failed to unsave post");
@@ -308,6 +318,7 @@ export default function Profile() {
     if (postToUnsave) {
       handleUnsavePost(postToUnsave);
       setPostToUnsave(null);
+      setIsUnsaveDialogOpen(false);
     }
   }, [postToUnsave, handleUnsavePost]);
 
@@ -324,22 +335,43 @@ export default function Profile() {
     }
   }, [user]);
 
-  // Optimized effects
+  // Fixed: Cleanup function for all listeners
+  const cleanupListeners = useCallback(() => {
+    unsubscribeRefs.current.forEach((unsubscribe) => {
+      if (typeof unsubscribe === "function") {
+        unsubscribe();
+      }
+    });
+    unsubscribeRefs.current = [];
+  }, []);
+
+  // Fixed: Optimized main auth effect with better error handling
   useEffect(() => {
+    let mounted = true;
+
     // Check sessionStorage for selected franchise
-    const storedFranchiseId = sessionStorage.getItem("selectedFranchiseId");
-    if (storedFranchiseId) {
-      setSelectedFranchiseId(storedFranchiseId);
+    try {
+      const storedFranchiseId = sessionStorage.getItem("selectedFranchiseId");
+      if (storedFranchiseId && mounted) {
+        setSelectedFranchiseId(storedFranchiseId);
+      }
+    } catch (error) {
+      console.error("Error reading from sessionStorage:", error);
     }
 
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (!mounted) return;
+
       if (user) {
         setUser(user);
         setLoadingUserData(true);
+        setAuthError(null);
 
         try {
           const userDocRef = doc(db, "users", user.uid);
           const userSnapshot = await getDoc(userDocRef);
+
+          if (!mounted) return;
 
           if (userSnapshot.exists()) {
             const userDoc = userSnapshot.data();
@@ -349,6 +381,8 @@ export default function Profile() {
               // Fetch the business data
               const businessDocRef = doc(db, "businesses", userDoc.businessId);
               const businessSnapshot = await getDoc(businessDocRef);
+
+              if (!mounted) return;
 
               if (businessSnapshot.exists()) {
                 const businessData = businessSnapshot.data();
@@ -386,31 +420,60 @@ export default function Profile() {
           }
         } catch (error) {
           console.error("Error fetching user data:", error);
-          toast.error("Failed to load user profile");
+          setAuthError("Failed to load user profile");
+          if (mounted) {
+            toast.error("Failed to load user profile");
+          }
         } finally {
-          setLoadingUserData(false);
+          if (mounted) {
+            setLoadingUserData(false);
+          }
         }
       } else {
-        router.push("/login");
+        if (mounted) {
+          router.push("/login");
+        }
       }
     });
 
-    return () => unsubscribe();
-  }, [router]);
+    // Store unsubscribe function
+    unsubscribeRefs.current.push(unsubscribe);
 
+    return () => {
+      mounted = false;
+      cleanupListeners();
+    };
+  }, [router, cleanupListeners]);
+
+  // Fixed: Followers/Following listener with proper cleanup
   useEffect(() => {
     if (!userId) return;
 
     const followersRef = collection(db, "users", userId, "followers");
     const followingRef = collection(db, "users", userId, "following");
 
-    const unsubscribeFollowers = onSnapshot(followersRef, (snapshot) => {
-      setFollowersCount(snapshot.size);
-    });
+    const unsubscribeFollowers = onSnapshot(
+      followersRef,
+      (snapshot) => {
+        setFollowersCount(snapshot.size);
+      },
+      (error) => {
+        console.error("Error fetching followers:", error);
+      }
+    );
 
-    const unsubscribeFollowing = onSnapshot(followingRef, (snapshot) => {
-      setFollowingCount(snapshot.size);
-    });
+    const unsubscribeFollowing = onSnapshot(
+      followingRef,
+      (snapshot) => {
+        setFollowingCount(snapshot.size);
+      },
+      (error) => {
+        console.error("Error fetching following:", error);
+      }
+    );
+
+    // Store unsubscribe functions
+    unsubscribeRefs.current.push(unsubscribeFollowers, unsubscribeFollowing);
 
     return () => {
       unsubscribeFollowers();
@@ -418,7 +481,7 @@ export default function Profile() {
     };
   }, [userId]);
 
-  // User photos listener
+  // Fixed: User photos listener with proper error handling
   useEffect(() => {
     if (!userId) {
       setLoadingPhotos(false);
@@ -447,40 +510,59 @@ export default function Profile() {
       (error) => {
         console.error("Error fetching user photos:", error);
         setLoadingPhotos(false);
+        setUserPhotos([]); // Fixed: Set empty array on error
       }
     );
+
+    unsubscribeRefs.current.push(unsubscribe);
 
     return () => unsubscribe();
   }, [userId, userData?.businessId]);
 
-  // Liked posts listener
+  // Fixed: Liked posts listener with better error handling
   useEffect(() => {
     if (!user?.uid) return;
 
     const unsubscribe = onSnapshot(
       collection(db, "users", user.uid, "postlikes"),
       async (querySnapshot) => {
-        const postIds = querySnapshot.docs.map((doc) => doc.id);
-        const postDocs = await Promise.all(
-          postIds.map((id) => getDoc(doc(db, "posts", id)))
-        );
-        const tempLikedPosts = postDocs
-          .filter((doc) => doc.exists())
-          .map((doc) => ({ ...doc.data(), id: doc.id }));
-        setLikedPosts(tempLikedPosts);
+        try {
+          const postIds = querySnapshot.docs.map((doc) => doc.id);
+          if (postIds.length === 0) {
+            setLikedPosts([]);
+            return;
+          }
+
+          const postDocs = await Promise.all(
+            postIds.map((id) => getDoc(doc(db, "posts", id)).catch(() => null))
+          );
+
+          const tempLikedPosts = postDocs
+            .filter((doc) => doc && doc.exists())
+            .map((doc) => ({ ...doc.data(), id: doc.id }));
+          setLikedPosts(tempLikedPosts);
+        } catch (error) {
+          console.error("Error fetching liked posts:", error);
+          setLikedPosts([]);
+        }
       },
       (error) => {
-        console.error("Error fetching liked posts:", error);
+        console.error("Error with liked posts listener:", error);
+        setLikedPosts([]);
       }
     );
+
+    unsubscribeRefs.current.push(unsubscribe);
 
     return () => unsubscribe();
   }, [user?.uid]);
 
-  // Saved posts listener
+  // Fixed: Saved posts effect with better error handling
   useEffect(() => {
     // Skip if not the current user
     if (!user || !isCurrentUser) {
+      setSavedPosts([]);
+      setLoadingSavedPosts(false);
       return;
     }
 
@@ -493,43 +575,58 @@ export default function Profile() {
 
         const postsData = [];
 
-        for (const doc of savedPostsSnap.docs) {
-          const postRef = doc.ref;
-          const postData = doc.data();
+        for (const docSnapshot of savedPostsSnap.docs) {
+          try {
+            const postData = docSnapshot.data();
 
-          // If postData has a reference to the original post
-          if (postData.postId) {
-            const postDoc = await getDoc(doc(db, "posts", postData.postId));
+            // If postData has a reference to the original post
+            if (postData.postId) {
+              const postDoc = await getDoc(doc(db, "posts", postData.postId));
 
-            if (postDoc.exists()) {
-              postsData.push({
-                id: postDoc.id,
-                ...postDoc.data(),
-                savedAt: postData.timestamp,
-                savedId: doc.id,
-              });
+              if (postDoc.exists()) {
+                postsData.push({
+                  id: postDoc.id,
+                  ...postDoc.data(),
+                  savedAt: postData.timestamp,
+                  savedId: docSnapshot.id,
+                });
+              }
             }
+          } catch (error) {
+            console.error("Error processing saved post:", error);
           }
         }
 
         // Sort by savedAt timestamp
-        postsData.sort((a, b) => b.savedAt - a.savedAt);
+        postsData.sort((a, b) => {
+          const aTime = a.savedAt?.toDate
+            ? a.savedAt.toDate()
+            : new Date(a.savedAt || 0);
+          const bTime = b.savedAt?.toDate
+            ? b.savedAt.toDate()
+            : new Date(b.savedAt || 0);
+          return bTime - aTime;
+        });
 
         setSavedPosts(postsData);
       } catch (error) {
         console.error("Error fetching saved posts:", error);
+        setSavedPosts([]);
+        toast.error("Failed to load saved posts");
       } finally {
         setLoadingSavedPosts(false);
       }
     };
 
     fetchSavedPosts();
-  }, [user, isCurrentUser]);
+  }, [user?.uid, isCurrentUser]); // Fixed: Remove user dependency to avoid infinite loop
 
-  // Orders listener
+  // Fixed: Orders effect with better error handling
   useEffect(() => {
     // Skip if not the current user
     if (!user?.uid || !isCurrentUser) {
+      setOrders([]);
+      setLoadingOrders(false);
       return;
     }
 
@@ -550,6 +647,7 @@ export default function Profile() {
         setOrders(ordersData);
       } catch (error) {
         console.error("Error fetching orders:", error);
+        setOrders([]);
         toast.error("Failed to load orders");
       } finally {
         setLoadingOrders(false);
@@ -559,9 +657,10 @@ export default function Profile() {
     fetchOrders();
   }, [user?.uid, isCurrentUser]);
 
-  // Load product ratings
+  // Fixed: Product ratings effect with better error handling
   useEffect(() => {
     if (!user?.uid || !isCurrentUser) {
+      setProductRatings({});
       return;
     }
 
@@ -574,23 +673,164 @@ export default function Profile() {
 
         ratingsSnap.docs.forEach((doc) => {
           const data = doc.data();
-          ratingsData[data.productId] = {
-            id: doc.id,
-            ...data,
-          };
+          if (data.productId) {
+            ratingsData[data.productId] = {
+              id: doc.id,
+              ...data,
+            };
+          }
         });
 
         setProductRatings(ratingsData);
       } catch (error) {
         console.error("Error fetching product ratings:", error);
+        setProductRatings({});
       }
     };
 
     fetchProductRatings();
   }, [user?.uid, isCurrentUser]);
 
-  // Memoized UI components
+  // Fixed: Franchises effect with better error handling
+  useEffect(() => {
+    if (!user?.uid || !isBusinessUser) {
+      setHasFranchises(false);
+      setFranchises([]);
+      setLoadingFranchises(false);
+      return;
+    }
+
+    const fetchFranchises = async () => {
+      try {
+        setLoadingFranchises(true);
+
+        // Query franchises owned by this business
+        const franchisesQuery = query(
+          collection(db, "businesses"),
+          where("franchiseOwner", "==", user.uid)
+        );
+
+        const franchisesSnapshot = await getDocs(franchisesQuery);
+
+        if (franchisesSnapshot.empty) {
+          setFranchises([]);
+          setHasFranchises(false);
+        } else {
+          const franchisesList = franchisesSnapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+
+          setFranchises(franchisesList);
+          setHasFranchises(true);
+        }
+      } catch (error) {
+        console.error("Error fetching franchises:", error);
+        toast.error("Failed to load franchises");
+        setHasFranchises(false);
+        setFranchises([]);
+      } finally {
+        setLoadingFranchises(false);
+      }
+    };
+
+    fetchFranchises();
+  }, [user?.uid, isBusinessUser]);
+
+  // Fixed: Handle franchise switch with better state management
+  const handleSwitchFranchise = useCallback(
+    (franchiseId, shouldReload = true) => {
+      try {
+        if (franchiseId === "headquarters") {
+          // Switch to main business profile
+          sessionStorage.removeItem("selectedFranchiseId");
+          setSelectedFranchiseId(null);
+          toast.success("Switched to Headquarters");
+        } else {
+          // Switch to franchise profile
+          sessionStorage.setItem("selectedFranchiseId", franchiseId);
+          setSelectedFranchiseId(franchiseId);
+          const franchise = franchises.find((f) => f.id === franchiseId);
+          toast.success(
+            `Switched to ${franchise?.businessName || "Franchise"}`
+          );
+        }
+
+        // Force reload to refresh data if specified
+        if (shouldReload) {
+          window.location.reload();
+        }
+      } catch (error) {
+        console.error("Error switching franchise:", error);
+        toast.error("Failed to switch franchise");
+      }
+    },
+    [franchises]
+  );
+
+  // Fixed: Dynamically exit franchise view with better error handling
+  const exitFranchiseView = useCallback(async () => {
+    try {
+      // Show loading state
+      const loadingToast = toast.loading("Updating profile...");
+
+      // Remove franchise ID from session storage
+      sessionStorage.removeItem("selectedFranchiseId");
+      setSelectedFranchiseId(null);
+
+      // Fetch the current user's data
+      const userDocRef = doc(db, "users", user.uid);
+      const userSnapshot = await getDoc(userDocRef);
+
+      if (userSnapshot.exists()) {
+        const userDoc = userSnapshot.data();
+        setUserData(userDoc);
+        setIsBusinessUser(!!userDoc.businessName);
+      }
+
+      // Fetch user photos
+      const photosRef = collection(db, "users", user.uid, "photos");
+      const photosQuery = query(photosRef, orderBy("addedOn", "desc"));
+      const photosSnapshot = await getDocs(photosQuery);
+
+      const photosData = photosSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      setUserPhotos(photosData);
+
+      // Dismiss loading toast and show success
+      toast.dismiss(loadingToast);
+      toast.success("Exited franchise view");
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      toast.dismiss();
+      toast.error("Failed to update profile");
+
+      // Fallback to page reload if dynamic update fails
+      window.location.reload();
+    }
+  }, [user?.uid]);
+
+  // Fixed: Memoized UI components with error handling
   const renderPosts = useMemo(() => {
+    if (error) {
+      return (
+        <div className="text-center py-12">
+          <FileTextIcon className="w-12 h-12 text-red-300 mx-auto mb-4" />
+          <p className="text-red-600 mb-2">Failed to load posts</p>
+          <Button
+            variant="outline"
+            onClick={() => window.location.reload()}
+            className="rounded-full px-6"
+          >
+            Try Again
+          </Button>
+        </div>
+      );
+    }
+
     if (loading && !posts.length) {
       return (
         <div className="flex justify-center py-8">
@@ -643,7 +883,7 @@ export default function Profile() {
         )}
       </div>
     );
-  }, [posts, loading, hasMore, handleLoadMore, userData]);
+  }, [posts, loading, hasMore, handleLoadMore, userData, error]);
 
   const renderEmptyState = useCallback((icon, message) => {
     const Icon = icon;
@@ -710,6 +950,9 @@ export default function Profile() {
                       src={post.mediaUrl}
                       alt="Post content"
                       className="object-cover w-full h-full"
+                      onError={(e) => {
+                        e.target.style.display = "none";
+                      }}
                     />
                   </div>
                 </div>
@@ -745,7 +988,7 @@ export default function Profile() {
     [prepareUnsave, router]
   );
 
-  // Handle printing functionality
+  // Fixed: Handle printing functionality with better error handling
   const handlePrint = useReactToPrint({
     content: () => billRef.current,
     documentTitle: `Invoice_${selectedOrder?.orderId || "order"}`,
@@ -761,26 +1004,31 @@ export default function Profile() {
     },
     removeAfterPrint: false,
     print: async (printIframe) => {
-      const document = printIframe.contentDocument;
-      if (document) {
-        const html = document.getElementsByTagName("html")[0];
+      try {
+        const document = printIframe.contentDocument;
+        if (document) {
+          const html = document.getElementsByTagName("html")[0];
 
-        // Try to force PDF to be an option
-        document.body.style.width = "210mm";
-        document.body.style.height = "297mm"; // A4 dimensions
+          // Try to force PDF to be an option
+          document.body.style.width = "210mm";
+          document.body.style.height = "297mm"; // A4 dimensions
 
-        html.style.width = "210mm";
-        html.style.height = "297mm";
+          html.style.width = "210mm";
+          html.style.height = "297mm";
 
-        setTimeout(() => {
-          window.print();
-        }, 500);
+          setTimeout(() => {
+            window.print();
+          }, 500);
+        }
+      } catch (error) {
+        console.error("Error printing:", error);
+        toast.error("Failed to print invoice");
       }
     },
   });
 
-  // Function to download PDF directly
-  const handleDownloadPDF = async () => {
+  // Fixed: Function to download PDF directly with better error handling
+  const handleDownloadPDF = useCallback(async () => {
     if (!billRef.current) return;
 
     try {
@@ -813,17 +1061,24 @@ export default function Profile() {
       toast.dismiss();
       toast.error("Failed to generate PDF");
     }
-  };
+  }, [selectedOrder?.orderId]);
 
-  // Function to handle bill generation
-  const handleGenerateBill = (order) => {
+  // Fixed: Function to handle bill generation with validation
+  const handleGenerateBill = useCallback((order) => {
+    if (!order) {
+      toast.error("Invalid order data");
+      return;
+    }
     setSelectedOrder(order);
     setBillDialogOpen(true);
-  };
+  }, []);
 
-  // Handle rating submission
-  const handleSubmitRating = async () => {
-    if (!selectedProductForRating || !user?.uid || ratingValue === 0) return;
+  // Fixed: Handle rating submission with better error handling
+  const handleSubmitRating = useCallback(async () => {
+    if (!selectedProductForRating || !user?.uid || ratingValue === 0) {
+      toast.error("Please provide a rating");
+      return;
+    }
 
     setIsSubmittingRating(true);
 
@@ -962,11 +1217,22 @@ export default function Profile() {
     } finally {
       setIsSubmittingRating(false);
     }
-  };
+  }, [
+    selectedProductForRating,
+    user?.uid,
+    ratingValue,
+    ratingFeedback,
+    productRatings,
+  ]);
 
-  // Handle opening the rating dialog
+  // Fixed: Handle opening the rating dialog with validation
   const handleOpenRatingDialog = useCallback(
     (product, order) => {
+      if (!product || !order) {
+        toast.error("Invalid product or order data");
+        return;
+      }
+
       const productWithOrderInfo = {
         ...product,
         orderId: order.id,
@@ -989,30 +1255,53 @@ export default function Profile() {
     [productRatings]
   );
 
-  // Render star rating component for selection
-  const renderStarRating = (currentRating, isSelectable = false) => {
+  // Fixed: Render star rating component for selection with proper key handling
+  const renderStarRating = useCallback(
+    (currentRating, isSelectable = false) => {
+      return (
+        <div className="flex items-center">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <button
+              key={star}
+              type="button"
+              className={`${isSelectable ? "cursor-pointer hover:scale-110 transition-transform" : ""}`}
+              onClick={() => isSelectable && setRatingValue(star)}
+              disabled={!isSelectable}
+            >
+              <Star
+                className={`h-6 w-6 ${
+                  star <= currentRating
+                    ? "fill-yellow-400 text-yellow-400"
+                    : "text-gray-300"
+                } ${isSelectable && star <= currentRating ? "text-yellow-400" : ""}`}
+              />
+            </button>
+          ))}
+        </div>
+      );
+    },
+    []
+  );
+
+  // Fixed: Add error boundary for auth errors
+  if (authError) {
     return (
-      <div className="flex items-center">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <button
-            key={star}
-            type="button"
-            className={`${isSelectable ? "cursor-pointer hover:scale-110 transition-transform" : ""}`}
-            onClick={() => isSelectable && setRatingValue(star)}
-            disabled={!isSelectable}
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-600 mb-4">
+            Error Loading Profile
+          </h1>
+          <p className="text-gray-600 mb-4">{authError}</p>
+          <Button
+            onClick={() => window.location.reload()}
+            className="rounded-full px-6"
           >
-            <Star
-              className={`h-6 w-6 ${
-                star <= currentRating
-                  ? "fill-yellow-400 text-yellow-400"
-                  : "text-gray-300"
-              } ${isSelectable && star <= currentRating ? "text-yellow-400" : ""}`}
-            />
-          </button>
-        ))}
+            Retry
+          </Button>
+        </div>
       </div>
     );
-  };
+  }
 
   return (
     <div className="min-h-screen">
@@ -1140,6 +1429,104 @@ export default function Profile() {
                         )}
                       </div>
 
+                      {/* Franchise Selector for business users with franchises */}
+                      {isBusinessUser &&
+                        hasFranchises &&
+                        !userData?.franchiseOwner && (
+                          <div className="mt-2 mb-2 flex gap-2">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="outline" className="gap-2">
+                                  {loadingFranchises ? (
+                                    <RefreshCw className="h-4 w-4 animate-spin" />
+                                  ) : selectedFranchiseId ? (
+                                    <Store className="h-4 w-4" />
+                                  ) : (
+                                    <Building2 className="h-4 w-4" />
+                                  )}
+                                  {loadingFranchises ? (
+                                    "Loading..."
+                                  ) : selectedFranchiseId ? (
+                                    <>
+                                      {franchises.find(
+                                        (f) => f.id === selectedFranchiseId
+                                      )?.businessName || "Franchise"}
+                                      <Badge
+                                        variant="outline"
+                                        className="ml-2 bg-blue-50 text-blue-600 border-blue-200 text-xs"
+                                      >
+                                        Franchise
+                                      </Badge>
+                                    </>
+                                  ) : (
+                                    <>
+                                      Headquarters
+                                      <Badge
+                                        variant="outline"
+                                        className="ml-2 bg-primary/10 text-primary border-primary/20 text-xs"
+                                      >
+                                        HQ
+                                      </Badge>
+                                    </>
+                                  )}
+                                  <ChevronDown className="h-4 w-4 ml-1" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-56">
+                                <DropdownMenuLabel>
+                                  Switch Location
+                                </DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+
+                                {/* Main business (Headquarters) */}
+                                <DropdownMenuItem
+                                  className="flex items-center gap-2 cursor-pointer"
+                                  onClick={() =>
+                                    handleSwitchFranchise("headquarters")
+                                  }
+                                >
+                                  <HomeIcon className="h-4 w-4" />
+                                  <span>Headquarters</span>
+                                  {!selectedFranchiseId && (
+                                    <Badge className="ml-auto">Current</Badge>
+                                  )}
+                                </DropdownMenuItem>
+
+                                {/* Franchises list */}
+                                {franchises.map((franchise) => (
+                                  <DropdownMenuItem
+                                    key={franchise.id}
+                                    className="flex items-center gap-2 cursor-pointer"
+                                    onClick={() =>
+                                      handleSwitchFranchise(franchise.id)
+                                    }
+                                  >
+                                    <Store className="h-4 w-4" />
+                                    <span>
+                                      {franchise.businessName || "Franchise"}
+                                    </span>
+                                    {selectedFranchiseId === franchise.id && (
+                                      <Badge className="ml-auto">Current</Badge>
+                                    )}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+
+                            {/* Exit Franchise View button */}
+                            {selectedFranchiseId && (
+                              <Button
+                                variant="outline"
+                                className="gap-2 text-blue-600 border-blue-200 hover:bg-blue-50"
+                                onClick={exitFranchiseView}
+                              >
+                                <ArrowLeftIcon className="h-4 w-4" />
+                                Exit Franchise View
+                              </Button>
+                            )}
+                          </div>
+                        )}
+
                       {/* Action buttons - simplified layout */}
                       <div className="flex flex-wrap gap-2 mt-3 md:mt-0">
                         {/* Primary buttons - always visible */}
@@ -1221,14 +1608,7 @@ export default function Profile() {
                                 )}
 
                               {selectedFranchiseId && (
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    sessionStorage.removeItem(
-                                      "selectedFranchiseId"
-                                    );
-                                    window.location.reload();
-                                  }}
-                                >
+                                <DropdownMenuItem onClick={exitFranchiseView}>
                                   <ArrowLeftIcon className="w-3.5 h-3.5 mr-2" />
                                   <span>
                                     Return to{" "}
@@ -1357,54 +1737,85 @@ export default function Profile() {
                     <Card className="border-0 shadow-sm overflow-hidden bg-white">
                       <Tabs defaultValue="posts" className="w-full">
                         <div className="border-b overflow-x-auto scrollbar-hide">
-                          <TabsList className="justify-start h-auto p-0 bg-transparent overflow-x-auto scrollbar-hide whitespace-nowrap w-max min-w-full">
+                          <TabsList className="justify-between h-auto p-0 bg-transparent w-full flex">
                             <TabsTrigger
                               value="posts"
                               className={cn(
-                                "rounded-none border-b-2 border-transparent",
+                                "rounded-none border-b-2 border-transparent flex-1",
                                 "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
+                                "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
                               )}
+                              title="View Posts"
                             >
-                              <FileTextIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                              Posts{" "}
-                              {userData?.role === "member" && "from Business"}
+                              <FileTextIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="hidden data-[state=active]:block">
+                                Posts{" "}
+                                {userData?.role === "member" && "from Business"}
+                              </span>
                             </TabsTrigger>
+
+                            {/* Franchises Tab - Only show for business owners with franchises */}
+                            {hasFranchises && !selectedFranchiseId && (
+                              <TabsTrigger
+                                value="franchises"
+                                title="Your Franchises"
+                                className={cn(
+                                  "rounded-none border-b-2 border-transparent flex-1",
+                                  "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
+                                  "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
+                                )}
+                              >
+                                <Building2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                                <span className="hidden data-[state=active]:block">
+                                  Franchises
+                                </span>
+                              </TabsTrigger>
+                            )}
+
                             <TabsTrigger
                               value="likes"
+                              title="Liked Posts"
                               className={cn(
-                                "rounded-none border-b-2 border-transparent",
+                                "rounded-none border-b-2 border-transparent flex-1",
                                 "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
+                                "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
                               )}
                             >
-                              <HeartIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                              Likes
+                              <HeartIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="hidden data-[state=active]:block">
+                                Likes
+                              </span>
                             </TabsTrigger>
                             <TabsTrigger
                               value="photos"
+                              title="Photos"
                               className={cn(
-                                "rounded-none border-b-2 border-transparent",
+                                "rounded-none border-b-2 border-transparent flex-1",
                                 "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
+                                "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
                               )}
                             >
-                              <Images className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                              Photos
+                              <Images className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="hidden data-[state=active]:block">
+                                Photos
+                              </span>
                             </TabsTrigger>
                             {userData?.business_categories?.includes(
                               "product"
                             ) && (
                               <TabsTrigger
+                                title="Products"
                                 value="products"
                                 className={cn(
-                                  "rounded-none border-b-2 border-transparent",
+                                  "rounded-none border-b-2 border-transparent flex-1",
                                   "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                  "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
+                                  "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
                                 )}
                               >
-                                <SquareChartGantt className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                                Products
+                                <SquareChartGantt className="w-3 h-3 sm:w-4 sm:h-4" />
+                                <span className="hidden data-[state=active]:block">
+                                  Products
+                                </span>
                               </TabsTrigger>
                             )}
                             {userData?.business_categories?.includes(
@@ -1412,14 +1823,17 @@ export default function Profile() {
                             ) && (
                               <TabsTrigger
                                 value="services"
+                                title="Services"
                                 className={cn(
-                                  "rounded-none border-b-2 border-transparent",
+                                  "rounded-none border-b-2 border-transparent flex-1",
                                   "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                  "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
+                                  "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
                                 )}
                               >
-                                <Settings className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                                Services
+                                <Settings className="w-3 h-3 sm:w-4 sm:h-4" />
+                                <span className="hidden data-[state=active]:block">
+                                  Services
+                                </span>
                               </TabsTrigger>
                             )}
                             {userData?.business_categories?.includes(
@@ -1427,37 +1841,46 @@ export default function Profile() {
                             ) && (
                               <TabsTrigger
                                 value="properties"
+                                title="Properties"
                                 className={cn(
-                                  "rounded-none border-b-2 border-transparent",
+                                  "rounded-none border-b-2 border-transparent flex-1",
                                   "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                  "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
+                                  "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
                                 )}
                               >
-                                <Home className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                                Properties
+                                <Home className="w-3 h-3 sm:w-4 sm:h-4" />
+                                <span className="hidden data-[state=active]:block">
+                                  Properties
+                                </span>
                               </TabsTrigger>
                             )}
                             <TabsTrigger
                               value="saved"
+                              title="Saved Posts"
                               className={cn(
-                                "rounded-none border-b-2 border-transparent",
+                                "rounded-none border-b-2 border-transparent flex-1",
                                 "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
+                                "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
                               )}
                             >
-                              <Bookmark className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                              Saved
+                              <Bookmark className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="hidden data-[state=active]:block">
+                                Saved Posts
+                              </span>
                             </TabsTrigger>
                             <TabsTrigger
                               value="orders"
+                              title="Your Orders"
                               className={cn(
-                                "rounded-none border-b-2 border-transparent",
+                                "rounded-none border-b-2 border-transparent flex-1",
                                 "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
+                                "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
                               )}
                             >
-                              <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                              Orders
+                              <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="hidden data-[state=active]:block">
+                                Orders
+                              </span>
                             </TabsTrigger>
                           </TabsList>
                         </div>
@@ -1468,6 +1891,251 @@ export default function Profile() {
                         >
                           {renderPosts}
                         </TabsContent>
+
+                        {/* Franchises tab content */}
+                        {hasFranchises && !selectedFranchiseId && (
+                          <TabsContent
+                            value="franchises"
+                            className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                          >
+                            <div className="space-y-2 mb-4">
+                              <h2 className="text-xl font-semibold">
+                                Your Franchises
+                              </h2>
+                              <p className="text-muted-foreground">
+                                Manage all your franchise locations.
+                              </p>
+                            </div>
+
+                            {loadingFranchises ? (
+                              <div className="flex justify-center py-10">
+                                <Loader2Icon className="w-8 h-8 animate-spin text-gray-400" />
+                              </div>
+                            ) : franchises.length === 0 ? (
+                              <div className="text-center py-12">
+                                <Building2 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+                                <p className="text-muted-foreground">
+                                  No franchises yet. Add a franchise to expand
+                                  your business.
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {franchises.map((franchise) => (
+                                  <Card
+                                    key={franchise.id}
+                                    className="overflow-hidden"
+                                  >
+                                    <CardHeader className="p-4 bg-gray-50">
+                                      <div className="flex justify-between items-start">
+                                        <div className="flex items-center gap-3">
+                                          <Avatar className="h-10 w-10 border border-gray-200">
+                                            <AvatarImage
+                                              src={
+                                                franchise.profilePic ||
+                                                "/avatar.png"
+                                              }
+                                              alt={franchise.businessName}
+                                            />
+                                          </Avatar>
+                                          <div>
+                                            <h3 className="font-medium text-lg">
+                                              {franchise.businessName}
+                                            </h3>
+                                            <p className="text-sm text-muted-foreground">
+                                              {franchise.locations?.address ||
+                                                "No address"}
+                                            </p>
+                                          </div>
+                                        </div>
+                                        <Badge
+                                          variant="outline"
+                                          className="bg-blue-50 text-blue-600 border-blue-200"
+                                        >
+                                          Franchise
+                                        </Badge>
+                                      </div>
+                                    </CardHeader>
+                                    <CardContent className="p-4">
+                                      <div className="grid grid-cols-2 gap-3 mb-4">
+                                        <div className="flex flex-col">
+                                          <span className="text-xs text-muted-foreground">
+                                            Admin
+                                          </span>
+                                          <span className="font-medium">
+                                            {franchise.adminName}
+                                          </span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                          <span className="text-xs text-muted-foreground">
+                                            Contact
+                                          </span>
+                                          <span className="font-medium">
+                                            {franchise.phone}
+                                          </span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                          <span className="text-xs text-muted-foreground">
+                                            Email
+                                          </span>
+                                          <span className="font-medium truncate">
+                                            {franchise.email}
+                                          </span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                          <span className="text-xs text-muted-foreground">
+                                            Created
+                                          </span>
+                                          <span className="font-medium">
+                                            {franchise.createdAt?.toDate
+                                              ? format(
+                                                  new Date(
+                                                    franchise.createdAt?.toDate()
+                                                  ),
+                                                  "MMM d, yyyy"
+                                                )
+                                              : "N/A"}
+                                          </span>
+                                        </div>
+                                      </div>
+                                      <div className="flex gap-2 justify-between">
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="gap-2 text-blue-600 border-blue-200 hover:bg-blue-50 flex-1"
+                                          onClick={() =>
+                                            handleSwitchFranchise(franchise.id)
+                                          }
+                                        >
+                                          <Store className="h-4 w-4" />
+                                          <span>View Franchise</span>
+                                        </Button>
+
+                                        <AlertDialog>
+                                          <AlertDialogTrigger asChild>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              className="gap-2 text-red-600 border-red-200 hover:bg-red-50"
+                                            >
+                                              <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                          </AlertDialogTrigger>
+                                          <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                              <AlertDialogTitle>
+                                                Delete Franchise
+                                              </AlertDialogTitle>
+                                              <AlertDialogDescription>
+                                                Are you sure you want to delete
+                                                this franchise? This action
+                                                cannot be undone and will remove
+                                                the franchise administrator
+                                                account.
+                                              </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                              <AlertDialogCancel>
+                                                Cancel
+                                              </AlertDialogCancel>
+                                              <AlertDialogAction
+                                                className="bg-destructive hover:bg-destructive/90"
+                                                onClick={() => {
+                                                  // Delete franchise handler
+                                                  const deleteFranchise =
+                                                    async () => {
+                                                      try {
+                                                        toast.loading(
+                                                          "Deleting franchise..."
+                                                        );
+
+                                                        // Delete franchise documents
+                                                        await deleteDoc(
+                                                          doc(
+                                                            db,
+                                                            "users",
+                                                            franchise.id
+                                                          )
+                                                        );
+                                                        await deleteDoc(
+                                                          doc(
+                                                            db,
+                                                            "businesses",
+                                                            franchise.id
+                                                          )
+                                                        );
+
+                                                        // Delete the user from Firebase Auth via API
+                                                        const response =
+                                                          await fetch(
+                                                            `/api/delete-franchise-user?userId=${franchise.id}`,
+                                                            { method: "DELETE" }
+                                                          );
+
+                                                        if (!response.ok) {
+                                                          throw new Error(
+                                                            "Failed to delete franchise user"
+                                                          );
+                                                        }
+
+                                                        // Update local state
+                                                        setFranchises(
+                                                          franchises.filter(
+                                                            (f) =>
+                                                              f.id !==
+                                                              franchise.id
+                                                          )
+                                                        );
+                                                        if (
+                                                          franchises.length <= 1
+                                                        ) {
+                                                          setHasFranchises(
+                                                            false
+                                                          );
+                                                        }
+
+                                                        toast.dismiss();
+                                                        toast.success(
+                                                          "Franchise deleted successfully"
+                                                        );
+                                                      } catch (error) {
+                                                        console.error(
+                                                          "Error deleting franchise:",
+                                                          error
+                                                        );
+                                                        toast.dismiss();
+                                                        toast.error(
+                                                          "Failed to delete franchise"
+                                                        );
+                                                      }
+                                                    };
+
+                                                  deleteFranchise();
+                                                }}
+                                              >
+                                                Delete
+                                              </AlertDialogAction>
+                                            </AlertDialogFooter>
+                                          </AlertDialogContent>
+                                        </AlertDialog>
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                ))}
+                              </div>
+                            )}
+
+                            <div className="mt-6">
+                              <Button
+                                onClick={() => setIsFranchiseModalOpen(true)}
+                                className="gap-2"
+                              >
+                                <PlusCircle className="h-4 w-4" />
+                                Add New Franchise
+                              </Button>
+                            </div>
+                          </TabsContent>
+                        )}
 
                         <TabsContent
                           value="likes"
@@ -1576,6 +2244,200 @@ export default function Profile() {
                                 : savedPosts.map(renderSavedPostCard)}
                           </div>
                         </TabsContent>
+
+                        <TabsContent
+                          value="orders"
+                          className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                        >
+                          {loadingOrders ? (
+                            renderLoading()
+                          ) : orders.length === 0 ? (
+                            renderEmptyState(ShoppingCart, "No orders yet")
+                          ) : (
+                            <div className="space-y-6">
+                              <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-lg font-semibold">
+                                  Your Orders
+                                </h2>
+                              </div>
+
+                              {orders.map((order) => (
+                                <Card
+                                  key={order.id}
+                                  className="overflow-hidden"
+                                >
+                                  <CardHeader className="bg-gray-50 py-3">
+                                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                                      <div>
+                                        <div className="flex items-center">
+                                          <h3 className="font-medium text-sm sm:text-base">
+                                            Order #
+                                            {order.orderId.substring(0, 8)}
+                                            ...
+                                          </h3>
+                                          <Badge
+                                            variant={
+                                              order.status === "completed"
+                                                ? "success"
+                                                : "outline"
+                                            }
+                                            className="ml-2"
+                                          >
+                                            {order.status === "completed"
+                                              ? "Completed"
+                                              : order.status}
+                                          </Badge>
+                                        </div>
+                                        <p className="text-xs sm:text-sm text-muted-foreground">
+                                          {format(
+                                            new Date(order.timestamp),
+                                            "MMM d, yyyy · h:mm a"
+                                          )}
+                                        </p>
+                                      </div>
+                                      <div className="text-right">
+                                        <p className="font-semibold text-sm sm:text-base">
+                                          ₹{order.amount?.toFixed(2)}
+                                        </p>
+                                        <p className="text-xs sm:text-sm text-muted-foreground">
+                                          {order.businessName}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </CardHeader>
+                                  <CardContent className="p-0">
+                                    <div className="px-4 py-3 border-b">
+                                      <div className="flex justify-between items-center">
+                                        <h4 className="text-sm font-medium">
+                                          Items
+                                        </h4>
+                                        <span className="text-xs text-muted-foreground">
+                                          {order.products?.length || 0} item(s)
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <div className="divide-y">
+                                      {order.products?.map((product, idx) => (
+                                        <div
+                                          key={idx}
+                                          className="p-4 flex items-center gap-3"
+                                        >
+                                          <div className="relative w-12 h-12 bg-gray-100 rounded overflow-hidden flex-shrink-0">
+                                            {product.imageUrl ? (
+                                              <Image
+                                                src={product.imageUrl}
+                                                alt={product.productName}
+                                                fill
+                                                className="object-cover"
+                                              />
+                                            ) : (
+                                              <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                                <Package className="w-6 h-6" />
+                                              </div>
+                                            )}
+                                          </div>
+                                          <div className="flex-grow">
+                                            <h5 className="font-medium text-sm">
+                                              {product.productName}
+                                            </h5>
+                                            <div className="flex items-center text-sm text-muted-foreground">
+                                              <span>
+                                                ₹{product.amount?.toFixed(2)} ×{" "}
+                                                {product.quantity}
+                                              </span>
+                                            </div>
+                                            {order.status === "completed" && (
+                                              <div className="mt-2">
+                                                {productRatings[
+                                                  product.productId
+                                                ] ? (
+                                                  <div className="flex flex-col gap-1">
+                                                    {renderStarRating(
+                                                      productRatings[
+                                                        product.productId
+                                                      ].rating
+                                                    )}
+                                                    <div className="flex items-center justify-between">
+                                                      <span className="text-xs text-green-600">
+                                                        You rated this product
+                                                      </span>
+                                                      <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="text-xs h-7 px-2 text-muted-foreground hover:text-primary"
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          handleOpenRatingDialog(
+                                                            product,
+                                                            order
+                                                          );
+                                                        }}
+                                                      >
+                                                        Edit
+                                                      </Button>
+                                                    </div>
+                                                  </div>
+                                                ) : (
+                                                  <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="text-xs"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      handleOpenRatingDialog(
+                                                        product,
+                                                        order
+                                                      );
+                                                    }}
+                                                  >
+                                                    Rate & Review
+                                                  </Button>
+                                                )}
+                                              </div>
+                                            )}
+                                          </div>
+                                          <div className="text-right">
+                                            <p className="font-medium">
+                                              ₹
+                                              {(
+                                                product.amount *
+                                                product.quantity
+                                              ).toFixed(2)}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                    <div className="border-t p-4 bg-gray-50">
+                                      <div className="flex flex-col gap-2">
+                                        <div className="flex justify-between">
+                                          <span className="text-sm font-medium">
+                                            Total
+                                          </span>
+                                          <span className="font-semibold">
+                                            ₹{order.amount?.toFixed(2)}
+                                          </span>
+                                        </div>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="flex items-center gap-1 mt-2 w-full"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleGenerateBill(order);
+                                          }}
+                                        >
+                                          <FileText className="h-4 w-4" />
+                                          <span>Generate Bill</span>
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              ))}
+                            </div>
+                          )}
+                        </TabsContent>
                       </Tabs>
                     </Card>
                   </Suspense>
@@ -1587,39 +2449,48 @@ export default function Profile() {
                     <Card className="border-0 shadow-sm overflow-hidden bg-white">
                       <Tabs defaultValue="saved" className="w-full">
                         <div className="border-b overflow-x-auto scrollbar-hide">
-                          <TabsList className="justify-start h-auto p-0 bg-transparent overflow-x-auto scrollbar-hide whitespace-nowrap w-max min-w-full">
+                          <TabsList className="justify-between h-auto p-0 bg-transparent w-full flex">
                             <TabsTrigger
+                              title="Saved Posts"
                               value="saved"
                               className={cn(
-                                "rounded-none border-b-2 border-transparent",
+                                "rounded-none border-b-2 border-transparent flex-1",
                                 "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
+                                "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
                               )}
                             >
-                              <Bookmark className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                              Saved Posts
+                              <Bookmark className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="hidden data-[state=active]:block">
+                                Saved Posts
+                              </span>
                             </TabsTrigger>
                             <TabsTrigger
+                              title="Liked Posts"
                               value="likes"
                               className={cn(
-                                "rounded-none border-b-2 border-transparent",
+                                "rounded-none border-b-2 border-transparent flex-1",
                                 "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
+                                "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
                               )}
                             >
-                              <HeartIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                              Likes
+                              <HeartIcon className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="hidden data-[state=active]:block">
+                                Likes
+                              </span>
                             </TabsTrigger>
                             <TabsTrigger
+                              title="Your Orders"
                               value="orders"
                               className={cn(
-                                "rounded-none border-b-2 border-transparent",
+                                "rounded-none border-b-2 border-transparent flex-1",
                                 "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-4 sm:px-6 py-3 font-medium text-xs sm:text-sm transition-all duration-200 whitespace-nowrap"
+                                "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
                               )}
                             >
-                              <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                              Orders
+                              <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="hidden data-[state=active]:block">
+                                Orders
+                              </span>
                             </TabsTrigger>
                           </TabsList>
                         </div>

@@ -12,6 +12,7 @@ import {
   GoogleAuthProvider,
   signInWithEmailAndPassword,
   signInWithPopup,
+  sendPasswordResetEmail,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import toast from "react-hot-toast";
@@ -64,6 +65,45 @@ export function LoginForm() {
         console.log(errorCode, errorMessage);
         toast.error("Error signing in");
       });
+  };
+
+  const handleForgotPassword = async () => {
+    const userEmail = window.prompt("Please enter your email address to reset your password:");
+    
+    if (!userEmail) {
+      return; // User cancelled or didn't enter email
+    }
+    
+    if (!userEmail.includes("@")) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      await sendPasswordResetEmail(auth, userEmail);
+      toast.success("Password reset email sent! Check your inbox.");
+    } catch (error) {
+      console.error("Error sending password reset email:", error);
+      
+      // Handle specific Firebase auth errors
+      switch (error.code) {
+        case "auth/user-not-found":
+          toast.error("No account found with this email address");
+          break;
+        case "auth/invalid-email":
+          toast.error("Invalid email address");
+          break;
+        case "auth/too-many-requests":
+          toast.error("Too many requests. Please try again later");
+          break;
+        default:
+          toast.error("Failed to send password reset email. Please try again");
+          break;
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -130,12 +170,14 @@ export function LoginForm() {
             <div className="grid gap-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Password</Label>
-                <a
-                  href="#"
-                  className="text-sm text-muted-foreground underline underline-offset-4 hover:text-primary"
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={isLoading}
+                  className="text-sm text-muted-foreground underline underline-offset-4 hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed bg-transparent border-none cursor-pointer"
                 >
                   Forgot password?
-                </a>
+                </button>
               </div>
               <Input
                 id="password"
