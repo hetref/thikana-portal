@@ -24,7 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, X, Plus } from "lucide-react";
+import { X, Plus } from "lucide-react";
 import { auth, db, storage } from "@/lib/firebase";
 import {
   collection,
@@ -35,6 +35,7 @@ import {
 } from "firebase/firestore";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import toast from "react-hot-toast";
+import Loader from "@/components/Loader";
 
 export default function AddPropertyModal({
   onPropertyAdded,
@@ -477,7 +478,7 @@ export default function AddPropertyModal({
             <Button type="submit" disabled={uploadingImages}>
               {uploadingImages ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader/>
                   Uploading...
                 </>
               ) : (

@@ -32,6 +32,8 @@ import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import toast from "react-hot-toast";
 import { Separator } from "@/components/ui/separator";
+import Loader from "@/components/Loader";
+
 
 export default function SettingsTab() {
   const [user, setUser] = useState(null);

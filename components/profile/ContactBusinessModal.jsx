@@ -33,9 +33,10 @@ import {
   limit,
 } from "firebase/firestore";
 import toast from "react-hot-toast";
-import { Loader2, MessageSquare, TicketIcon } from "lucide-react";
+import { MessageSquare, TicketIcon } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import Loader from "@/components/Loader";
 
 export default function ContactBusinessModal({
   isOpen,
@@ -310,7 +311,7 @@ export default function ContactBusinessModal({
             <form onSubmit={handleSubmit} className="space-y-4 mt-4">
               {loading ? (
                 <div className="flex justify-center py-4">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  <Loader/>
                 </div>
               ) : services.length === 0 ? (
                 <div className="text-center py-2 text-muted-foreground">
@@ -401,7 +402,7 @@ export default function ContactBusinessModal({
                 >
                   {isSubmitting ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader/>
                       Creating Ticket...
                     </>
                   ) : (
@@ -416,7 +417,7 @@ export default function ContactBusinessModal({
             <div className="space-y-4 py-2">
               {loadingTickets ? (
                 <div className="flex justify-center py-4">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  <Loader/>
                 </div>
               ) : tickets.length === 0 ? (
                 <div className="text-center py-6 text-muted-foreground">

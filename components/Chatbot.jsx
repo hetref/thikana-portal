@@ -17,11 +17,11 @@ import {
   X,
   MessageCircle,
   Send,
-  Loader2,
   ArrowDownCircleIcon,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { generateId } from "@/lib/utils";
+import Loader from "@/components/Loader";
 
 // Custom chat hook to replace @ai-sdk/react
 function useCustomChat() {
@@ -286,13 +286,12 @@ export default function Chatbot() {
                   ))}
                   {isLoading && (
                     <div className="w-full items-center flex justify-center gap-3">
-                      <Loader2 className="animate-spin h-5 w-5 text-primary" />
+                      <Loader className="h-1 w-1"/>
                       <button
                         className="underline"
                         type="button"
                         onClick={() => stop()}
                       >
-                        loading
                       </button>
                     </div>
                   )}

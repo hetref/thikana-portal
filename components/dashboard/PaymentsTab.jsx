@@ -43,7 +43,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
-  Loader2,
   PlusCircle,
   Link as LinkIcon,
   Calendar as CalendarIcon,
@@ -90,6 +89,7 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
+import Loader from "@/components/Loader";
 
 // Schema for creating a payment link
 const paymentLinkSchema = z.object({
@@ -620,7 +620,7 @@ export default function PaymentsTab() {
   if (loading) {
     return (
       <div className="flex justify-center items-center py-16">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <Loader/>
       </div>
     );
   }
@@ -1018,7 +1018,7 @@ export default function PaymentsTab() {
                   <Button type="submit" disabled={isGeneratingLink}>
                     {isGeneratingLink ? (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <Loader/>
                         Creating...
                       </>
                     ) : (
@@ -1171,7 +1171,7 @@ export default function PaymentsTab() {
                 >
                   {isGeneratingLink ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader/>
                       Creating...
                     </>
                   ) : (
@@ -1199,7 +1199,7 @@ export default function PaymentsTab() {
 
           {loadingDetails ? (
             <div className="py-8 flex justify-center">
-              <Loader2 className="h-8 w-8 animate-spin" />
+              <Loader/>
             </div>
           ) : (
             <div className="py-4 space-y-6">
@@ -1524,7 +1524,7 @@ export default function PaymentsTab() {
             >
               {isCancelling ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader/>
                   Cancelling...
                 </>
               ) : (

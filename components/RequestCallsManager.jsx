@@ -43,7 +43,6 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
   Phone,
-  Loader2,
   Check,
   X,
   Clock,
@@ -60,6 +59,7 @@ import toast from "react-hot-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import Loader from "@/components/Loader";
 
 export default function RequestCallsManager() {
   const [callRequests, setCallRequests] = useState([]);
@@ -375,7 +375,7 @@ export default function RequestCallsManager() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-48">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader/>
       </div>
     );
   }
@@ -624,7 +624,7 @@ export default function RequestCallsManager() {
                         >
                           {savingBooking ? (
                             <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              <Loader/>
                               Saving...
                             </>
                           ) : (
@@ -739,7 +739,7 @@ export default function RequestCallsManager() {
                   >
                     {processingCall ? (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <Loader/>
                         Initiating...
                       </>
                     ) : (

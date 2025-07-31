@@ -52,10 +52,10 @@ import {
   orderBy,
   Timestamp,
 } from "firebase/firestore";
-import { Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useEffect } from "react";
 import { sendNotificationToUser } from "@/lib/notifications";
+import Loader from "@/components/Loader";
 
 export default function ContactsTab() {
   const [contacts, setContacts] = useState([]);
@@ -315,7 +315,7 @@ export default function ContactsTab() {
   if (loading) {
     return (
       <div className="flex justify-center items-center py-16">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <Loader/>
       </div>
     );
   }

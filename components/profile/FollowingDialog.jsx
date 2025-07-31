@@ -13,7 +13,6 @@ import { doc, setDoc, deleteDoc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import Link from "next/link";
 import {
-  Loader2,
   Minus,
   Search,
   UserMinus,
@@ -26,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import toast from "react-hot-toast";
 import { sendNotificationToUser } from "@/lib/notifications";
+import Loader from "@/components/Loader";
 
 const FollowingDialog = ({ followingCount, userId, className }) => {
   const [following, setFollowing] = useState([]);
@@ -188,7 +188,7 @@ const FollowingDialog = ({ followingCount, userId, className }) => {
           <div className="mt-2 max-h-[60vh] overflow-y-auto pr-1">
             {loading ? (
               <div className="flex flex-col items-center justify-center py-8 space-y-2">
-                <Loader2 className="h-8 w-8 animate-spin text-primary/70" />
+                <Loader/>
                 <p className="text-sm text-muted-foreground">
                   Loading following...
                 </p>
@@ -305,7 +305,7 @@ const FollowingDialog = ({ followingCount, userId, className }) => {
                       >
                         {loadingId === user?.uid ? (
                           <>
-                            <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                            <Loader/>
                             <span>Unfollowing...</span>
                           </>
                         ) : (

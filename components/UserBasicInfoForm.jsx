@@ -17,7 +17,7 @@ import toast from "react-hot-toast";
 import ImageUpload from "./ImageUpload";
 import { storage } from "@/lib/firebase";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
-import { Loader2, Info } from "lucide-react";
+import { Info } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Tooltip,
@@ -257,7 +257,7 @@ export default function UserBasicInfoForm({ userData = null }) {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-[50vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader />
       </div>
     );
   }
@@ -461,7 +461,7 @@ export default function UserBasicInfoForm({ userData = null }) {
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader/>
                   Updating...
                 </>
               ) : (

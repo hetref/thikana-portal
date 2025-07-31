@@ -21,11 +21,12 @@ import toast from "react-hot-toast";
 import ImageUpload from "./ImageUpload";
 import { storage } from "@/lib/firebase";
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
-import { Loader2 } from "lucide-react";
 import { Plus, X, Edit2, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import Loader from "@/components/Loader";
+
 
 const basicInfoSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -327,7 +328,7 @@ export default function BasicInfoForm() {
     return (
       <div className="flex justify-center items-center min-h-[400px]">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <Loader/>
           <p className="text-muted-foreground">Loading your profile...</p>
         </div>
       </div>
@@ -361,7 +362,7 @@ export default function BasicInfoForm() {
             {uploadingType && (
               <div className="md:col-span-2 bg-blue-50 p-3 rounded-md">
                 <div className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader/>
                   <span>
                     {uploadingType === "profileImg"
                       ? `Profile Image Uploading... ${uploadingProgress.profileImg.toFixed(0)}%`
@@ -512,7 +513,7 @@ export default function BasicInfoForm() {
                         >
                           {isGeneratingTags ? (
                             <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              <Loader/>
                               Generating...
                             </>
                           ) : (
@@ -680,7 +681,7 @@ export default function BasicInfoForm() {
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader/>
                   Saving...
                 </>
               ) : (

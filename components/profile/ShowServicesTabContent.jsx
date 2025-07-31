@@ -27,7 +27,6 @@ import {
   Settings,
   ArrowRight,
   Clock,
-  Loader2,
   MessageSquare,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -181,7 +180,7 @@ export default function ShowServicesTabContent({
   if (loading) {
     return (
       <div className="flex justify-center items-center py-16">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <Loader/>
       </div>
     );
   }
@@ -342,7 +341,7 @@ export default function ShowServicesTabContent({
               <Button type="submit" disabled={contactForm.submitting}>
                 {contactForm.submitting ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader/>
                     Sending...
                   </>
                 ) : (

@@ -23,7 +23,8 @@ import {
 import { auth, db } from "@/lib/firebase";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import toast from "react-hot-toast";
-import { Loader2, Plus, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
+import Loader from "@/components/Loader";
 
 const businessInfoSchema = z.object({
   business_type: z.string().min(1, "Business type is required"),
@@ -284,7 +285,7 @@ export default function BusinessInfoForm({
 
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <Loader/>
           </div>
         ) : (
           <div>
@@ -356,7 +357,7 @@ export default function BusinessInfoForm({
     return (
       <div className="flex justify-center items-center min-h-[400px]">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <Loader/>
           <p className="text-muted-foreground">
             Loading business information...
           </p>
@@ -606,7 +607,7 @@ export default function BusinessInfoForm({
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader/>
                   Saving...
                 </>
               ) : (

@@ -10,7 +10,6 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import {
-  Loader2,
   TrendingUp,
   TrendingDown,
   AlertTriangle,
@@ -37,6 +36,7 @@ import {
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { toast } from "react-hot-toast";
+import Loader from "@/components/Loader";
 
 // Colors for pie chart
 const COLORS = [
@@ -457,7 +457,7 @@ export default function AnalyticsTab() {
   if (loading) {
     return (
       <div className="flex justify-center py-8">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <Loader/>
       </div>
     );
   }
@@ -478,7 +478,7 @@ export default function AnalyticsTab() {
             className="flex items-center gap-2"
           >
             {generatingPdf ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader/>
             ) : (
               <Download className="h-4 w-4" />
             )}

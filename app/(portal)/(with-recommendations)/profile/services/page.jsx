@@ -33,7 +33,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 import {
   AlertDialog,
@@ -48,6 +48,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import Loader from "@/components/Loader";
+
 
 export default function ServicesPage() {
   const [services, setServices] = useState([]);
@@ -196,7 +198,7 @@ export default function ServicesPage() {
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <Loader/>
       </div>
     );
   }
