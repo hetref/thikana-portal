@@ -25,7 +25,6 @@ import {
   ChevronRight,
   Home,
 } from "lucide-react";
-import { useSearchParams } from "next/navigation";
 import { useGetUserPosts } from "@/hooks/useGetPosts";
 import useGetUser from "@/hooks/useGetUser";
 import { auth, db } from "@/lib/firebase";
@@ -77,8 +76,7 @@ const scrollbarHideStyles = `
 export default function UserProfile() {
   const router = useRouter();
   const params = useParams();
-  const username = params.username;
-  const searchParams = useSearchParams();
+  const userId = params.username; // Use username param directly as userId
   const [currentUser, setCurrentUser] = useState(null);
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
@@ -89,9 +87,6 @@ export default function UserProfile() {
   const [userPhotos, setUserPhotos] = useState([]);
   const [loadingPhotos, setLoadingPhotos] = useState(false);
 
-  // Get the user ID from the search params or by looking up the username
-  const paramUserId = searchParams.get("user");
-  const [userId, setUserId] = useState(paramUserId);
   const userData = useGetUser(userId);
 
   // Log user data for debugging
@@ -109,24 +104,6 @@ export default function UserProfile() {
     hasMore,
     error,
   } = useGetUserPosts(userId);
-
-  // If we don't have a userId from search params, look it up by username
-  useEffect(() => {
-    const fetchUserIdByUsername = async () => {
-      if (!username || paramUserId) return;
-      try {
-        const usernameDoc = await getDoc(doc(db, "usernames", username));
-        if (usernameDoc.exists()) {
-          const uid = usernameDoc.data().uid;
-          setUserId(uid);
-        }
-      } catch (err) {
-        console.error("Error fetching user by username:", err);
-      }
-    };
-
-    fetchUserIdByUsername();
-  }, [username, paramUserId]);
 
   // Check if the current user is logged in
   useEffect(() => {

@@ -1,14 +1,14 @@
 "use client";
 import Sidebar from "@/components/Sidebar";
 import React, { useEffect, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams } from "next/navigation";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Loader2 } from "lucide-react";
 
 const UsernameLayout = ({ children }) => {
-  const searchParams = useSearchParams();
-  const userId = searchParams.get("user");
+  const params = useParams();
+  const userId = params.username; // Use username param directly as userId
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
