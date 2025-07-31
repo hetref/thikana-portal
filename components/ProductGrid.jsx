@@ -9,7 +9,7 @@ import { db } from "@/lib/firebase";
 import { ShoppingBag, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import useBusinessIdForMember from "@/hooks/useBusinessIdForMember";
-
+import Loader from "@/components/Loader"
 export function ProductGrid({ userId, userData, userType = "customer" }) {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [products, setProducts] = useState([]);
@@ -74,7 +74,7 @@ export function ProductGrid({ userId, userData, userType = "customer" }) {
   if (idLoading || loading) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
-        <Loader/>
+        <Loader />
         <p className="text-muted-foreground">Loading products...</p>
       </div>
     );
