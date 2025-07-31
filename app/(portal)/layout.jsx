@@ -13,7 +13,7 @@ import { GlobalLocationAlert } from "@/components/GlobalLocationAlert";
 import { ToastProvider } from "@/components/ui/use-toast";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/context/AuthContext";
-
+// portal
 const layout = ({ children }) => {
   const [userData, setUserData] = useState(null);
   const router = useRouter();
