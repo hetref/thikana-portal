@@ -23,7 +23,7 @@ const layout = ({ children }) => {
         setUserData(user);
       } else {
         setUserData(false);
-        router.push("/");
+        router.push("/login");
       }
     });
 
