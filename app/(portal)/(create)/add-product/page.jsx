@@ -15,7 +15,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import ImageUpload from "@/components/ImageUpload";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { collection, addDoc } from "firebase/firestore";
+import { collection, addDoc, updateDoc, setDoc, doc } from "firebase/firestore";
 import { auth, db, storage } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
@@ -113,9 +113,9 @@ const AddProductPage = () => {
         quantity: parseInt(formState.quantity) || 0,
         category: formState.category,
         imageUrl: imageUrl,
-        businessId: user.uid,
+        userId: user.uid,
         createdAt: new Date(),
-        // Add analytics fields with initial values
+        // Analytics fields with initial values
         totalSales: 0,
         totalRevenue: 0,
         purchaseCount: 0,
@@ -128,11 +128,14 @@ const AddProductPage = () => {
         yearlySales: {},
       };
 
-      // Add to the user's products collection
-      console.log("Creating product document with data:", productData);
-      const productsRef = collection(db, `users/${user.uid}/products`);
-      const docRef = await addDoc(productsRef, productData);
-      console.log("Product document created with ID:", docRef.id);
+      // Add to the root products collection
+      const productsRootRef = collection(db, "products");
+      const docRef = await addDoc(productsRootRef, productData);
+      await updateDoc(docRef, { id: docRef.id });
+
+      // Add to the user's products subcollection with the same ID
+      const userProductsRef = collection(db, "users", user.uid, "products");
+      await setDoc(doc(userProductsRef, docRef.id), { ...productData, id: docRef.id });
 
       toast.success("Product added successfully!");
       // Clear form
@@ -246,7 +249,7 @@ const AddProductPage = () => {
             <div className="space-y-2">
               <Label>Product Image</Label>
               <ImageUpload
-                label="Product Image"
+                label=""
                 onImageChange={handleFileChange}
                 currentImage={file ? URL.createObjectURL(file) : null}
                 isSubmitting={loading}

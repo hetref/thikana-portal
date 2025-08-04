@@ -12,7 +12,7 @@ import { LocationAlertProvider } from "@/lib/context/LocationAlertContext";
 import { GlobalLocationAlert } from "@/components/GlobalLocationAlert";
 import { ToastProvider } from "@/components/ui/use-toast";
 import { Toaster } from "@/components/ui/toaster";
-import { AuthProvider } from "@/context/AuthContext";
+// AuthProvider is already provided in root layout
 // portal
 const layout = ({ children }) => {
   const [userData, setUserData] = useState(null);
@@ -37,16 +37,14 @@ const layout = ({ children }) => {
     );
   }
   return (
-    <AuthProvider>
-      <ToastProvider>
-        <LocationAlertProvider>
-          <GlobalLocationAlert />
-          <MainNav />
-          <div className="mt-[80px]">{children}</div>
-          <Toaster />
-        </LocationAlertProvider>
-      </ToastProvider>
-    </AuthProvider>
+    <ToastProvider>
+      <LocationAlertProvider>
+        <GlobalLocationAlert />
+        <MainNav />
+        <div className="mt-[80px]">{children}</div>
+        <Toaster />
+      </LocationAlertProvider>
+    </ToastProvider>
   );
 };
 
