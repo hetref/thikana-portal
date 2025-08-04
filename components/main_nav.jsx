@@ -281,6 +281,11 @@ const MainNav = () => {
                         <span>Add Product</span>
                       </Link>
                     </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/add-bulk-products" className="flex items-center gap-2">
+                        <span>Add Bulk Products</span>
+                      </Link>
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
 

@@ -1,16 +1,12 @@
 "use client";
 import React from "react";
-import "@/app/globals.css";
-import { Inter } from "next/font/google";
 
-const inter = Inter({ subsets: ["latin"] });
-
-const RootLayout = ({ children }) => {
+const WbLayout = ({ children }) => {
   return (
-    <html lang="en">
-      <body className={inter.className}>{children}</body>
-    </html>
+    <div className="w-full h-full">
+      {children}
+    </div>
   );
 };
 
-export default RootLayout;
+export default WbLayout;
