@@ -2,6 +2,7 @@
 
 import { Instagram, Linkedin, Twitter, Youtube } from "lucide-react"
 import Image from "next/image"
+import { useTheme } from "@/context/ThemeContext"
 
 const footerColumns = [
   {
@@ -28,8 +29,10 @@ const socialIcons = [
 ]
 
 export default function Footer() {
+  const { isDark } = useTheme();
+  
   return (
-    <footer className="bg-black text-white relative w-full pt-20 pb-10">
+    <footer className={`${isDark ? 'bg-zinc-900 text-white' : 'bg-black text-white'} relative w-full pt-20 pb-10 transition-colors duration-300`}>
       <div className="pointer-events-none absolute top-0 left-0 z-0 h-full w-full overflow-hidden">
         <div className="bg-white/5 absolute top-1/3 left-1/4 h-64 w-64 rounded-full opacity-10 blur-3xl" />
         <div className="bg-white/5 absolute right-1/4 bottom-1/4 h-80 w-80 rounded-full opacity-10 blur-3xl" />
@@ -40,7 +43,7 @@ export default function Footer() {
           <div className="col-span-2 lg:col-span-1">
             <div className="mb-6 flex items-center space-x-2">
               <Image 
-                src="/logo/white-logo.png" 
+                src={isDark ? "/logo/white-logo.png" : "/logo/black-logo.png"} 
                 alt="logo" 
                 width={100} 
                 height={100} 

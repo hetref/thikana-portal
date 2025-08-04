@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { auth, db, storage } from "@/lib/firebase"; // Firebase setup
-import { collection, addDoc } from "firebase/firestore";
+import { collection, addDoc, updateDoc, setDoc, doc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
@@ -74,7 +74,8 @@ const BulkProductUpload = () => {
     setIsSubmitting(true);
 
     try {
-      const productsRef = collection(db, "users", user.uid, "products");
+      const productsRootRef = collection(db, "products");
+      const userProductsRef = collection(db, "users", user.uid, "products");
 
       // Upload images & store URLs
       const imageUploadPromises = tableData.map(async (product, index) => {
@@ -88,16 +89,16 @@ const BulkProductUpload = () => {
 
       // Save products to Firestore with the same structure as single product upload
       const productUploadPromises = tableData.map(async (product, index) => {
-        return addDoc(productsRef, {
+        const productData = {
           name: product.Name || "",
           description: product.Description || "",
           price: parseFloat(product.Price) || 0,
-          category: product.Category || "",
           quantity: parseInt(product.Quantity) || 0,
+          category: product.Category || "",
           imageUrl: imageUrls[index],
-          businessId: user.uid,
+          userId: user.uid,
           createdAt: new Date(),
-          // Add analytics fields with initial values - matching single product upload
+          // Analytics fields with initial values
           totalSales: 0,
           totalRevenue: 0,
           purchaseCount: 0,
@@ -108,7 +109,12 @@ const BulkProductUpload = () => {
           },
           monthlySales: {},
           yearlySales: {},
-        });
+        };
+        // Add to the root products collection
+        const docRef = await addDoc(productsRootRef, productData);
+        await updateDoc(docRef, { id: docRef.id });
+        // Add to the user's products subcollection with the same ID
+        await setDoc(doc(userProductsRef, docRef.id), { ...productData, id: docRef.id });
       });
 
       await Promise.all(productUploadPromises);

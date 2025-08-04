@@ -2,7 +2,14 @@ import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "./ui/card";
 import { Avatar, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
-import { Heart, MessageCircle, MapPin, Send, Bookmark, MoreVertical } from "lucide-react";
+import {
+  Heart,
+  MessageCircle,
+  MapPin,
+  Send,
+  Bookmark,
+  MoreVertical,
+} from "lucide-react";
 import { Input } from "./ui/input";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
@@ -18,8 +25,22 @@ import {
   deleteDoc,
 } from "firebase/firestore";
 import toast from "react-hot-toast";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "./ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 
@@ -32,7 +53,7 @@ function PostCard({ post, onLike, onView, showDistance, distanceText }) {
   const [isSaved, setIsSaved] = useState(false);
   const [isSaveProcessing, setIsSaveProcessing] = useState(false);
   const router = useRouter();
-  
+
   // Edit and delete states
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteAlert, setShowDeleteAlert] = useState(false);
@@ -73,20 +94,20 @@ function PostCard({ post, onLike, onView, showDistance, distanceText }) {
     };
 
     checkIfSaved();
-    
+
     // Check if current user is the post owner
     const currentUser = auth.currentUser;
     if (currentUser && post) {
       // Check both uid (from creation) and authorId (might be used in some posts)
       setIsPostOwner(
-        currentUser.uid === post.uid || 
-        currentUser.uid === post.authorId
+        currentUser.uid === post.uid || currentUser.uid === post.authorId
       );
       console.log("Post ownership:", {
         currentUserId: currentUser.uid,
         postUid: post.uid,
         postAuthorId: post.authorId,
-        isOwner: currentUser.uid === post.uid || currentUser.uid === post.authorId
+        isOwner:
+          currentUser.uid === post.uid || currentUser.uid === post.authorId,
       });
     }
   }, [post?.postId, post?.uid, post?.authorId]);
@@ -256,7 +277,7 @@ function PostCard({ post, onLike, onView, showDistance, distanceText }) {
   // Handle edit post
   const handleEditPost = async (e) => {
     if (e) e.preventDefault();
-    
+
     if (!editData.title.trim() || !editData.description.trim()) {
       toast.error("Title and description cannot be empty.");
       return;
@@ -274,12 +295,11 @@ function PostCard({ post, onLike, onView, showDistance, distanceText }) {
 
       toast.success("Post updated successfully!");
       setShowEditDialog(false);
-      
+
       // Update the local post state
       post.title = editData.title;
       post.content = editData.description;
       post.description = editData.description;
-      
     } catch (error) {
       console.error("Error updating post:", error);
       toast.error("Failed to update post. Please try again.");
@@ -311,7 +331,7 @@ function PostCard({ post, onLike, onView, showDistance, distanceText }) {
       e.stopPropagation();
       e.preventDefault();
     }
-    
+
     setEditData({
       title: post.title || post.caption || "",
       description: post.content || post.description || "",
@@ -325,7 +345,7 @@ function PostCard({ post, onLike, onView, showDistance, distanceText }) {
       e.stopPropagation();
       e.preventDefault();
     }
-    
+
     setShowDeleteAlert(true);
   };
 
@@ -346,12 +366,16 @@ function PostCard({ post, onLike, onView, showDistance, distanceText }) {
                 />
               </Avatar>
               <div>
-                <p className="font-semibold">{post?.authorName || "Anonymous"}</p>
+                <p className="font-semibold">
+                  {post?.authorName || "Anonymous"}
+                </p>
                 <p className="text-sm text-muted-foreground">
                   @{post?.authorUsername || "user"}
                 </p>
                 {isPostOwner && (
-                  <span className="text-xs text-blue-500">You are the author</span>
+                  <span className="text-xs text-blue-500">
+                    You are the author
+                  </span>
                 )}
               </div>
             </div>
@@ -363,11 +387,18 @@ function PostCard({ post, onLike, onView, showDistance, distanceText }) {
                   <span>{distanceText}</span>
                 </div>
               )}
-              
+
               {isPostOwner && (
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                    <Button variant="outline" size="icon" className="h-8 w-8 border border-gray-200">
+                  <DropdownMenuTrigger
+                    asChild
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 border border-gray-200"
+                    >
                       <MoreVertical className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -375,9 +406,10 @@ function PostCard({ post, onLike, onView, showDistance, distanceText }) {
                     <DropdownMenuItem onClick={openEditDialog}>
                       Edit
                     </DropdownMenuItem>
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
                       onClick={openDeleteDialog}
-                      className="text-red-500 focus:text-red-500">
+                      className="text-red-500 focus:text-red-500"
+                    >
                       Delete
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -388,8 +420,42 @@ function PostCard({ post, onLike, onView, showDistance, distanceText }) {
 
           {/* Post Content */}
           <div className="space-y-4">
-            <h3 className="font-semibold text-lg">{post?.title || post?.caption || ""}</h3>
-            <p>{post?.content || post?.description || "No description"}</p>
+            <h3 className="font-semibold text-lg">
+              {post?.title || post?.caption || ""}
+            </h3>
+            {(() => {
+              const text =
+                post?.content || post?.description || "No description";
+              const WORD_LIMIT = 30;
+              const words = text.split(/\s+/);
+              const isLong = words.length > WORD_LIMIT;
+              const excerpt = isLong
+                ? words.slice(0, WORD_LIMIT).join(" ") + "..."
+                : text;
+              const [showFull, setShowFull] = React.useState(false);
+
+              if (!isLong) {
+                return <p>{text}</p>;
+              }
+
+              return (
+                <p>
+                  {showFull ? text : excerpt}{" "}
+                  {!showFull && (
+                    <button
+                      type="button"
+                      className="text-gray-500 hover:underline text-sm font-medium"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowFull(true);
+                      }}
+                    >
+                      Read more...
+                    </button>
+                  )}
+                </p>
+              );
+            })()}
             {/* Image */}
             {post?.mediaUrl && (
               <div className="relative rounded-lg overflow-hidden bg-muted">
@@ -493,7 +559,9 @@ function PostCard({ post, onLike, onView, showDistance, distanceText }) {
               <Input
                 id="edit-title"
                 value={editData.title}
-                onChange={(e) => setEditData(prev => ({ ...prev, title: e.target.value }))}
+                onChange={(e) =>
+                  setEditData((prev) => ({ ...prev, title: e.target.value }))
+                }
                 placeholder="Enter post title"
               />
             </div>
@@ -502,7 +570,12 @@ function PostCard({ post, onLike, onView, showDistance, distanceText }) {
               <Textarea
                 id="edit-description"
                 value={editData.description}
-                onChange={(e) => setEditData(prev => ({ ...prev, description: e.target.value }))}
+                onChange={(e) =>
+                  setEditData((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
                 placeholder="Enter post description"
                 rows={5}
                 className="resize-none"
@@ -511,10 +584,7 @@ function PostCard({ post, onLike, onView, showDistance, distanceText }) {
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isEditing}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleEditPost}
-              disabled={isEditing}
-            >
+            <AlertDialogAction onClick={handleEditPost} disabled={isEditing}>
               {isEditing ? "Saving..." : "Save Changes"}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -527,7 +597,8 @@ function PostCard({ post, onLike, onView, showDistance, distanceText }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete your post.
+              This action cannot be undone. This will permanently delete your
+              post.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

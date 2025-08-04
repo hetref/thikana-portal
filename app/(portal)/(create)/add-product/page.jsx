@@ -13,9 +13,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-// import { FileUploader } from "@/components/ui/file-uploader";
+import ImageUpload from "@/components/ImageUpload";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { collection, addDoc } from "firebase/firestore";
+import { collection, addDoc, updateDoc, setDoc, doc } from "firebase/firestore";
 import { auth, db, storage } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
@@ -31,13 +31,18 @@ const AddProductPage = () => {
   });
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [authChecking, setAuthChecking] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
     // Check if user is authenticated
     const unsubscribe = auth.onAuthStateChanged((user) => {
+      setAuthChecking(false);
       if (!user) {
+        console.log("User not authenticated, redirecting to login");
         router.push("/login");
+      } else {
+        console.log("User authenticated:", user.uid);
       }
     });
 
@@ -50,29 +55,54 @@ const AddProductPage = () => {
   };
 
   const handleFileChange = (selectedFile) => {
+    console.log("File selected:", selectedFile);
     setFile(selectedFile);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log("Form submitted with data:", formState);
+    
+    // Basic validation
+    if (!formState.name.trim()) {
+      toast.error("Product name is required");
+      return;
+    }
+    
+    if (!formState.price || parseFloat(formState.price) <= 0) {
+      toast.error("Please enter a valid price");
+      return;
+    }
+    
+    if (!formState.quantity || parseInt(formState.quantity) < 0) {
+      toast.error("Please enter a valid quantity");
+      return;
+    }
+    
     setLoading(true);
 
     try {
       // Check if user is authenticated
       const user = auth.currentUser;
       if (!user) {
+        console.log("No authenticated user found");
         toast.error("You must be logged in to add a product");
         setLoading(false);
         return;
       }
+      console.log("User authenticated:", user.uid);
 
       let imageUrl = null;
       if (file) {
+        console.log("Uploading image:", file.name);
         // Upload image to Firebase Storage using the same path as bulk upload
         const filename = `${Date.now()}_${file.name}`;
         const storageRef = ref(storage, `products/${user.uid}/${filename}`);
         await uploadBytes(storageRef, file);
         imageUrl = await getDownloadURL(storageRef);
+        console.log("Image uploaded successfully:", imageUrl);
+      } else {
+        console.log("No image file selected");
       }
 
       // Create a product document in Firestore
@@ -83,9 +113,9 @@ const AddProductPage = () => {
         quantity: parseInt(formState.quantity) || 0,
         category: formState.category,
         imageUrl: imageUrl,
-        businessId: user.uid,
+        userId: user.uid,
         createdAt: new Date(),
-        // Add analytics fields with initial values
+        // Analytics fields with initial values
         totalSales: 0,
         totalRevenue: 0,
         purchaseCount: 0,
@@ -98,9 +128,14 @@ const AddProductPage = () => {
         yearlySales: {},
       };
 
-      // Add to the user's products collection
-      const productsRef = collection(db, `users/${user.uid}/products`);
-      const docRef = await addDoc(productsRef, productData);
+      // Add to the root products collection
+      const productsRootRef = collection(db, "products");
+      const docRef = await addDoc(productsRootRef, productData);
+      await updateDoc(docRef, { id: docRef.id });
+
+      // Add to the user's products subcollection with the same ID
+      const userProductsRef = collection(db, "users", user.uid, "products");
+      await setDoc(doc(userProductsRef, docRef.id), { ...productData, id: docRef.id });
 
       toast.success("Product added successfully!");
       // Clear form
@@ -114,8 +149,8 @@ const AddProductPage = () => {
       });
       setFile(null);
 
-      // Redirect to products page
-      router.push("/profile/products");
+      // Redirect to inventory page
+      router.push("/profile/inventory");
     } catch (error) {
       console.error("Error adding product:", error);
       toast.error("Failed to add product. Please try again.");
@@ -123,6 +158,17 @@ const AddProductPage = () => {
       setLoading(false);
     }
   };
+
+  if (authChecking) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto py-10">
@@ -202,10 +248,11 @@ const AddProductPage = () => {
 
             <div className="space-y-2">
               <Label>Product Image</Label>
-              <FileUploader
-                onFileSelect={handleFileChange}
-                acceptedFileTypes="image/*"
-                selectedFile={file}
+              <ImageUpload
+                label=""
+                onImageChange={handleFileChange}
+                currentImage={file ? URL.createObjectURL(file) : null}
+                isSubmitting={loading}
               />
             </div>
           </CardContent>
