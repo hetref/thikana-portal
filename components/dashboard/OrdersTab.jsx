@@ -42,6 +42,12 @@ import {
   Printer,
   FileText,
   Star,
+  Clock,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  Truck,
+  ChefHat,
 } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import {
@@ -64,22 +70,24 @@ import { Timestamp } from "firebase/firestore";
 import { toast } from "react-hot-toast";
 import Loader from "@/components/Loader";
 
-
 export default function OrdersTab() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [timeFilter, setTimeFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [hasMore, setHasMore] = useState(true);
   const [lastOrder, setLastOrder] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [billDialogOpen, setBillDialogOpen] = useState(false);
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
-  const [selectedProductForReview, setSelectedProductForReview] =
-    useState(null);
+  const [statusUpdateDialogOpen, setStatusUpdateDialogOpen] = useState(false);
+  const [selectedProductForReview, setSelectedProductForReview] = useState(null);
   const [ratingValue, setRatingValue] = useState(0);
   const [ratingFeedback, setRatingFeedback] = useState("");
   const [isSubmittingRating, setIsSubmittingRating] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [newOrderStatus, setNewOrderStatus] = useState("");
 
   const billRef = useRef();
 
@@ -91,7 +99,7 @@ export default function OrdersTab() {
 
   useEffect(() => {
     fetchOrders();
-  }, [timeFilter]);
+  }, [timeFilter, statusFilter]);
 
   const fetchOrders = async (isLoadMore = false) => {
     if (!auth.currentUser) return;
@@ -119,6 +127,11 @@ export default function OrdersTab() {
             break;
         }
         ordersQuery = query(ordersQuery, where("timestamp", ">=", startDate));
+      }
+
+      // Apply status filter
+      if (statusFilter !== "all") {
+        ordersQuery = query(ordersQuery, where("status", "==", statusFilter));
       }
 
       // Apply pagination
@@ -157,6 +170,18 @@ export default function OrdersTab() {
     );
   });
 
+  // Calculate stats
+  const calculateStats = () => {
+    const totalOrders = orders.length;
+    const pendingOrders = orders.filter(order => order.status === "pending").length;
+    const completedOrders = orders.filter(order => order.status === "completed").length;
+    const totalRevenue = orders.reduce((total, order) => total + (order.amount || 0), 0);
+
+    return { totalOrders, pendingOrders, completedOrders, totalRevenue };
+  };
+
+  const stats = calculateStats();
+
   const calculateTotal = (products) => {
     return products.reduce((total, product) => {
       return total + product.amount * product.quantity;
@@ -167,6 +192,76 @@ export default function OrdersTab() {
   const handleGenerateBill = (order) => {
     setSelectedOrder(order);
     setBillDialogOpen(true);
+  };
+
+  // Function to handle status update
+  const handleStatusUpdate = (order) => {
+    setSelectedOrder(order);
+    setNewOrderStatus(order.status);
+    setStatusUpdateDialogOpen(true);
+  };
+
+  // Function to update order status
+  const updateOrderStatus = async () => {
+    if (!selectedOrder || !newOrderStatus || newOrderStatus === selectedOrder.status) {
+      toast.error("Please select a different status");
+      return;
+    }
+
+    try {
+      setUpdatingStatus(true);
+
+      const response = await fetch("/api/update-order-status", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          orderId: selectedOrder.id,
+          newStatus: newOrderStatus,
+          businessId: auth.currentUser.uid,
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log("Status updated successfully:", result);
+        
+        // Update local state
+        setOrders(prev => prev.map(order => 
+          order.id === selectedOrder.id 
+            ? { ...order, status: newOrderStatus, statusUpdatedAt: new Date() }
+            : order
+        ));
+
+        toast.success(`Order status updated to ${newOrderStatus}`);
+        setStatusUpdateDialogOpen(false);
+        setSelectedOrder(null);
+        setNewOrderStatus("");
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.error || "Failed to update order status");
+      }
+    } catch (error) {
+      console.error("Error updating order status:", error);
+      toast.error("Failed to update order status");
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  // Get status icon and color
+  const getStatusInfo = (status) => {
+    const statusConfig = {
+      pending: { icon: Clock, color: "text-orange-600", bgColor: "bg-orange-100", label: "Pending" },
+      confirmed: { icon: CheckCircle, color: "text-blue-600", bgColor: "bg-blue-100", label: "Confirmed" },
+      preparing: { icon: ChefHat, color: "text-purple-600", bgColor: "bg-purple-100", label: "Preparing" },
+      ready: { icon: Package, color: "text-green-600", bgColor: "bg-green-100", label: "Ready" },
+      completed: { icon: CheckCircle, color: "text-green-600", bgColor: "bg-green-100", label: "Completed" },
+      cancelled: { icon: XCircle, color: "text-red-600", bgColor: "bg-red-100", label: "Cancelled" },
+    };
+
+    return statusConfig[status] || statusConfig.pending;
   };
 
   // Add this new function to handle review submission
@@ -338,15 +433,27 @@ export default function OrdersTab() {
   return (
     <div className="space-y-6">
       {/* Header with stats */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
             <ShoppingBag className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{orders.length}</div>
+            <div className="text-2xl font-bold">{stats.totalOrders}</div>
             <p className="text-xs text-muted-foreground">All time orders</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pending Orders</CardTitle>
+            <Clock className="h-4 w-4 text-orange-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">{stats.pendingOrders}</div>
+            <p className="text-xs text-muted-foreground">
+              Need your attention
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -354,12 +461,10 @@ export default function OrdersTab() {
             <CardTitle className="text-sm font-medium">
               Completed Orders
             </CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
+            <Package className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {orders.filter((order) => order.status === "completed").length}
-            </div>
+            <div className="text-2xl font-bold text-green-600">{stats.completedOrders}</div>
             <p className="text-xs text-muted-foreground">
               Successfully delivered
             </p>
@@ -383,10 +488,7 @@ export default function OrdersTab() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ₹
-              {orders
-                .reduce((total, order) => total + (order.amount || 0), 0)
-                .toFixed(2)}
+              ₹{stats.totalRevenue.toFixed(2)}
             </div>
             <p className="text-xs text-muted-foreground">
               Total earnings from orders
@@ -406,6 +508,20 @@ export default function OrdersTab() {
             className="pl-10"
           />
         </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Filter by status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="confirmed">Confirmed</SelectItem>
+            <SelectItem value="preparing">Preparing</SelectItem>
+            <SelectItem value="ready">Ready</SelectItem>
+            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="cancelled">Cancelled</SelectItem>
+          </SelectContent>
+        </Select>
         <Select value={timeFilter} onValueChange={setTimeFilter}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Filter by time" />
@@ -451,6 +567,7 @@ export default function OrdersTab() {
                   onClick={() => {
                     setSearchQuery("");
                     setTimeFilter("all");
+                    setStatusFilter("all");
                   }}
                   className="flex items-center gap-2"
                 >
@@ -461,129 +578,140 @@ export default function OrdersTab() {
             </div>
           ) : (
             <div className="space-y-4">
-              {filteredOrders.map((order) => (
-                <Card key={order.id} className="overflow-hidden">
-                  <CardHeader className="bg-gray-50 py-3">
-                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-                      <div>
-                        <div className="flex items-center">
-                          <h3 className="font-medium text-sm sm:text-base">
-                            Order #{order.orderId.substring(0, 8)}...
-                          </h3>
-                          <Badge
-                            variant={
-                              order.status === "completed"
-                                ? "success"
-                                : "outline"
-                            }
-                            className="ml-2"
-                          >
-                            {order.status === "completed"
-                              ? "Completed"
-                              : order.status}
-                          </Badge>
-                        </div>
-                        <p className="text-xs sm:text-sm text-muted-foreground">
-                          {format(
-                            new Date(order.timestamp),
-                            "MMM d, yyyy · h:mm a"
-                          )}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold text-sm sm:text-base">
-                          ₹{order.amount?.toFixed(2)}
-                        </p>
-                        <div className="flex items-center text-muted-foreground text-sm">
-                          <User className="h-3 w-3 mr-1" />
-                          <span>{order.userId.substring(0, 8)}...</span>
-                        </div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <div className="px-4 py-3 border-b">
-                      <div className="flex justify-between items-center">
-                        <h4 className="text-sm font-medium">Items</h4>
-                        <span className="text-xs text-muted-foreground">
-                          {order.products?.length || 0} item(s)
-                        </span>
-                      </div>
-                    </div>
-                    <div className="divide-y">
-                      {order.products?.map((product, idx) => (
-                        <div key={idx} className="p-4 flex items-center gap-3">
-                          <div className="relative w-12 h-12 bg-gray-100 rounded overflow-hidden flex-shrink-0">
-                            {product.imageUrl ? (
-                              <Image
-                                src={product.imageUrl}
-                                alt={product.productName}
-                                fill
-                                className="object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                <Package className="w-6 h-6" />
-                              </div>
-                            )}
+              {filteredOrders.map((order) => {
+                const statusInfo = getStatusInfo(order.status);
+                const StatusIcon = statusInfo.icon;
+
+                return (
+                  <Card key={order.id} className="overflow-hidden">
+                    <CardHeader className="bg-gray-50 py-3">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                        <div>
+                          <div className="flex items-center">
+                            <h3 className="font-medium text-sm sm:text-base">
+                              Order #{order.orderId.substring(0, 8)}...
+                            </h3>
+                            <Badge
+                              variant="outline"
+                              className={`ml-2 ${statusInfo.color} ${statusInfo.bgColor} border-0`}
+                            >
+                              <StatusIcon className="h-3 w-3 mr-1" />
+                              {statusInfo.label}
+                            </Badge>
                           </div>
-                          <div className="flex-grow">
-                            <h5 className="font-medium text-sm">
-                              {product.productName}
-                            </h5>
-                            <div className="flex items-center text-sm text-muted-foreground">
-                              <span>
-                                ₹{product.amount?.toFixed(2)} ×{" "}
-                                {product.quantity}
-                              </span>
+                          <p className="text-xs sm:text-sm text-muted-foreground">
+                            {format(
+                              new Date(order.timestamp),
+                              "MMM d, yyyy · h:mm a"
+                            )}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold text-sm sm:text-base">
+                            ₹{order.amount?.toFixed(2)}
+                          </p>
+                          <div className="flex items-center text-muted-foreground text-sm">
+                            <User className="h-3 w-3 mr-1" />
+                            <span>{order.userId.substring(0, 8)}...</span>
+                          </div>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <div className="px-4 py-3 border-b">
+                        <div className="flex justify-between items-center">
+                          <h4 className="text-sm font-medium">Items</h4>
+                          <span className="text-xs text-muted-foreground">
+                            {order.products?.length || 0} item(s)
+                          </span>
+                        </div>
+                      </div>
+                      <div className="divide-y">
+                        {order.products?.map((product, idx) => (
+                          <div key={idx} className="p-4 flex items-center gap-3">
+                            <div className="relative w-12 h-12 bg-gray-100 rounded overflow-hidden flex-shrink-0">
+                              {product.imageUrl ? (
+                                <Image
+                                  src={product.imageUrl}
+                                  alt={product.productName}
+                                  fill
+                                  className="object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                  <Package className="w-6 h-6" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-grow">
+                              <h5 className="font-medium text-sm">
+                                {product.productName}
+                              </h5>
+                              <div className="flex items-center text-sm text-muted-foreground">
+                                <span>
+                                  ₹{product.amount?.toFixed(2)} ×{" "}
+                                  {product.quantity}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-medium">
+                                ₹{(product.amount * product.quantity).toFixed(2)}
+                              </p>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-xs text-primary mt-1"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedProductForReview({
+                                    ...product,
+                                    orderId: order.id,
+                                    businessId: order.businessId,
+                                  });
+                                  setReviewDialogOpen(true);
+                                }}
+                              >
+                                Rate & Review
+                              </Button>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <p className="font-medium">
-                              ₹{(product.amount * product.quantity).toFixed(2)}
-                            </p>
+                        ))}
+                      </div>
+                      <div className="border-t p-4 bg-gray-50">
+                        <div className="flex flex-col gap-2">
+                          <div className="flex justify-between">
+                            <span className="text-sm font-medium">Total</span>
+                            <span className="font-semibold">
+                              ₹{order.amount?.toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="flex gap-2 mt-2">
                             <Button
-                              variant="ghost"
+                              variant="outline"
                               size="sm"
-                              className="text-xs text-primary mt-1"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedProductForReview({
-                                  ...product,
-                                  orderId: order.id,
-                                  businessId: order.businessId,
-                                });
-                                setReviewDialogOpen(true);
-                              }}
+                              className="flex items-center gap-1 flex-1"
+                              onClick={() => handleGenerateBill(order)}
                             >
-                              Rate & Review
+                              <FileText className="h-4 w-4" />
+                              <span>Bill</span>
+                            </Button>
+                            <Button
+                              variant="default"
+                              size="sm"
+                              className="flex items-center gap-1 flex-1"
+                              onClick={() => handleStatusUpdate(order)}
+                            >
+                              <AlertCircle className="h-4 w-4" />
+                              <span>Update Status</span>
                             </Button>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                    <div className="border-t p-4 bg-gray-50">
-                      <div className="flex flex-col gap-2">
-                        <div className="flex justify-between">
-                          <span className="text-sm font-medium">Total</span>
-                          <span className="font-semibold">
-                            ₹{order.amount?.toFixed(2)}
-                          </span>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex items-center gap-1 mt-2 w-full"
-                          onClick={() => handleGenerateBill(order)}
-                        >
-                          <FileText className="h-4 w-4" />
-                          <span>Generate Bill</span>
-                        </Button>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
 
               {hasMore && (
                 <div className="flex justify-center pt-4">
@@ -706,6 +834,99 @@ export default function OrdersTab() {
             <Button onClick={handlePrint} className="flex items-center gap-1">
               <Printer className="h-4 w-4" />
               <span>Print / Save PDF</span>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Status Update Dialog */}
+      <Dialog open={statusUpdateDialogOpen} onOpenChange={setStatusUpdateDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Update Order Status</DialogTitle>
+            <DialogDescription>
+              Update the status for Order #{selectedOrder?.orderId?.substring(0, 8)}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="status" className="text-sm font-medium">
+                New Status
+              </label>
+              <Select value={newOrderStatus} onValueChange={setNewOrderStatus}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select new status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-orange-500" />
+                      Pending
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="confirmed">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-blue-500" />
+                      Confirmed
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="preparing">
+                    <div className="flex items-center gap-2">
+                      <ChefHat className="h-4 w-4 text-purple-500" />
+                      Preparing
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="ready">
+                    <div className="flex items-center gap-2">
+                      <Package className="h-4 w-4 text-green-500" />
+                      Ready for Pickup/Delivery
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="completed">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      Completed
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="cancelled">
+                    <div className="flex items-center gap-2">
+                      <XCircle className="h-4 w-4 text-red-500" />
+                      Cancelled
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedOrder && (
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <p className="text-sm text-gray-600">
+                  <strong>Current Status:</strong> {getStatusInfo(selectedOrder.status).label}
+                </p>
+                <p className="text-sm text-gray-600">
+                  <strong>Customer:</strong> {selectedOrder.userId.substring(0, 8)}...
+                </p>
+                <p className="text-sm text-gray-600">
+                  <strong>Order Total:</strong> ₹{selectedOrder.amount?.toFixed(2)}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setStatusUpdateDialogOpen(false)}
+              disabled={updatingStatus}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={updateOrderStatus}
+              disabled={!newOrderStatus || newOrderStatus === selectedOrder?.status || updatingStatus}
+            >
+              {updatingStatus ? "Updating..." : "Update Status"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -90,6 +90,7 @@ function CartPageContent() {
         for (const businessDoc of cartsSnapshot.docs) {
           const businessId = businessDoc.id;
           const businessData = businessDoc.data();
+          console.log("Business ID:", businessDoc.data());
 
           // Get products for this business
           const productsCollectionRef = collection(
@@ -159,7 +160,7 @@ function CartPageContent() {
   };
 
   // Update Firestore after successful payment
-  const updateFirestoreAfterPayment = async (businessId, orderId, products) => {
+  const updateFirestoreAfterPayment = async (businessId, orderId, products, order = null) => {
     if (!auth.currentUser) return;
 
     try {
@@ -177,34 +178,107 @@ function CartPageContent() {
         })
       );
 
-      // Update business orders
+      // Prepare order metadata
+      const orderMetadata = {
+        products: productDetails,
+        orderId: orderId,
+        userId: auth.currentUser.uid,
+        timestamp: timestamp,
+        amount: calculateBusinessTotal(businessId),
+        status: "pending",
+        statusUpdatedAt: timestamp,
+        businessId: businessId,
+        businessName: userCart[businessId]?.businessName || "Store",
+        isSystemOrder: order?.isSystemOrder || false, // Track if it's a system order
+        paymentMethod: "razorpay",
+        currency: "INR",
+      };
+
+      // Update business orders with "pending" status
       await setDoc(
         doc(db, "businesses", businessId, "orders", orderTimestamp),
-        {
-          products: productDetails,
-          orderId: orderId,
-          userId: auth.currentUser.uid,
-          timestamp: timestamp,
-          amount: calculateBusinessTotal(businessId),
-          status: "completed",
-        }
+        orderMetadata
       );
 
-      // Update user orders
+      // Update user orders with "pending" status
       await setDoc(
         doc(db, "users", auth.currentUser.uid, "orders", orderTimestamp),
         {
-          businessId: businessId,
+          ...orderMetadata,
           businessName: userCart[businessId]?.businessName || "Store",
-          orderId: orderId,
-          timestamp: timestamp,
-          amount: calculateBusinessTotal(businessId),
-          products: productDetails,
-          status: "completed",
         }
       );
 
-      // Send notification to business owner
+      // Get business and user information for email notifications
+      let businessOwnerEmail = null;
+      let businessOwnerName = null;
+      let customerEmail = auth.currentUser.email;
+      let customerName = null;
+
+      try {
+        // Get business owner's information
+        const businessDoc = await getDoc(doc(db, "businesses", businessId));
+        if (businessDoc.exists()) {
+          const businessData = businessDoc.data();
+          const businessOwnerId = businessData.adminId;
+          console.log("BUSINESSOWNERID", businessOwnerId, businessData)
+
+          if (businessOwnerId) {
+            const businessOwnerDoc = await getDoc(doc(db, "users", businessOwnerId));
+            if (businessOwnerDoc.exists()) {
+              const businessOwnerData = businessOwnerDoc.data();
+              console.log("BUSINESSOWNERDATA", businessOwnerData)
+              businessOwnerEmail = businessOwnerData.email;
+              businessOwnerName = businessOwnerData.name || businessOwnerData.displayName;
+            }
+          }
+        }
+
+        // Get customer information
+        const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          customerName = userData.name || userData.displayName || auth.currentUser.displayName;
+        }
+      } catch (error) {
+        console.error("Error fetching user information for emails:", error);
+      }
+
+      // Send order emails using Gmail SMTP
+      try {
+        if (customerEmail || businessOwnerEmail) {
+          const emailResponse = await fetch("/api/send-order-email", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              type: "both", // Send to both customer and business
+              customerEmail: customerEmail,
+              businessEmail: businessOwnerEmail,
+              customerName: customerName || "Valued Customer",
+              businessName: userCart[businessId]?.businessName || "Store",
+              orderId: orderId,
+              amount: calculateBusinessTotal(businessId),
+              products: productDetails,
+              customerId: auth.currentUser.uid,
+            }),
+          });
+
+          if (emailResponse.ok) {
+            const emailResult = await emailResponse.json();
+            console.log("Order emails sent successfully:", emailResult);
+          } else {
+            const errorText = await emailResponse.text();
+            console.warn("Failed to send order emails:", errorText);
+          }
+        }
+      } catch (emailError) {
+        console.error("Error sending order emails:", emailError);
+        // Don't fail the order if email fails
+      }
+
+      // Send notification to business owner (existing functionality)
       try {
         // Get business owner's userId
         const businessDoc = await getDoc(doc(db, "businesses", businessId));
@@ -231,10 +305,10 @@ function CartPageContent() {
             // Send notification to business owner
             await sendNotificationToUser(businessOwnerId, {
               title: "New Order Received",
-              message: `${userName} has placed an order for ${itemsCount} ${itemsCount === 1 ? "item" : "items"} worth ₹${totalAmount}. Check your orders tab for details.`,
+              message: `${userName} has placed an order for ${itemsCount} ${itemsCount === 1 ? "item" : "items"} worth ₹${totalAmount}. The order is pending and needs your attention. Check your orders tab for details.`,
               type: "order_update",
               link: "/profile?tab=orders",
-              email: true,
+              email: false, // Disabled since we're sending custom emails
               whatsapp: false, // Set to true if you want WhatsApp notifications
             });
 
@@ -249,7 +323,7 @@ function CartPageContent() {
       // Clear the business items from cart
       await clearBusinessItems(businessId);
 
-      console.log("Database updated successfully after payment");
+      console.log("Database updated successfully after payment with pending status");
     } catch (error) {
       console.error("Error updating Firestore after payment:", error);
       toast.error(
@@ -288,7 +362,8 @@ function CartPageContent() {
           await updateFirestoreAfterPayment(
             businessId,
             order.orderId,
-            products
+            products,
+            order // Pass the order object to updateFirestoreAfterPayment
           );
 
           // Show success dialog
@@ -487,7 +562,15 @@ function CartPageContent() {
       }
 
       toast.dismiss();
-      toast.success("Order created successfully");
+      
+      // Show different messages based on order type
+      if (order.isSystemOrder) {
+        toast.success("Order created successfully using Thikana payment system");
+        console.log("System order created for business:", businessId);
+      } else {
+        toast.success("Order created successfully");
+        console.log("Business-specific order created");
+      }
 
       // Open Razorpay payment gateway
       openRazorpayPaymentGateway(

@@ -20,6 +20,7 @@ import {
 } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import toast from "react-hot-toast";
+import { resolveBusinessId, getBusinessName } from "@/lib/business-utils";
 
 const CartContext = createContext();
 
@@ -152,9 +153,12 @@ export function CartProvider({ children }) {
       return false;
     }
 
+    // Resolve the effective business ID using the new utility
+    const effectiveBusinessId = resolveBusinessId(businessId, product);
+
     console.log("Adding to cart with:", {
       userId: userIdToUse,
-      businessId,
+      businessId: effectiveBusinessId,
       productId: product.id,
       product: product,
       quantity,
@@ -162,51 +166,24 @@ export function CartProvider({ children }) {
 
     try {
       // Ensure the business document exists
-      const businessDocRef = doc(db, "users", userIdToUse, "carts", businessId);
+      const businessDocRef = doc(db, "users", userIdToUse, "carts", effectiveBusinessId);
       const businessDocSnap = await getDoc(businessDocRef);
 
-      let businessName = product.businessName || "Store";
+      // Get business name using the utility
+      let businessName = await getBusinessName(effectiveBusinessId);
 
       // If business document doesn't exist, create it with proper info
       if (!businessDocSnap.exists()) {
         console.log("Business document doesn't exist in cart, creating it now");
 
-        // If product doesn't have businessName or has default value, try to fetch it
-        if (businessName === "Store" && businessId !== "default-business") {
-          try {
-            console.log(
-              "Attempting to fetch business details for ID:",
-              businessId
-            );
-            const businessUserDoc = await getDoc(doc(db, "users", businessId));
-            if (businessUserDoc.exists()) {
-              const businessUserData = businessUserDoc.data();
-              businessName =
-                businessUserData.businessName ||
-                businessUserData.name ||
-                "Store";
-              console.log(
-                "Retrieved business name from Firestore:",
-                businessName
-              );
-            } else {
-              console.log("Business document not found in Firestore");
-            }
-          } catch (error) {
-            console.error("Error fetching business details:", error);
-            // Continue with default name
-          }
-        }
-
-        console.log(
-          "Creating business document in cart with name:",
-          businessName
-        );
         await setDoc(businessDocRef, {
-          businessId: businessId,
+          businessId: effectiveBusinessId,
           businessName: businessName,
+          createdAt: new Date(),
           updatedAt: new Date(),
         });
+
+        console.log("Created new business document in cart");
       } else {
         console.log(
           "Business document already exists in cart:",
@@ -238,7 +215,7 @@ export function CartProvider({ children }) {
         "users",
         userIdToUse,
         "carts",
-        businessId,
+        effectiveBusinessId,
         "products",
         product.id
       );
@@ -266,7 +243,7 @@ export function CartProvider({ children }) {
           price: product.price || 0,
           quantity: quantity,
           imageUrl: product.imageUrl || null,
-          businessId: businessId,
+          businessId: effectiveBusinessId,
           businessName: businessName,
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -292,18 +269,18 @@ export function CartProvider({ children }) {
         // Update the local cart state
         const updatedCart = { ...cart };
         if (!updatedCart[userIdToUse]) updatedCart[userIdToUse] = {};
-        if (!updatedCart[userIdToUse][businessId]) {
-          updatedCart[userIdToUse][businessId] = {
-            businessId,
-            businessName: product.businessName || "Store",
+        if (!updatedCart[userIdToUse][effectiveBusinessId]) {
+          updatedCart[userIdToUse][effectiveBusinessId] = {
+            businessId: effectiveBusinessId,
+            businessName: businessName,
             products: {},
           };
         }
 
         // Update or add the product
         const existingProduct =
-          updatedCart[userIdToUse][businessId].products[product.id];
-        updatedCart[userIdToUse][businessId].products[product.id] = {
+          updatedCart[userIdToUse][effectiveBusinessId].products[product.id];
+        updatedCart[userIdToUse][effectiveBusinessId].products[product.id] = {
           ...product,
           quantity: existingProduct
             ? existingProduct.quantity + quantity

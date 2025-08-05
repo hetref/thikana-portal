@@ -18,8 +18,9 @@ import { db, auth } from "@/lib/firebase";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCart } from "@/components/CartContext";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useParams } from "next/navigation";
 import { createRazorpayOrder } from "@/lib/payment/razorpay";
+import { resolveBusinessId, getBusinessName } from "@/lib/business-utils";
 
 /**
  * ProductDialog - A component for displaying and interacting with product details
@@ -50,9 +51,51 @@ export default function ProductDialog({
   const [editableProduct, setEditableProduct] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [businessName, setBusinessName] = useState("Store");
   const { addToCart } = useCart();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const params = useParams();
+
+  // Calculate total price based on quantity
+  const totalPrice = () => (product?.price * quantity).toFixed(2);
+
+  // Extract business ID from URL parameters - optimized for the current route structure
+  const extractBusinessId = () => {
+    // First, try to get the username from route parameters (most common case)
+    if (params?.username) {
+      console.log("Extracted business ID from route parameter:", params.username);
+      return params.username;
+    }
+
+    // Extract from pathname segments as fallback
+    if (pathname) {
+      console.log("Current pathname:", pathname);
+      const segments = pathname.split("/").filter(Boolean);
+
+      // Handle different profile route patterns
+      if (segments.length >= 1) {
+        // For routes like /[username] or /[username]/... 
+        // The username is typically the first segment after the initial route parts
+        for (let i = 0; i < segments.length; i++) {
+          const segment = segments[i];
+          // Skip common route segments that aren't usernames
+          if (!['portal', 'profile', 'business-profile', 'products', 'services'].includes(segment)) {
+            // This could be a username/business ID
+            console.log("Extracted business ID from pathname segment:", segment);
+            return segment;
+          }
+        }
+      }
+    }
+
+    // Use business utilities to resolve the business ID
+    const resolvedId = resolveBusinessId(product?.businessId, product);
+    console.log("Using resolved business ID:", resolvedId);
+    return resolvedId;
+  };
+
+  // Get the business ID
+  const businessId = extractBusinessId();
 
   // Initialize editable product when product changes or editing mode is toggled
   useEffect(() => {
@@ -63,57 +106,23 @@ export default function ProductDialog({
     }
   }, [product, isEditing]);
 
-  // Calculate total price based on quantity
-  const totalPrice = () => (product?.price * quantity).toFixed(2);
-
-  // Extract business ID from URL path and query parameters
-  const extractBusinessId = () => {
-    // First try to extract from query parameters
-    const userParam = searchParams.get("user");
-    if (userParam) {
-      console.log("Extracted business ID from query param:", userParam);
-      return userParam;
-    }
-
-    // Extract from pathname segments if no query parameter is found
-    if (pathname) {
-      console.log("Current pathname:", pathname);
-
-      const segments = pathname.split("/");
-
-      // Check if in business profile path
-      if (pathname.includes("/business-profile/")) {
-        const businessId = segments[segments.length - 1];
-        console.log(
-          "Extracted business ID from business profile path:",
-          businessId
-        );
-        return businessId;
+  // Fetch business name when component mounts or business ID changes
+  useEffect(() => {
+    const fetchBusinessNameData = async () => {
+      if (businessId) {
+        try {
+          const name = await getBusinessName(businessId);
+          setBusinessName(name);
+          console.log("Fetched business name:", name, "for business ID:", businessId);
+        } catch (error) {
+          console.error("Error fetching business name:", error);
+          setBusinessName("Store");
+        }
       }
-    }
+    };
 
-    // If nothing found, use product's businessId or default
-    const fallbackId = product?.businessId || "default-business";
-    console.log("Using fallback business ID:", fallbackId);
-    return fallbackId;
-  };
-
-  // Fetch business name from Firestore using business ID
-  const fetchBusinessName = async (businessId) => {
-    if (!businessId) return "Store";
-
-    try {
-      const businessDoc = await getDoc(doc(db, "users", businessId));
-      if (businessDoc.exists()) {
-        const businessData = businessDoc.data();
-        return businessData.businessName || businessData.name || "Store";
-      }
-      return "Store";
-    } catch (error) {
-      console.error("Error fetching business name:", error);
-      return "Store";
-    }
-  };
+    fetchBusinessNameData();
+  }, [businessId]);
 
   // Open Razorpay payment gateway
   const openRazorpayPaymentGateway = (order, keyId, amount) => {
@@ -183,8 +192,6 @@ export default function ProductDialog({
 
     setIsLoading(true);
     try {
-      // Extract business ID for the order
-      const businessId = product.businessId || extractBusinessId();
       console.log(
         `Starting buy now for product ${product.id} with price ${totalPrice()} from business ${businessId}`
       );
@@ -221,19 +228,8 @@ export default function ProductDialog({
     }
 
     try {
-      // Get business ID from URL or use the one from product
-      const businessId = extractBusinessId();
       console.log("Business ID for cart:", businessId);
-
-      // Fetch the business name if not already in the product
-      let businessName = product.businessName;
-      if (!businessName) {
-        console.log("No businessName in product, fetching from Firestore...");
-        businessName = await fetchBusinessName(businessId);
-        console.log("Fetched business name:", businessName);
-      } else {
-        console.log("Using business name from product:", businessName);
-      }
+      console.log("Business name for cart:", businessName);
 
       // Make sure the product has all required properties
       const productToAdd = {

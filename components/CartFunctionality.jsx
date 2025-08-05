@@ -6,6 +6,23 @@ import { ShoppingCart, Plus, Minus } from "lucide-react";
 import toast from "react-hot-toast";
 import { ref, set, get, onValue, update } from "firebase/database";
 import { database } from "@/lib/firebase"; // Ensure you have your Firebase config setup
+import { initializeApp } from "firebase/app";
+import {
+  getDatabase,
+  ref,
+  push,
+  set,
+  get,
+  remove,
+  update,
+  onValue,
+  off,
+} from "firebase/database";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "react-hot-toast";
+import { Button } from "@/components/ui/button";
+import { Minus, Plus } from "lucide-react";
+import { resolveBusinessId, getBusinessName } from "@/lib/business-utils";
 
 export function useRealtimeCart(userId) {
   // Add state for cart data and loading
@@ -47,46 +64,38 @@ export function useRealtimeCart(userId) {
     return () => unsubscribe();
   }, [userId]);
 
-  const addToCart = async (product, quantity, businessId, userIdParam) => {
-    // Use the passed userId if provided, otherwise fall back to the hook's userId
-    const effectiveUserId = userIdParam || userId;
+  const addToCart = async (product, quantity, businessId, passedUserId = null) => {
+    // Use the passed userId or the one from the hook
+    const effectiveUserId = passedUserId || userId;
     
     if (!effectiveUserId) {
-      toast.error("Please log in to add items to cart");
+      console.error("User ID is required for cart operations");
       return false;
     }
-    
-    // Validate product data
-    if (!product) {
-      console.error("Product is undefined or null");
-      toast.error("Invalid product data");
-      return false;
-    }
-    
-    if (!product.id) {
-      console.error("Product is missing an ID:", product);
-      toast.error("Product is missing required data");
-      return false;
-    }
-    
-    // Log detailed product info for debugging
-    console.log("Adding to cart - Product details:", {
-      id: product.id,
-      name: product.name,
-      price: product.price,
+
+    console.log("Adding to cart:", {
+      product: product,
+      quantity: quantity,
       businessId: businessId,
-      imageUrl: product.imageUrl,
       userId: effectiveUserId
     });
     
     try {
+      // Resolve the effective business ID using the new utility
+      const effectiveBusinessId = resolveBusinessId(businessId, product);
+      console.log("Resolved business ID:", effectiveBusinessId);
+
+      // Get the business name
+      const businessName = await getBusinessName(effectiveBusinessId);
+      console.log("Business name:", businessName);
+      
       // Path to this product in the user's cart
       const cartItemRef = ref(
         database,
-        `users/${effectiveUserId}/carts/${businessId}/products/${product.id}`
+        `users/${effectiveUserId}/carts/${effectiveBusinessId}/products/${product.id}`
       );
       
-      console.log("Database path:", `users/${effectiveUserId}/carts/${businessId}/products/${product.id}`);
+      console.log("Database path:", `users/${effectiveUserId}/carts/${effectiveBusinessId}/products/${product.id}`);
       
       // Check if product already exists in cart
       const snapshot = await get(cartItemRef);
@@ -108,7 +117,8 @@ export function useRealtimeCart(userId) {
           price: product.price,
           quantity: quantity,
           imageUrl: product.imageUrl || null,
-          businessId: businessId
+          businessId: effectiveBusinessId,
+          businessName: businessName
         });
         
         await set(cartItemRef, {
@@ -117,32 +127,31 @@ export function useRealtimeCart(userId) {
           price: product.price,
           quantity: quantity,
           imageUrl: product.imageUrl || null,
-          businessId: businessId
+          businessId: effectiveBusinessId,
+          businessName: businessName
         });
         console.log("Added new item to cart");
       }
       
-      // Update business name if needed
-      const businessRef = ref(database, `users/${effectiveUserId}/carts/${businessId}`);
+      // Update business metadata in cart
+      const businessRef = ref(database, `users/${effectiveUserId}/carts/${effectiveBusinessId}`);
       const businessSnapshot = await get(businessRef);
-      if (!businessSnapshot.exists() || !businessSnapshot.val().businessName) {
-        const businessName = product.businessName || "Store";
-        console.log(`Setting business name to "${businessName}" at path:`, `users/${effectiveUserId}/carts/${businessId}`);
-        
-        await update(businessRef, {
-          businessName: businessName
-        });
+      
+      const businessMetadata = {
+        businessName: businessName,
+        lastUpdated: Date.now()
+      };
+
+      if (!businessSnapshot.exists()) {
+        await set(businessRef, businessMetadata);
+      } else {
+        await update(businessRef, businessMetadata);
       }
       
-      // Verify data was written
-      const verifySnapshot = await get(cartItemRef);
-      console.log("Verification - Cart item data:", verifySnapshot.val());
-      
-      toast.success("Added to cart successfully!");
       return true;
     } catch (error) {
       console.error("Error adding to cart:", error);
-      toast.error("Failed to add to cart: " + error.message);
+      toast.error("Failed to add item to cart");
       return false;
     }
   };
