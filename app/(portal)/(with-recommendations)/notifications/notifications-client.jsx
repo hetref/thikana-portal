@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { auth } from "@/lib/firebase";
 import {
   getNotifications,
   markNotificationAsRead,
   markAllNotificationsAsRead,
-  addTestNotification,
   sendNotificationToUser,
 } from "@/lib/notifications";
 import {
@@ -34,29 +34,57 @@ export default function NotificationsClient() {
   const [sendEmail, setSendEmail] = useState(false);
   const [testMessage, setTestMessage] = useState("");
   const { user } = useAuth();
+  const unsubscribeRef = useRef(() => {});
 
   useEffect(() => {
-    let unsubscribe = () => {};
+    // Clean up any previous listener
+    if (unsubscribeRef.current) {
+      try { unsubscribeRef.current(); } catch {}
+    }
 
+    setLoading(true);
+
+    // Prefer context user if available
     if (user?.uid) {
-      setLoading(true);
-      console.log("Setting up realtime notifications for user:", user.uid);
-      unsubscribe = getNotifications((newNotifications) => {
-        console.log("Received new notifications:", newNotifications);
+      const unsubscribe = getNotifications((newNotifications) => {
         setNotifications(newNotifications);
         setLoading(false);
       }, user.uid);
+      unsubscribeRef.current = unsubscribe;
+      return () => {
+        try { unsubscribe(); } catch {}
+      };
     }
 
-    return () => unsubscribe();
-  }, [user]);
+    // Fallback to Firebase auth if no provider or user not yet in context
+    const off = auth.onAuthStateChanged((authUser) => {
+      if (authUser?.uid) {
+        const unsubscribe = getNotifications((newNotifications) => {
+          setNotifications(newNotifications);
+          setLoading(false);
+        }, authUser.uid);
+        unsubscribeRef.current = unsubscribe;
+      } else {
+        setNotifications([]);
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      try { off(); } catch {}
+      if (unsubscribeRef.current) {
+        try { unsubscribeRef.current(); } catch {}
+      }
+    };
+  }, [user?.uid]);
 
   const handleMarkAsRead = async (notificationId) => {
-    if (!user?.uid) return;
+    const uid = user?.uid || auth.currentUser?.uid;
+    if (!uid) return;
 
-    await markNotificationAsRead(user.uid, notificationId);
+    await markNotificationAsRead(uid, notificationId);
 
-    // Update UI optimistically
+    // Optimistic UI
     setNotifications((prev) =>
       prev.map((notif) =>
         notif.id === notificationId ? { ...notif, isRead: true } : notif
@@ -65,31 +93,23 @@ export default function NotificationsClient() {
   };
 
   const handleMarkAllAsRead = async () => {
-    if (!user?.uid) return;
+    const uid = user?.uid || auth.currentUser?.uid;
+    if (!uid) return;
     try {
       setMarkAllLoading(true);
-      await markAllNotificationsAsRead(user.uid);
-
-      // Update UI optimistically
-      setNotifications((prev) =>
-        prev.map((notif) => ({ ...notif, isRead: true }))
-      );
-    } catch (error) {
-      console.error("Error marking all notifications as read:", error);
+      await markAllNotificationsAsRead(uid);
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     } finally {
       setMarkAllLoading(false);
     }
   };
 
   const handleTestNotification = async () => {
-    if (!user?.uid) return;
-
+    const uid = user?.uid || auth.currentUser?.uid;
+    if (!uid) return;
     try {
       setTestLoading(true);
-      console.log("Creating test notification for user:", user.uid);
-
-      // Use sendNotificationToUser instead of addTestNotification to include WhatsApp and email
-      await sendNotificationToUser(user.uid, {
+      await sendNotificationToUser(uid, {
         title: "Test Notification",
         message:
           testMessage ||
@@ -99,14 +119,7 @@ export default function NotificationsClient() {
         whatsapp: sendWhatsApp,
         email: sendEmail,
       });
-
-      console.log("Test notification created successfully");
-      console.log("WhatsApp:", sendWhatsApp, "Email:", sendEmail);
-
-      // Clear test message
       setTestMessage("");
-    } catch (error) {
-      console.error("Error creating test notification:", error);
     } finally {
       setTestLoading(false);
     }
@@ -124,16 +137,26 @@ export default function NotificationsClient() {
         return "⚙️";
       case "follower":
         return "👥";
+      case "appointment-reminder":
+        return "⏰";
       default:
         return "🔔";
     }
   };
 
-  // Get unread notifications count
   const unreadCount = notifications.filter((notif) => !notif.isRead).length;
 
   if (loading) {
     return <NotificationsSkeleton />;
+  }
+
+  // If not logged-in
+  if (!user?.uid && !auth.currentUser?.uid) {
+    return (
+      <div className="flex items-center justify-center py-16 text-muted-foreground">
+        Please sign in to view notifications.
+      </div>
+    );
   }
 
   const renderNotificationList = (items) => {
@@ -205,12 +228,8 @@ export default function NotificationsClient() {
         <CardHeader>
           <div className="flex justify-between items-center">
             <div>
-              <CardTitle className="text-2xl font-bold">
-                Notifications
-              </CardTitle>
-              <CardDescription>
-                Stay updated with your latest activities
-              </CardDescription>
+              <CardTitle className="text-2xl font-bold">Notifications</CardTitle>
+              <CardDescription>Stay updated with your latest activities</CardDescription>
             </div>
             {unreadCount > 0 && (
               <Button
@@ -275,9 +294,7 @@ export default function NotificationsClient() {
             className="w-full"
             variant="outline"
           >
-            {testLoading
-              ? "Creating Test Notification..."
-              : "Create Test Notification"}
+            {testLoading ? "Creating Test Notification..." : "Create Test Notification"}
           </Button>
         </CardFooter>
       </Card>

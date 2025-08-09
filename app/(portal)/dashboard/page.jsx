@@ -91,6 +91,7 @@ import IncomeAnalyticsTab from "@/components/dashboard/IncomeAnalyticsTab";
 import TicketsTab from "@/components/dashboard/TicketsTab";
 import OrdersTab from "@/components/dashboard/OrdersTab";
 import MembersTab from "@/components/dashboard/MembersTab";
+import AppointmentsTab from "@/components/dashboard/AppointmentsTab";
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState("tickets");
@@ -184,7 +185,7 @@ export default function DashboardPage() {
             <Tabs value={activeTab} onValueChange={handleTabChange}>
               {/* Desktop Tabs List */}
               <div className="hidden md:flex justify-between items-center mb-6">
-                <TabsList className="grid grid-cols-4 lg:grid-cols-8 mb-3">
+                <TabsList className="grid grid-cols-4 lg:grid-cols-9 mb-3">
                   <TabsTrigger
                     value="contacts"
                     className="flex items-center gap-2"
@@ -233,6 +234,13 @@ export default function DashboardPage() {
                   >
                     <BarChart className="h-4 w-4" />
                     Analytics
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="appointments"
+                    className="flex items-center gap-2"
+                  >
+                    <Calendar className="h-4 w-4" />
+                    Appointments
                   </TabsTrigger>
                   <TabsTrigger
                     value="members"
@@ -304,6 +312,13 @@ export default function DashboardPage() {
                   >
                     <BarChart className="h-3 w-3" />
                     <span className="text-xs">Analytics</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="appointments"
+                    className="flex items-center gap-1 whitespace-nowrap px-3 sm:px-4"
+                  >
+                    <Calendar className="h-3 w-3" />
+                    <span className="text-xs">Appointments</span>
                   </TabsTrigger>
                   <TabsTrigger
                     value="settings"
@@ -381,6 +396,10 @@ export default function DashboardPage() {
                     <IncomeAnalyticsTab />
                   </TabsContent>
                 </Tabs>
+              </TabsContent>
+
+              <TabsContent value="appointments" className="space-y-4">
+                <AppointmentsTab />
               </TabsContent>
 
               <TabsContent value="members" className="space-y-4">

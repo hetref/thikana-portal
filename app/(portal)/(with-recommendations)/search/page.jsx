@@ -278,9 +278,9 @@ const SearchPage = () => {
 
   return (
     <div className="mx-auto flex gap-6 px-4 md:px-6 lg:gap-10 max-w-[1400px] pt-8">
-      <div className="hidden md:block w-64 flex-shrink-0">
+      {/* <div className="hidden md:block w-64 flex-shrink-0">
         <Sidebar />
-      </div>
+      </div> */}
       <div className="flex-1">
         <InstantSearch
           searchClient={searchClient}

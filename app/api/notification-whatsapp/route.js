@@ -9,7 +9,7 @@ export async function POST(request) {
 — Thikana Team`
 
     const response = await fetch(
-      "https://graph.facebook.com/v21.0/592543543932338/messages",
+      "https://graph.facebook.com/v23.0/592543543932338/messages",
       {
         method: "POST",
         headers: {

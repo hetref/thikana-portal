@@ -61,6 +61,8 @@ import { cn } from "@/lib/utils";
 import ShowServicesTabContent from "@/components/profile/ShowServicesTabContent";
 import { sendNotificationToUser } from "@/lib/notifications";
 import ShowBusinessProperties from "@/components/profile/ShowBusinessProperties";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 // Add a style element to hide scrollbars
 const scrollbarHideStyles = `
@@ -86,8 +88,147 @@ export default function UserProfile() {
   const [followLoading, setFollowLoading] = useState(false);
   const [userPhotos, setUserPhotos] = useState([]);
   const [loadingPhotos, setLoadingPhotos] = useState(false);
+  const [bookOpen, setBookOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(""); // YYYY-MM-DD
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [selectedStart, setSelectedStart] = useState(""); // HH:MM
+  const [multiplier, setMultiplier] = useState(1);
+  const [computedEnd, setComputedEnd] = useState(""); // HH:MM
+  const [bookingDescription, setBookingDescription] = useState("");
+  const [bookingLoading, setBookingLoading] = useState(false);
 
   const userData = useGetUser(userId);
+
+  // Helpers for slot computation
+  const parseTimeToMinutes = (hhmm) => {
+    const [h, m] = (hhmm || "").split(":");
+    const hours = parseInt(h, 10);
+    const mins = parseInt(m, 10);
+    if (Number.isNaN(hours) || Number.isNaN(mins)) return null;
+    return hours * 60 + mins;
+  };
+  const minutesToTime = (mins) => {
+    const h = Math.floor(mins / 60)
+      .toString()
+      .padStart(2, "0");
+    const m = (mins % 60).toString().padStart(2, "0");
+    return `${h}:${m}`;
+  };
+  const getDayIndexFromISO = (dateStr) => {
+    if (!dateStr) return null;
+    const [y, m, d] = dateStr.split("-").map((x) => parseInt(x, 10));
+    const dt = new Date(y, m - 1, d);
+    const jsDay = dt.getDay();
+    return (jsDay + 6) % 7; // Monday=0
+  };
+
+  useEffect(() => {
+    // Recompute available slots when date changes
+    if (!selectedDate || !userData) {
+      setAvailableSlots([]);
+      setSelectedStart("");
+      setComputedEnd("");
+      return;
+    }
+    if (!userData.acceptAppointments) {
+      setAvailableSlots([]);
+      return;
+    }
+    const ops = userData.operationalHours || [];
+    const dayIdx = getDayIndexFromISO(selectedDate);
+    const info = ops[dayIdx];
+    if (!info || !info.enabled) {
+      setAvailableSlots([]);
+      return;
+    }
+    const slotMinutes = typeof userData.appointmentSlotMinutes === "number" ? userData.appointmentSlotMinutes : 30;
+    const openMins = parseTimeToMinutes(info.openTime);
+    const closeMins = parseTimeToMinutes(info.closeTime);
+    if (openMins == null || closeMins == null) {
+      setAvailableSlots([]);
+      return;
+    }
+
+    const slots = [];
+    for (let t = openMins; t + slotMinutes <= closeMins; t += slotMinutes) {
+      slots.push(minutesToTime(t));
+    }
+    setAvailableSlots(slots);
+    setSelectedStart(slots[0] || "");
+  }, [selectedDate, userData]);
+
+  useEffect(() => {
+    // Compute end time from start and multiplier
+    if (!selectedStart || !userData) {
+      setComputedEnd("");
+      return;
+    }
+    const slotMinutes = typeof userData.appointmentSlotMinutes === "number" ? userData.appointmentSlotMinutes : 30;
+    const ops = userData.operationalHours || [];
+    const dayIdx = getDayIndexFromISO(selectedDate);
+    const info = ops[dayIdx];
+    const startMins = parseTimeToMinutes(selectedStart);
+    const endMins = startMins + slotMinutes * Math.max(1, Number(multiplier) || 1);
+    const closeMins = info && parseTimeToMinutes(info.closeTime);
+    if (closeMins != null && endMins <= closeMins) {
+      setComputedEnd(minutesToTime(endMins));
+    } else {
+      setComputedEnd("");
+    }
+  }, [selectedStart, multiplier, selectedDate, userData]);
+
+  const submitBooking = async () => {
+    if (!currentUser) {
+      toast.error("Please log in to book an appointment");
+      return;
+    }
+    if (!userData?.acceptAppointments) {
+      toast.error("This business is not accepting appointments");
+      return;
+    }
+    if (!selectedDate) {
+      toast.error("Please select a date");
+      return;
+    }
+    if (!selectedStart || !computedEnd) {
+      toast.error("Please select a valid time slot");
+      return;
+    }
+
+    try {
+      setBookingLoading(true);
+      const token = await currentUser.getIdToken();
+      const res = await fetch("/api/appointments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          businessId: userId,
+          date: selectedDate,
+          startTime: selectedStart,
+          endTime: computedEnd,
+          description: bookingDescription,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "Failed to book appointment");
+      }
+      toast.success("Appointment requested successfully");
+      setBookOpen(false);
+      setSelectedDate("");
+      setSelectedStart("");
+      setMultiplier(1);
+      setBookingDescription("");
+    } catch (e) {
+      console.error(e);
+      toast.error(e.message || "Failed to book appointment");
+    } finally {
+      setBookingLoading(false);
+    }
+  };
 
   // Log user data for debugging
   useEffect(() => {
@@ -455,6 +596,95 @@ export default function UserProfile() {
                       businessId={userId}
                       businessName={userData.businessName}
                     />
+                  )}
+
+                  {/* Book Appointment Button */}
+                  {userData?.acceptAppointments && currentUser && currentUser.uid !== userId && (
+                    <Dialog open={bookOpen} onOpenChange={setBookOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" className="px-3">
+                          <Calendar className="w-4 h-4 mr-1" />
+                          Book Appointment
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Book Appointment</DialogTitle>
+                          <DialogDescription>
+                            Select a date and time. Slots are in increments of {userData?.appointmentSlotMinutes || 30} minutes.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium mb-1">Date</label>
+                            <Input
+                              type="date"
+                              value={selectedDate}
+                              onChange={(e) => setSelectedDate(e.target.value)}
+                            />
+                          </div>
+                          {selectedDate && (
+                            <>
+                              {availableSlots.length === 0 ? (
+                                <div className="text-sm text-muted-foreground">Closed on selected date</div>
+                              ) : (
+                                <>
+                                  <div>
+                                    <label className="block text-sm font-medium mb-1">Start Time</label>
+                                    <select
+                                      className="w-full border rounded-md px-3 py-2"
+                                      value={selectedStart}
+                                      onChange={(e) => setSelectedStart(e.target.value)}
+                                    >
+                                      {availableSlots.map((s) => (
+                                        <option key={s} value={s}>{s}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="block text-sm font-medium mb-1">Duration (x slots)</label>
+                                    <Input
+                                      type="number"
+                                      min={1}
+                                      max={8}
+                                      value={multiplier}
+                                      onChange={(e) => setMultiplier(Number(e.target.value) || 1)}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-sm font-medium mb-1">End Time</label>
+                                    <Input type="time" value={computedEnd || ""} readOnly />
+                                  </div>
+                                  <div>
+                                    <label className="block text-sm font-medium mb-1">Notes</label>
+                                    <Textarea
+                                      placeholder="Share any details for the business"
+                                      value={bookingDescription}
+                                      onChange={(e) => setBookingDescription(e.target.value)}
+                                    />
+                                  </div>
+                                </>
+                              )}
+                            </>
+                          )}
+                          <div className="flex justify-end gap-2">
+                            <Button variant="outline" onClick={() => setBookOpen(false)}>
+                              Cancel
+                            </Button>
+                            <Button onClick={submitBooking} disabled={bookingLoading || !computedEnd || availableSlots.length === 0}>
+                              {bookingLoading ? (
+                                <>
+                                  <Loader2Icon className="w-4 h-4 mr-2 animate-spin" />
+                                  Booking...
+                                </>
+                              ) : (
+                                "Confirm"
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                   )}
 
                   <Button

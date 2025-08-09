@@ -25,6 +25,8 @@ import { doc, setDoc, getDoc } from "firebase/firestore";
 import toast from "react-hot-toast";
 import { Plus, X } from "lucide-react";
 import Loader from "@/components/Loader";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 const businessInfoSchema = z.object({
   business_type: z.string().min(1, "Business type is required"),
@@ -39,19 +41,56 @@ const businessInfoSchema = z.object({
   registrationDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)"),
-  operationalHours: z.array(
-    z.object({
-      day: z.string(),
-      openTime: z.string(),
-      closeTime: z.string(),
-    })
-  ),
+  operationalHours: z
+    .array(
+      z.object({
+        day: z.string(),
+        enabled: z.boolean().default(false),
+        openTime: z.string().optional().or(z.literal("")),
+        closeTime: z.string().optional().or(z.literal("")),
+      })
+    )
+    .length(7),
   socialMediaLinks: z.array(
     z.object({
       platform: z.string(),
       url: z.string().url("Invalid URL"),
     })
   ),
+  acceptAppointments: z.boolean().default(false),
+  appointmentSlotMinutes: z
+    .number()
+    .int()
+    .min(5, "Minimum slot is 5 minutes")
+    .max(240, "Maximum slot is 240 minutes")
+    .optional(),
+}).superRefine((data, ctx) => {
+  // If acceptAppointments is true, require a valid appointmentSlotMinutes
+  if (data.acceptAppointments) {
+    if (
+      typeof data.appointmentSlotMinutes !== "number" ||
+      Number.isNaN(data.appointmentSlotMinutes)
+    ) {
+      ctx.addIssue({
+        path: ["appointmentSlotMinutes"],
+        code: z.ZodIssueCode.custom,
+        message: "Please provide the single appointment time in minutes",
+      });
+    }
+  }
+  // If a day is enabled, require open and close time
+  for (let i = 0; i < data.operationalHours.length; i++) {
+    const oh = data.operationalHours[i];
+    if (oh.enabled) {
+      if (!oh.openTime || !oh.closeTime) {
+        ctx.addIssue({
+          path: ["operationalHours", i],
+          code: z.ZodIssueCode.custom,
+          message: "Please set opening and closing time for enabled days",
+        });
+      }
+    }
+  }
 });
 
 const days = [
@@ -98,10 +137,13 @@ export default function BusinessInfoForm({
       registrationDate: "",
       operationalHours: days.map((day) => ({
         day,
+        enabled: false,
         openTime: "",
         closeTime: "",
       })),
       socialMediaLinks: [{ platform: "", url: "" }],
+      acceptAppointments: false,
+      appointmentSlotMinutes: 30,
     },
   });
 
@@ -117,6 +159,26 @@ export default function BusinessInfoForm({
 
         const businessDocRef = doc(db, "businesses", targetId);
         const businessDocSnap = await getDoc(businessDocRef);
+
+        // Helper to normalize operational hours to new schema
+        const normalizeOperationalHours = (ops) => {
+          if (!Array.isArray(ops) || ops.length !== 7) {
+            return days.map((day) => ({ day, enabled: false, openTime: "", closeTime: "" }));
+          }
+          return ops.map((item, idx) => {
+            const baseDay = days[idx] || item.day;
+            const enabled =
+              typeof item.enabled === "boolean"
+                ? item.enabled
+                : Boolean(item.openTime && item.closeTime);
+            return {
+              day: item.day || baseDay,
+              enabled,
+              openTime: item.openTime || "",
+              closeTime: item.closeTime || "",
+            };
+          });
+        };
 
         // If business data doesn't exist in businesses collection, try to fetch from users collection
         if (!businessDocSnap.exists()) {
@@ -143,16 +205,17 @@ export default function BusinessInfoForm({
               gstinNumber: userData.gstinNumber || "",
               businessLicense: userData.businessLicense || "",
               registrationDate: userData.registrationDate || "",
-              operationalHours:
-                userData.operationalHours ||
-                days.map((day) => ({
-                  day,
-                  openTime: "",
-                  closeTime: "",
-                })),
+              operationalHours: normalizeOperationalHours(
+                userData.operationalHours
+              ),
               socialMediaLinks: userData.socialMediaLinks || [
                 { platform: "", url: "" },
               ],
+              acceptAppointments: Boolean(userData.acceptAppointments),
+              appointmentSlotMinutes:
+                typeof userData.appointmentSlotMinutes === "number"
+                  ? userData.appointmentSlotMinutes
+                  : 30,
             };
 
             form.reset(formData);
@@ -175,16 +238,17 @@ export default function BusinessInfoForm({
             gstinNumber: businessData.gstinNumber || "",
             businessLicense: businessData.businessLicense || "",
             registrationDate: businessData.registrationDate || "",
-            operationalHours:
-              businessData.operationalHours ||
-              days.map((day) => ({
-                day,
-                openTime: "",
-                closeTime: "",
-              })),
+            operationalHours: normalizeOperationalHours(
+              businessData.operationalHours
+            ),
             socialMediaLinks: businessData.socialMediaLinks || [
               { platform: "", url: "" },
             ],
+            acceptAppointments: Boolean(businessData.acceptAppointments),
+            appointmentSlotMinutes:
+              typeof businessData.appointmentSlotMinutes === "number"
+                ? businessData.appointmentSlotMinutes
+                : 30,
           };
 
           form.reset(formData);
@@ -237,13 +301,37 @@ export default function BusinessInfoForm({
           ? customBusinessType
           : selectedBusinessType;
 
+      // Sanitize operational hours: clear times for disabled days
+      const sanitizedOperationalHours = data.operationalHours.map((oh) =>
+        oh.enabled
+          ? oh
+          : { day: oh.day, enabled: false, openTime: "", closeTime: "" }
+      );
+
+      // Compose payload
+      const payload = {
+        ...data,
+        business_type: finalBusinessType,
+        operationalHours: sanitizedOperationalHours,
+        updatedAt: new Date(),
+      };
+
       // Save data to Firestore with the correct business_type
       const businessRef = doc(db, "businesses", user.uid);
+      await setDoc(businessRef, payload, { merge: true });
+
+      // Mirror key scheduling fields to users doc for consumer-side reads
+      const userRef = doc(db, "users", user.uid);
       await setDoc(
-        businessRef,
+        userRef,
         {
-          ...data,
           business_type: finalBusinessType,
+          operationalHours: sanitizedOperationalHours,
+          acceptAppointments: Boolean(data.acceptAppointments),
+          appointmentSlotMinutes:
+            typeof data.appointmentSlotMinutes === "number"
+              ? data.appointmentSlotMinutes
+              : 30,
           updatedAt: new Date(),
         },
         { merge: true }
@@ -311,7 +399,7 @@ export default function BusinessInfoForm({
                   >
                     <div className="flex-1 font-medium">{item.day}</div>
                     <div className="flex-1">
-                      {item.openTime && item.closeTime
+                      {item.enabled && item.openTime && item.closeTime
                         ? `${item.openTime} - ${item.closeTime}`
                         : "Closed"}
                     </div>
@@ -347,6 +435,15 @@ export default function BusinessInfoForm({
                 </div>
               </div>
             )}
+
+            <div className="mb-4">
+              <div className="text-sm font-medium text-gray-700 mb-1">Appointments</div>
+              <div className="p-2 border rounded-md bg-gray-50 text-gray-700">
+                {values.acceptAppointments
+                  ? `Accepting appointments (slot: ${values.appointmentSlotMinutes || 30} minutes)`
+                  : "Not accepting appointments"}
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -372,6 +469,7 @@ export default function BusinessInfoForm({
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Business type and registration/gstin/license remain */}
             <FormField
               control={form.control}
               name="business_type"
@@ -464,16 +562,19 @@ export default function BusinessInfoForm({
               )}
             />
 
+            {/* Operational Hours */}
             <div className="md:col-span-2">
               <h3 className="text-lg font-semibold mb-4">Operational Hours</h3>
               <div className="bg-gray-50 p-4 rounded-md space-y-3">
-                <div className="grid grid-cols-3 gap-3 mb-2 text-sm font-medium text-muted-foreground">
+                <div className="grid grid-cols-5 gap-3 mb-2 text-sm font-medium text-muted-foreground">
                   <div>Day</div>
+                  <div className="col-span-1">Open?</div>
                   <div>Opening Time</div>
                   <div>Closing Time</div>
+                  <div></div>
                 </div>
                 {form.watch("operationalHours").map((_, index) => (
-                  <div key={index} className="grid grid-cols-3 gap-3">
+                  <div key={index} className="grid grid-cols-5 gap-3 items-center">
                     <FormField
                       control={form.control}
                       name={`operationalHours.${index}.day`}
@@ -492,41 +593,87 @@ export default function BusinessInfoForm({
                     />
                     <FormField
                       control={form.control}
-                      name={`operationalHours.${index}.openTime`}
+                      name={`operationalHours.${index}.enabled`}
                       render={({ field }) => (
-                        <FormItem>
+                        <FormItem className="flex items-center gap-2">
                           <FormControl>
-                            <Input
-                              type="time"
-                              {...field}
-                              disabled={isSubmitting}
-                              className="bg-white"
-                            />
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={(val) => {
+                                  field.onChange(val);
+                                  if (!val) {
+                                    // Clear times when disabling
+                                    form.setValue(
+                                      `operationalHours.${index}.openTime`,
+                                      ""
+                                    );
+                                    form.setValue(
+                                      `operationalHours.${index}.closeTime`,
+                                      ""
+                                    );
+                                  }
+                                }}
+                                disabled={isSubmitting}
+                              />
+                              <Label className="text-sm">Open</Label>
+                            </div>
                           </FormControl>
+                          <FormMessage />
                         </FormItem>
                       )}
                     />
                     <FormField
                       control={form.control}
-                      name={`operationalHours.${index}.closeTime`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormControl>
-                            <Input
-                              type="time"
-                              {...field}
-                              disabled={isSubmitting}
-                              className="bg-white"
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
+                      name={`operationalHours.${index}.openTime`}
+                      render={({ field }) => {
+                        const isEnabled = form.getValues(
+                          `operationalHours.${index}.enabled`
+                        );
+                        return (
+                          <FormItem>
+                            <FormControl>
+                              <Input
+                                type="time"
+                                {...field}
+                                disabled={isSubmitting || !isEnabled}
+                                className="bg-white"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
                     />
+                    <FormField
+                      control={form.control}
+                      name={`operationalHours.${index}.closeTime`}
+                      render={({ field }) => {
+                        const isEnabled = form.getValues(
+                          `operationalHours.${index}.enabled`
+                        );
+                        return (
+                          <FormItem>
+                            <FormControl>
+                              <Input
+                                type="time"
+                                {...field}
+                                disabled={isSubmitting || !isEnabled}
+                                className="bg-white"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
+                    />
+                    <div></div>
                   </div>
                 ))}
               </div>
             </div>
 
+            {/* Social Media Links */}
             <div className="md:col-span-2">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Social Media Links</h3>
@@ -546,7 +693,8 @@ export default function BusinessInfoForm({
                   <div key={field.id} className="flex gap-3 items-start">
                     <FormField
                       control={form.control}
-                      name={`socialMediaLinks.${index}.platform`}
+                      name={`socialMediaLinks.${index}.platform`
+                      }
                       render={({ field }) => (
                         <FormItem className="flex-1">
                           <FormControl>
@@ -594,6 +742,63 @@ export default function BusinessInfoForm({
                   <p className="text-sm text-gray-500 py-2">
                     No social media links added yet.
                   </p>
+                )}
+              </div>
+            </div>
+
+            {/* Appointments Settings */}
+            <div className="md:col-span-2">
+              <h3 className="text-lg font-semibold mb-4">Appointments</h3>
+              <div className="bg-gray-50 p-4 rounded-md space-y-4">
+                <FormField
+                  control={form.control}
+                  name="acceptAppointments"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="mb-2">Accept Appointments</FormLabel>
+                      <FormControl>
+                        <div className="flex items-center gap-3">
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={(val) => field.onChange(val)}
+                            disabled={isSubmitting}
+                          />
+                          <span className="text-sm text-muted-foreground">
+                            Enable consumers to book appointments
+                          </span>
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {form.watch("acceptAppointments") && (
+                  <FormField
+                    control={form.control}
+                    name="appointmentSlotMinutes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Single Appointment Time (minutes)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min={5}
+                            max={240}
+                            step={5}
+                            {...field}
+                            value={field.value ?? 30}
+                            onChange={(e) =>
+                              field.onChange(parseInt(e.target.value || "30", 10))
+                            }
+                            disabled={isSubmitting}
+                            className="bg-white max-w-xs"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 )}
               </div>
             </div>
