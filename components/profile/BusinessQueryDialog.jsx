@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { auth, db } from "@/lib/firebase";
-import { addDoc, collection, serverTimestamp, doc, setDoc } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp, doc, setDoc, getDoc } from "firebase/firestore";
 import toast from "react-hot-toast";
 import Loader from "@/components/Loader";
 
@@ -79,6 +79,20 @@ export default function BusinessQueryDialog({ open, onOpenChange }) {
       const seconds = String(now.getSeconds()).padStart(2, '0');
       const ticketId = `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`;
 
+      // Get user data from Firestore to get the username
+      const userDocRef = doc(db, "users", user.uid);
+      const userDoc = await getDoc(userDocRef);
+      
+      let displayName = "Unknown User";
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        // Use username from Firestore if available, otherwise fallback to email
+        displayName = userData.username || userData.name || user.email || "Unknown User";
+      } else {
+        // Fallback if user document doesn't exist
+        displayName = user.email || "Unknown User";
+      }
+      
       // Reference to the document with custom ID
       const ticketRef = doc(db, "users", user.uid, "tickets", ticketId);
 
@@ -91,7 +105,7 @@ export default function BusinessQueryDialog({ open, onOpenChange }) {
         priority: formData.priority,
         userId: user.uid,
         userEmail: user.email,
-        userName: user.displayName || user.email,
+        userName: displayName,
         status: "open",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -100,7 +114,7 @@ export default function BusinessQueryDialog({ open, onOpenChange }) {
           text: formData.message,
           sender: "business",
           timestamp: new Date(),
-          userName: user.displayName || user.email
+          userName: displayName
         }]
       });
 
