@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Head from "next/head";
 import Script from "next/script";
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, setDoc } from "firebase/firestore";
 import { useLocationAlert } from "@/lib/context/LocationAlertContext";
 
 export default function StoreLocationPicker() {
@@ -20,85 +20,108 @@ export default function StoreLocationPicker() {
   const mapContainerRef = useRef(null);
   const inputRef = useRef(null);
 
-  // Your Gomaps API key
-  const GOMAPS_API_KEY = process.env.NEXT_PUBLIC_GOMAPS_API_KEY;
+  // Your Google Maps API key
+  const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+  // Utility: wait until window.google.maps is available after script onLoad
+  const waitForGoogleMaps = () =>
+    new Promise((resolve, reject) => {
+      if (typeof window === "undefined") return reject(new Error("Window not available"));
+      if (window.google && window.google.maps) return resolve();
+      let attempts = 0;
+      const tm = setInterval(() => {
+        if (window.google && window.google.maps) {
+          clearInterval(tm);
+          resolve();
+        } else if (++attempts > 100) {
+          clearInterval(tm);
+          reject(new Error("Google Maps failed to load"));
+        }
+      }, 100);
+    });
 
   useEffect(() => {
-    if (!isMapLoaded || !mapContainerRef.current || !inputRef.current) return;
+    const init = async () => {
+      if (!isMapLoaded || !mapContainerRef.current || !inputRef.current) return;
 
-    try {
-      // Initialize the map
-      const defaultLocation = { lat: 19.076, lng: 72.877 }; // Default location (Mumbai)
+      try {
+        // Ensure google.maps exists even if onLoad fired early
+        await waitForGoogleMaps();
 
-      mapRef.current = new window.google.maps.Map(mapContainerRef.current, {
-        center: defaultLocation,
-        zoom: 13,
-      });
+        // Initialize the map
+        const defaultLocation = { lat: 19.076, lng: 72.877 }; // Default location (Mumbai)
 
-      // Create the autocomplete object and bind it to the input field
-      autocompleteRef.current = new window.google.maps.places.Autocomplete(
-        inputRef.current
-      );
-      autocompleteRef.current.bindTo("bounds", mapRef.current);
-
-      // Set up the event listener for when the user selects a place
-      autocompleteRef.current.addListener("place_changed", () => {
-        const place = autocompleteRef.current.getPlace();
-
-        if (!place.geometry) {
-          console.log(
-            "No details available for the input: '" + place.name + "'"
-          );
-          return;
-        }
-
-        if (place.geometry.viewport) {
-          mapRef.current.fitBounds(place.geometry.viewport);
-        } else {
-          mapRef.current.setCenter(place.geometry.location);
-          mapRef.current.setZoom(17);
-        }
-
-        // Update or create marker
-        const coordinates = {
-          lat: place.geometry.location.lat(),
-          lng: place.geometry.location.lng(),
-        };
-
-        updateMarker(coordinates);
-
-        // Set the selected location with place details
-        setSelectedLocation({
-          name: place.name,
-          address: place.formatted_address,
-          coordinates: coordinates,
+        mapRef.current = new window.google.maps.Map(mapContainerRef.current, {
+          center: existingLocation || defaultLocation,
+          zoom: 13,
         });
 
-        console.log("Selected location coordinates:", coordinates);
-      });
+        // Create the autocomplete object and bind it to the input field
+        autocompleteRef.current = new window.google.maps.places.Autocomplete(
+          inputRef.current
+        );
+        autocompleteRef.current.bindTo("bounds", mapRef.current);
 
-      // Add click event to the map to set location manually
-      mapRef.current.addListener("click", (event) => {
-        const clickedLocation = {
-          coordinates: {
-            lat: event.latLng.lat(),
-            lng: event.latLng.lng(),
-          },
-        };
+        // Set up the event listener for when the user selects a place
+        autocompleteRef.current.addListener("place_changed", () => {
+          const place = autocompleteRef.current.getPlace();
 
-        // Update the marker
-        updateMarker(clickedLocation.coordinates);
+          if (!place?.geometry) {
+            console.log("No details available for the input");
+            return;
+          }
 
-        // Do reverse geocoding to get address details
-        reverseGeocode(clickedLocation.coordinates);
-      });
+          if (place.geometry.viewport) {
+            mapRef.current.fitBounds(place.geometry.viewport);
+          } else {
+            mapRef.current.setCenter(place.geometry.location);
+            mapRef.current.setZoom(17);
+          }
 
-      console.log("Map initialized successfully");
-    } catch (err) {
-      console.error("Error initializing map:", err);
-      setError("Failed to initialize map. Please refresh the page.");
-    }
-  }, [isMapLoaded]);
+          // Update or create marker
+          const coordinates = {
+            lat: place.geometry.location.lat(),
+            lng: place.geometry.location.lng(),
+          };
+
+          updateMarker(coordinates);
+
+          // Set the selected location with place details
+          setSelectedLocation({
+            name: place.name || "Selected Location",
+            address: place.formatted_address || "",
+            coordinates: coordinates,
+          });
+
+          console.log("Selected location coordinates:", coordinates);
+        });
+
+        // Add click event to the map to set location manually
+        mapRef.current.addListener("click", (event) => {
+          const clickedLocation = {
+            coordinates: {
+              lat: event.latLng.lat(),
+              lng: event.latLng.lng(),
+            },
+          };
+
+          // Update the marker
+          updateMarker(clickedLocation.coordinates);
+
+          // Do reverse geocoding to get address details
+          reverseGeocode(clickedLocation.coordinates);
+        });
+
+        console.log("Map initialized successfully");
+      } catch (err) {
+        console.error("Error initializing map:", err);
+        setError("Failed to initialize map. Please refresh the page.");
+      }
+    };
+
+    init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMapLoaded, mapContainerRef.current]);
 
   // Add new useEffect to fetch existing location and user role
   useEffect(() => {
@@ -116,21 +139,41 @@ export default function StoreLocationPicker() {
           setUserRole(userDoc.data().role);
         }
 
-        if (businessDoc.exists() && businessDoc.data().location) {
-          const location = businessDoc.data().location;
-          setExistingLocation(location);
-
-          // If map is loaded, update the marker and center
-          if (isMapLoaded && mapRef.current) {
-            const coordinates = {
-              lat: location.latitude,
-              lng: location.longitude,
+        if (businessDoc.exists()) {
+          const bData = businessDoc.data();
+          // Prefer _geoloc, fallback to legacy location
+          let center = null;
+          if (
+            bData &&
+            bData._geoloc &&
+            typeof bData._geoloc.lat === "number" &&
+            typeof bData._geoloc.lng === "number"
+          ) {
+            center = { lat: bData._geoloc.lat, lng: bData._geoloc.lng };
+          } else if (
+            bData &&
+            bData.location &&
+            typeof bData.location.latitude === "number" &&
+            typeof bData.location.longitude === "number"
+          ) {
+            center = {
+              lat: bData.location.latitude,
+              lng: bData.location.longitude,
             };
+          }
 
-            mapRef.current.setCenter(coordinates);
-            mapRef.current.setZoom(17);
-            updateMarker(coordinates);
-            reverseGeocode(coordinates);
+          if (center) {
+            setExistingLocation(center);
+
+            // If map is loaded and map exists, update the marker and center
+            if (isMapLoaded && mapRef.current) {
+              mapRef.current.setCenter(center);
+              mapRef.current.setZoom(17);
+              updateMarker(center);
+              reverseGeocode(center);
+            }
+          } else if (userRole === "business") {
+            setShowLocationAlert(true);
           }
         } else if (userRole === "business") {
           setShowLocationAlert(true);
@@ -141,7 +184,8 @@ export default function StoreLocationPicker() {
     };
 
     fetchLocationAndRole();
-  }, [isMapLoaded, auth.currentUser]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMapLoaded]);
 
   // Handle getting current location
   const handleGetCurrentLocation = () => {
@@ -184,6 +228,7 @@ export default function StoreLocationPicker() {
 
   // Update marker on map
   const updateMarker = (coordinates) => {
+    if (!window?.google?.maps || !mapRef.current) return;
     // If marker already exists, update its position
     if (markerRef.current) {
       markerRef.current.setPosition(coordinates);
@@ -216,6 +261,7 @@ export default function StoreLocationPicker() {
   // Perform reverse geocoding to get address from coordinates
   const reverseGeocode = async (coordinates) => {
     try {
+      if (!window?.google?.maps) return;
       // Use the geocoder from Google Maps JavaScript API
       const geocoder = new window.google.maps.Geocoder();
 
@@ -257,27 +303,36 @@ export default function StoreLocationPicker() {
     }
 
     try {
-      const location = {
-        latitude: selectedLocation.coordinates.lat,
-        longitude: selectedLocation.coordinates.lng,
+      const geoloc = {
+        lat: selectedLocation.coordinates.lat,
+        lng: selectedLocation.coordinates.lng,
       };
 
       const businessesRef = doc(db, "businesses", auth.currentUser.uid);
       await updateDoc(businessesRef, {
-        location: location,
+        _geoloc: geoloc,
+        // Keep legacy field updated to avoid breaking other pages relying on it
+        location: { latitude: geoloc.lat, longitude: geoloc.lng },
+        locationAddress: selectedLocation.address || "",
       });
+
       const usersRef = doc(db, "users", auth.currentUser.uid);
-      await updateDoc(usersRef, {
-        location: location,
-      });
+      await setDoc(
+        usersRef,
+        {
+          _geoloc: geoloc,
+          location: { latitude: geoloc.lat, longitude: geoloc.lng },
+          locationAddress: selectedLocation.address || "",
+          updatedAt: new Date(),
+        },
+        { merge: true }
+      );
 
       // Update the global alert state
       setShowLocationAlert(false);
 
       alert(
-        `Location confirmed! Coordinates: ${JSON.stringify(
-          selectedLocation.coordinates
-        )}`
+        `Location confirmed! Coordinates: ${JSON.stringify(geoloc)}\nAddress: ${selectedLocation.address || ""}`
       );
     } catch (err) {
       console.error("Error updating location:", err);
@@ -289,20 +344,15 @@ export default function StoreLocationPicker() {
     <div className="container mx-auto px-4 py-8">
       <Head>
         <title>Thikana - Set Your Store Location</title>
-        <meta
-          name="description"
-          content="Set your business location on Thikana"
-        />
+        <meta name="description" content="Set your business location on Thikana" />
       </Head>
 
-      {/* Load the Gomaps script with places library */}
+      {/* Load the Google Maps script with places library */}
       <Script
-        src={`https://maps.gomaps.pro/maps/api/js?key=${GOMAPS_API_KEY}&libraries=geometry,places`}
+        src={`https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=geometry,places`}
         strategy="afterInteractive"
         onLoad={() => setIsMapLoaded(true)}
-        onError={() =>
-          setError("Failed to load maps. Please refresh the page.")
-        }
+        onError={() => setError("Failed to load maps. Please refresh the page.")}
       />
 
       <h1 className="text-3xl font-bold mb-6">Set Your Store Location</h1>
@@ -314,10 +364,7 @@ export default function StoreLocationPicker() {
           <div className="bg-white p-4 rounded-lg shadow">
             <div className="space-y-4">
               <div>
-                <label
-                  htmlFor="pac-input"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
+                <label htmlFor="pac-input" className="block text-sm font-medium text-gray-700 mb-1">
                   Search for your store location
                 </label>
                 <div className="flex">
@@ -356,9 +403,7 @@ export default function StoreLocationPicker() {
 
           {/* Error message */}
           {error && (
-            <div className="bg-red-100 p-4 rounded-md text-red-800">
-              {error}
-            </div>
+            <div className="bg-red-100 p-4 rounded-md text-red-800">{error}</div>
           )}
 
           {/* Selected location display */}
@@ -367,12 +412,9 @@ export default function StoreLocationPicker() {
               <h2 className="text-lg font-medium mb-2">Selected Location</h2>
               <div className="bg-blue-50 p-3 rounded">
                 <p className="font-medium">{selectedLocation.name}</p>
-                <p className="text-sm text-gray-600 mb-2">
-                  {selectedLocation.address}
-                </p>
+                <p className="text-sm text-gray-600 mb-2">{selectedLocation.address}</p>
                 <p className="text-xs">
-                  Lat: {selectedLocation.coordinates.lat.toFixed(6)}, Lng:{" "}
-                  {selectedLocation.coordinates.lng.toFixed(6)}
+                  Lat: {selectedLocation.coordinates.lat.toFixed(6)}, Lng: {selectedLocation.coordinates.lng.toFixed(6)}
                 </p>
               </div>
 
@@ -399,8 +441,7 @@ export default function StoreLocationPicker() {
 
             <div className="mt-4 text-sm text-gray-600">
               <p>
-                You can search for your location, use your current location, or
-                click directly on the map.
+                You can search for your location, use your current location, or click directly on the map.
               </p>
               <p>Drag the marker to fine-tune the position if needed.</p>
             </div>
