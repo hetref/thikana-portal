@@ -9,7 +9,7 @@ import '@grapesjs/studio-sdk/style';
 import { auth, db } from '../../../lib/firebase';
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { collection, query, where, orderBy, limit, getDocs, addDoc, serverTimestamp, setDoc, doc } from 'firebase/firestore';
-import MainNav from '@/components/main_nav';
+import MainNav from '@/components/landing_nav';
 import { useRouter } from 'next/navigation';
 
 // Add keyframes for toast animations

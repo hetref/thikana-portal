@@ -24,6 +24,20 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import NotificationsSkeleton from "@/components/NotificationsSkeleton";
+import {
+  Bell,
+  BellRing,
+  CheckCheck,
+  Send,
+  MessageCircle,
+  Package,
+  Tag,
+  Settings,
+  Users,
+  Smartphone,
+  Mail,
+  Sparkles,
+} from "lucide-react";
 
 export default function NotificationsClient() {
   const [notifications, setNotifications] = useState([]);
@@ -128,19 +142,40 @@ export default function NotificationsClient() {
   const getNotificationTypeIcon = (type) => {
     switch (type) {
       case "message":
-        return "💬";
+        return <MessageCircle className="w-4 h-4 text-blue-600" />;
       case "order_update":
-        return "📦";
+        return <Package className="w-4 h-4 text-green-600" />;
       case "promotion":
-        return "🏷️";
+        return <Tag className="w-4 h-4 text-purple-600" />;
       case "system":
-        return "⚙️";
+        return <Settings className="w-4 h-4 text-gray-600" />;
       case "follower":
-        return "👥";
+        return <Users className="w-4 h-4 text-orange-600" />;
+      case "test":
+        return <Sparkles className="w-4 h-4 text-pink-600" />;
+      default:
+        return <Bell className="w-4 h-4 text-gray-600" />;
+    }
+  };
+
+  const getNotificationBgColor = (type) => {
+    switch (type) {
+      case "message":
+        return "bg-blue-50 border-blue-100";
+      case "order_update":
+        return "bg-green-50 border-green-100";
+      case "promotion":
+        return "bg-purple-50 border-purple-100";
+      case "system":
+        return "bg-gray-50 border-gray-100";
+      case "follower":
+        return "bg-orange-50 border-orange-100";
+      case "test":
+        return "bg-pink-50 border-pink-100";
       case "appointment-reminder":
         return "⏰";
       default:
-        return "🔔";
+        return "bg-gray-50 border-gray-100";
     }
   };
 
@@ -162,83 +197,117 @@ export default function NotificationsClient() {
   const renderNotificationList = (items) => {
     if (items.length === 0) {
       return (
-        <div className="text-center py-8 text-muted-foreground">
-          No notifications to display
+        <div className="text-center py-12">
+          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+            <Bell className="w-8 h-8 text-gray-400" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            No notifications yet
+          </h3>
+          <p className="text-gray-500">
+            When you receive notifications, they'll appear here
+          </p>
         </div>
       );
     }
 
     return (
-      <div className="space-y-4">
+      <div className="space-y-3">
         {items.map((notification) => (
-          <Card
+          <div
             key={notification.id}
-            className={`cursor-pointer hover:bg-accent/50 transition-colors ${
+            className={`group relative rounded-xl border transition-all duration-200 cursor-pointer hover:shadow-md ${
               notification.isRead
-                ? "opacity-70"
-                : "bg-accent/10 border-primary/20"
+                ? "bg-white border-gray-100 opacity-75"
+                : `${getNotificationBgColor(notification.type)} shadow-sm hover:shadow-lg`
             }`}
             onClick={() =>
               !notification.isRead && handleMarkAsRead(notification.id)
             }
           >
-            <CardContent className="p-4">
-              <div className="flex-1">
-                <div className="flex justify-between items-center mb-1">
-                  <div className="font-semibold flex items-center gap-2">
-                    <span className="mr-1">
-                      {getNotificationTypeIcon(notification.type)}
-                    </span>
-                    {notification.title || notification.type}
-                    {!notification.isRead && (
-                      <Badge variant="default" className="text-xs">
-                        New
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {notification.timestamp}
-                  </div>
+            <div className="p-5">
+              <div className="flex items-start gap-4">
+                {/* Icon */}
+                <div className={`p-2.5 rounded-lg ${
+                  notification.isRead ? "bg-gray-100" : "bg-white/80"
+                } flex-shrink-0`}>
+                  {getNotificationTypeIcon(notification.type)}
                 </div>
-                <p className="text-sm">{notification.message}</p>
-                <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                  <span>From: {notification.sender}</span>
-                  {notification.whatsapp && (
-                    <Badge variant="outline" className="text-xs">
-                      WhatsApp
-                    </Badge>
-                  )}
-                  {notification.email && (
-                    <Badge variant="outline" className="text-xs">
-                      Email
-                    </Badge>
-                  )}
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <h4 className="font-semibold text-gray-900 text-base leading-tight">
+                      {notification.title || notification.type}
+                    </h4>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {!notification.isRead && (
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      )}
+                      <span className="text-xs text-gray-500 font-medium">
+                        {notification.timestamp}
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="text-gray-700 text-sm leading-relaxed mb-3">
+                    {notification.message}
+                  </p>
+
+                  {/* Footer */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500">
+                        From: {notification.sender}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      {notification.whatsapp && (
+                        <div className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-md">
+                          <Smartphone className="w-3 h-3" />
+                          <span className="text-xs font-medium">WhatsApp</span>
+                        </div>
+                      )}
+                      {notification.email && (
+                        <div className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-md">
+                          <Mail className="w-3 h-3" />
+                          <span className="text-xs font-medium">Email</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         ))}
       </div>
     );
   };
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50/30">
+      <div className="px-6 md:px-10 py-8 w-full">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div>
               <CardTitle className="text-2xl font-bold">Notifications</CardTitle>
               <CardDescription>Stay updated with your latest activities</CardDescription>
             </div>
+
             {unreadCount > 0 && (
               <Button
                 variant="outline"
                 onClick={handleMarkAllAsRead}
                 disabled={markAllLoading}
-                size="sm"
+                className="flex items-center gap-2 px-6 py-3 rounded-xl border-2 hover:bg-green-50 hover:border-green-200 transition-all duration-200"
               >
-                {markAllLoading ? "Marking..." : "Mark all as read"}
+                <CheckCheck className="w-4 h-4" />
+                <span className="font-medium">
+                  {markAllLoading ? "Marking..." : "Mark all as read"}
+                </span>
               </Button>
             )}
           </div>

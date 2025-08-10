@@ -21,7 +21,6 @@ import {
   setDoc,
   writeBatch,
 } from "firebase/firestore";
-import Chatbot from "@/components/Chatbot";
 import PostCard from "@/components/PostCard";
 import { userEmailStatus } from "@/utils/userStatus";
 import { sendEmailVerification } from "firebase/auth";
@@ -528,6 +527,46 @@ const FeedPage = () => {
           </div>
         </div>
       )}
+      {/* Location status indicator - only when location is active and ready */}
+      {isGranted && isLocationReady && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
+          <div className="flex items-start space-x-3">
+            <div className="text-blue-500 mt-0.5">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                <circle cx="12" cy="10" r="3"></circle>
+              </svg>
+            </div>
+            <div className="flex-1">
+              <p className="text-sm text-blue-600 font-medium">
+                Showing posts from businesses near you
+              </p>
+              <div className="mt-2 text-xs text-blue-500 space-y-1">
+                <p>• Free plan businesses within 2km</p>
+                <p>• Standard plan businesses within 4km</p>
+                <p>• Premium plan businesses within 8km</p>
+              </div>
+            </div>
+            <Button
+              onClick={handleManualRefresh}
+              disabled={loading}
+              className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 border-0 h-8 px-3"
+            >
+              {loading ? "Refreshing..." : "Refresh"}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Posts */}
       {posts.map((post) => (
@@ -541,6 +580,16 @@ const FeedPage = () => {
         />
       ))}
 
+      {/* Load more button */}
+      {hasMore && (
+        <button
+          onClick={loadMore}
+          disabled={loading}
+          className="w-full py-3 mt-6 text-blue-600 hover:text-blue-800 disabled:opacity-50 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+        >
+          {loading ? "Loading..." : "Load More Posts"}
+        </button>
+      )}
       {/* Load more button */}
       {hasMore && (
         <button

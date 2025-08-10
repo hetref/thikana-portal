@@ -1,7 +1,6 @@
 "use client";
 
 import Loader from "@/components/Loader";
-import MainNav from "@/components/main_nav";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { get, ref } from "firebase/database";

@@ -1,5 +1,5 @@
 "use client"
-import TopNavbar from "@/components/TopNavbar"
+import LandingNav from "@/components/landing_nav"
 import Footer from "@/components/Footer"
 import { motion, AnimatePresence } from "framer-motion"
 import { useTheme } from "@/context/ThemeContext"
@@ -29,7 +29,7 @@ const LandingPageLayout = ({ children }) => {
           isDark ? 'bg-black' : 'bg-white'
         }`}
       >
-        <TopNavbar />
+        <LandingNav />
         <motion.main
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}

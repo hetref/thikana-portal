@@ -1,49 +1,52 @@
-"use client";
+"use client"
 
-import * as React from "react";
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import useGetUser from "@/hooks/useGetUser"
+import { auth } from "@/lib/firebase"
+import { authenticatedItems } from "@/constants/navLinks"
+import Image from "next/image"
+import { onAuthStateChanged, signOut } from "firebase/auth"
+import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
+import { Menu, X, Plus, MapPin, Search, Globe, Bell, User, Home, Settings } from "lucide-react"
 import {
-  Home, Search, Bell, User,
-  HelpCircle, LogOut, ChevronRight, Globe
-} from 'lucide-react';
-import {
-  Avatar, AvatarFallback, AvatarImage
-} from "@/components/ui/avatar";
-import Image from "next/image";
-import {
-  Collapsible, CollapsibleContent, CollapsibleTrigger
-} from "@/components/ui/collapsible";
-import {
-  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
-  SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton,
-  SidebarMenuItem, SidebarTrigger
-} from "@/components/ui/sidebar";
-import { cn } from "@/lib/utils";
-import useGetUser from "@/hooks/useGetUser";
-import { auth } from "@/lib/firebase";
-import { onAuthStateChanged, signOut } from "firebase/auth";
-import { useRouter, usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel
-} from "@/components/ui/dropdown-menu";
-import { Badge } from "@/components/ui/badge";
-import { getUnreadNotificationCount } from "@/lib/notifications";
-import AddPhotoModal from "./AddPhotoModal";
-import { CartProvider } from "@/components/CartContext";
-import { useTheme } from "@/context/ThemeContext";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu"
+import { Badge } from "@/components/ui/badge"
+import { getUnreadNotificationCount } from "@/lib/notifications"
+import AddPhotoModal from "./AddPhotoModal"
+import CartIcon from "@/components/cart/CartIcon"
+import { CartProvider } from "@/components/CartContext"
+import { ThemeToggle } from "@/components/ui/theme-toggle"
+import { cn } from "@/lib/utils"
+import { useTheme } from "@/context/ThemeContext"
 
-// Shared state and functionality
-const useNavigationState = () => {
-  const [authUser, setAuthUser] = useState(null);
-  const [isAddPhotoModalOpen, setIsAddPhotoModalOpen] = useState(false);
-  const [notificationCount, setNotificationCount] = useState(0);
-  const [currentLanguage, setCurrentLanguage] = useState("en");
-  const [mounted, setMounted] = useState(false);
-  const { isDark } = useTheme();
-  const userData = useGetUser(authUser?.uid);
-  const router = useRouter();
+const MainNav = () => {
+  const [authUser, setAuthUser] = useState(null)
+  const [menuState, setMenuState] = useState(false)
+  const [isScrolled, setIsScrolled] = useState(false)
+  const [isAddPhotoModalOpen, setIsAddPhotoModalOpen] = useState(false)
+  const [notificationCount, setNotificationCount] = useState(0)
+  const [currentLanguage, setCurrentLanguage] = useState("en")
+  const [mounted, setMounted] = useState(false)
+  const { isDark } = useTheme()
 
+  // Ensure component is mounted before rendering to prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Get the complete user data from Firestore
+  const userData = useGetUser(authUser?.uid)
+  const router = useRouter()
+
+  // Languages supported by our app
   const languages = [
     { code: "en", name: "English" },
     { code: "hi", name: "हिन्दी (Hindi)" },
@@ -58,120 +61,88 @@ const useNavigationState = () => {
     { code: "ja", name: "日本語 (Japanese)" },
     { code: "zh-CN", name: "中文 (Chinese)" },
     { code: "ar", name: "العربية (Arabic)" },
-  ];
+  ]
 
-  useEffect(() => { setMounted(true); }, []);
-
+  // Scroll effect
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const savedLanguage = localStorage.getItem("preferredLanguage");
-      if (savedLanguage) setCurrentLanguage(savedLanguage);
-    } catch {}
-  }, []);
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 50)
+    }
+    window.addEventListener("scroll", handleScroll)
+    return () => window.removeEventListener("scroll", handleScroll)
+  }, [])
 
+  // Initialize language preference from localStorage
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    try {
+      const savedLanguage = localStorage.getItem("preferredLanguage")
+      if (savedLanguage) {
+        setCurrentLanguage(savedLanguage)
+      }
+    } catch (error) {
+      console.error("Error accessing localStorage:", error)
+    }
+  }, [])
+
+  // Function to change the language
   const changeLanguage = (langCode) => {
     try {
-      if (typeof window === "undefined") return;
-      localStorage.setItem("preferredLanguage", langCode);
-      setCurrentLanguage(langCode);
+      if (typeof window === "undefined") return
+
+      localStorage.setItem("preferredLanguage", langCode)
+      setCurrentLanguage(langCode)
+
       if (langCode === "en") {
-        window.location.hash = "";
+        window.location.hash = ""
       } else {
-        window.location.hash = `#googtrans(en|${langCode})`;
+        window.location.hash = `#googtrans(en|${langCode})`
       }
-      window.location.reload();
-    } catch {}
-  };
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (currentLanguage !== "en") {
-      const script = document.createElement("script");
-      script.src =
-        "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
-      script.async = true;
-      window.googleTranslateElementInit = () => {
-        new window.google.translate.TranslateElement(
-          {
-            pageLanguage: "en",
-            includedLanguages: languages.map((lang) => lang.code).join(","),
-            autoDisplay: false,
-            layout: window.google.translate.TranslateElement.InlineLayout.HORIZONTAL,
-          },
-          "google_translate_element"
-        );
-        const googleFrame = document.getElementsByClassName("goog-te-banner-frame")[0];
-        if (googleFrame) googleFrame.style.display = "none";
-        document.body.style.top = "0px";
-      };
-      document.body.appendChild(script);
+    } catch (error) {
+      console.error("Error changing language:", error)
     }
-  }, [currentLanguage]);
+  }
 
+  // Get notification count
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) setAuthUser(user);
-      else setAuthUser(false);
-    });
-    return () => unsubscribe();
-  }, []);
+    let unsubscribe = () => {}
 
-  useEffect(() => {
-    let unsubscribe = () => {};
     if (authUser?.uid) {
       unsubscribe = getUnreadNotificationCount((count) => {
-        setNotificationCount(count);
-      }, authUser.uid);
-    } else {
-      setNotificationCount(0);
+        setNotificationCount(count)
+      }, authUser.uid)
     }
-    return () => unsubscribe();
-  }, [authUser]);
+
+    return unsubscribe
+  }, [authUser?.uid])
+
+  // Auth state listener
+  useEffect(() => {
+    let unsubscribe = () => {}
+
+    if (typeof window !== "undefined") {
+      unsubscribe = onAuthStateChanged(auth, (user) => {
+        setAuthUser(user)
+      })
+    }
+
+    return unsubscribe
+  }, [])
 
   const logoutHandler = async () => {
     try {
-      await signOut(auth);
-      router.push("/");
+      await signOut(auth)
+      router.push("/")
     } catch (error) {
-      console.error("Logout Error:", error);
+      console.error("Error signing out:", error)
     }
-  };
+  }
 
-  return {
-    authUser, userData, isAddPhotoModalOpen, setIsAddPhotoModalOpen,
-    notificationCount, currentLanguage, mounted, isDark,
-    languages, changeLanguage, logoutHandler
-  };
-};
-
-const navigationData = [
-  {
-    type: "section",
-    label: "MAIN",
-    items: [
-      { title: "Home", icon: Home, url: "/feed" },
-      { title: "Search", icon: Search, url: "/search" },
-      { title: "Notifications", icon: Bell, url: "/notifications" },
-      { title: "Profile", icon: User, url: "/profile" },
-    ],
-  },
-];
-
-const bottomNavigationData = [
-  { title: "Help", icon: HelpCircle, url: "#" },
-  { title: "Logout Account", icon: LogOut, url: "#", className: "text-red-500 hover:text-red-600" },
-];
-
-export function SidebarNav({ ...props }) {
-  const {
-    authUser, userData, isAddPhotoModalOpen, setIsAddPhotoModalOpen,
-    notificationCount, currentLanguage, mounted, languages,
-    changeLanguage, logoutHandler
-  } = useNavigationState();
-  const pathname = usePathname();
-
-  if (!mounted) return null;
+  // Don't render until mounted to prevent hydration issues
+  if (!mounted) {
+    return null
+  }
 
   return (
     <nav
@@ -182,7 +153,7 @@ export function SidebarNav({ ...props }) {
           : "bg-background/95 backdrop-blur-sm"
       )}
     >
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex items-center">
@@ -308,11 +279,6 @@ export function SidebarNav({ ...props }) {
                     <DropdownMenuItem asChild>
                       <Link href="/add-product" className="flex items-center gap-2">
                         <span>Add Product</span>
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/add-bulk-products" className="flex items-center gap-2">
-                        <span>Add Bulk Products</span>
                       </Link>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -469,15 +435,14 @@ export function SidebarNav({ ...props }) {
         )}
       </div>
 
-      {authUser && (
-        <AddPhotoModal
-          isOpen={isAddPhotoModalOpen}
-          onClose={() => setIsAddPhotoModalOpen(false)}
-          userId={authUser.uid}
-        />
-      )}
-    </CartProvider>
-  );
+      {/* Add Photo Modal */}
+      <AddPhotoModal
+        isOpen={isAddPhotoModalOpen}
+        onClose={() => setIsAddPhotoModalOpen(false)}
+        userId={authUser?.uid}
+      />
+    </nav>
+  )
 }
 
-export default SidebarNav;
+export default MainNav
