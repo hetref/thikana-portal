@@ -30,6 +30,7 @@ export default function RootLayout({ children }) {
           src="https://checkout.razorpay.com/v1/checkout.js"
           strategy="afterInteractive"
         />
+        {/* hello */}
       </body>
     </html>
   );
