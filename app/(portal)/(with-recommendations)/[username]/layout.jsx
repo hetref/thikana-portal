@@ -1,5 +1,4 @@
 "use client";
-import Sidebar from "@/components/Sidebar";
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { doc, getDoc } from "firebase/firestore";
@@ -61,15 +60,9 @@ const UsernameLayout = ({ children }) => {
 
   if (notFound) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-[ #F5F5F5]">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col lg:flex-row gap-6 px-2 md:px-4">
-            <aside className="hidden lg:block lg:w-80">
-              <div className="sticky top-20">
-                <Sidebar />
-              </div>
-            </aside>
-
             <main className="flex-1 py-10 px-4">
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-10 text-center">
                 <h1 className="text-2xl font-bold text-gray-900 mb-4">
@@ -91,12 +84,6 @@ const UsernameLayout = ({ children }) => {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col lg:flex-row gap-6 px-2 md:px-4">
-          <aside className="hidden lg:block lg:w-80">
-            <div className="sticky top-20">
-              <Sidebar />
-            </div>
-          </aside>
-
           <main className="flex-1">{children}</main>
         </div>
       </div>

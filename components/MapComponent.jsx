@@ -5,6 +5,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { MapPin, Navigation } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 // Fix Leaflet icon issues in Next.js
 const fixLeafletIcons = () => {
@@ -53,53 +54,65 @@ export default function MapComponent({ location, name, address }) {
 
   if (!location || !location.lat || !location.lng) {
     return (
-      <div className="flex justify-center items-center h-full bg-gray-100">
-        <p className="text-gray-500">No valid location coordinates</p>
-      </div>
+      <Card className="overflow-hidden shadow-md border border-gray-200 bg-white w-full">
+        <CardContent className="p-0">
+          <div className="flex justify-center items-center h-64 bg-gray-50">
+            <p className="text-gray-500">No valid location coordinates</p>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-grow relative">
-        <MapContainer
-          center={[location.lat, location.lng]}
-          zoom={16}
-          scrollWheelZoom={false}
-          style={{ height: "100%", width: "100%" }}
-          whenReady={() => setIsMapLoaded(true)}
-        >
-          <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          />
-          <Marker position={[location.lat, location.lng]}>
-            <Popup>
-              <div className="text-center">
-                <strong>{name || "Location"}</strong>
-                {address && <p className="text-sm">{address}</p>}
-                <p className="text-xs mt-1">
-                  {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
-                </p>
-              </div>
-            </Popup>
-          </Marker>
-          <MapController location={location} />
-        </MapContainer>
+    <Card className="overflow-hidden shadow-md border border-gray-200 bg-white w-full">
+      <CardHeader className="p-4 pb-2">
+        <CardTitle className="text-base">
+          {name || "Location"}
+        </CardTitle>
+        {address && <p className="text-sm text-gray-500">{address}</p>}
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="relative h-[320px] sm:h-[360px] md:h-[420px] lg:h-[500px] w-full">
+          <MapContainer
+            center={[location.lat, location.lng]}
+            zoom={16}
+            scrollWheelZoom={false}
+            style={{ height: "100%", width: "100%" }}
+            whenReady={() => setIsMapLoaded(true)}
+          >
+            <TileLayer
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            />
+            <Marker position={[location.lat, location.lng]}>
+              <Popup>
+                <div className="text-center">
+                  <strong>{name || "Location"}</strong>
+                  {address && <p className="text-sm">{address}</p>}
+                  <p className="text-xs mt-1">
+                    {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
+                  </p>
+                </div>
+              </Popup>
+            </Marker>
+            <MapController location={location} />
+          </MapContainer>
 
-        {isMapLoaded && (
-          <div className="absolute bottom-4 right-4 z-[1000]">
-            <Button
-              onClick={handleGetDirections}
-              size="sm"
-              className="flex items-center gap-2 bg-white text-black hover:bg-gray-100 shadow-md border border-gray-200"
-            >
-              <Navigation size={16} />
-              <span>Get Directions</span>
-            </Button>
-          </div>
-        )}
-      </div>
-    </div>
+          {isMapLoaded && (
+            <div className="absolute bottom-4 right-4 z-[1000]">
+              <Button
+                onClick={handleGetDirections}
+                size="sm"
+                className="flex items-center gap-2 bg-white text-black hover:bg-gray-100 shadow-md border border-gray-200"
+              >
+                <Navigation size={16} />
+                <span>Get Directions</span>
+              </Button>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

@@ -5,6 +5,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import Map from "./Map";
+import Sidebar from "./Sidebar";
 import {
   Select,
   SelectContent,
@@ -31,7 +32,7 @@ import { toast } from "react-hot-toast";
 import { RefreshCw } from "lucide-react";
 import Loader from "@/components/Loader";
 
-export default function WhoToFollow() {
+export default function WhoToFollow({ showSidebar = true, className = "" }) {
   const [businesses, setBusinesses] = useState([]);
   const [following, setFollowing] = useState(new Set());
   const [loading, setLoading] = useState(false);
@@ -245,196 +246,168 @@ export default function WhoToFollow() {
   };
 
   return (
-    <div className="sticky top-20">
-      <Card className="overflow-hidden shadow-md border-none">
-        <CardHeader className="p-6 pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="font-semibold text-lg">
-              Who to Follow
-            </CardTitle>
-            <Select
-              value={recommendationType}
-              onValueChange={handleRecommendationTypeChange}
-            >
-              <SelectTrigger className="w-[140px] h-8 text-xs">
-                <SelectValue placeholder="Filter by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="location">Location Based</SelectItem>
-                <SelectItem value="activity">Activity Based</SelectItem>
-              </SelectContent>
-            </Select>
+    <div className={`${showSidebar ? "flex flex-col lg:flex-row gap-6" : "w-full"} ${className}`}>
+      {/* Left Sidebar */}
+      {showSidebar && (
+        <aside className="hidden lg:block lg:w-80">
+          <div className="sticky top-20">
+            <Sidebar />
           </div>
-          <Separator className="my-3" />
-        </CardHeader>
+        </aside>
+      )}
 
-        <CardContent className="p-6 pt-0">
-          {userEmailStatus() === false ? (
-            <div className="flex flex-col gap-4 items-center py-6 px-2 text-center">
-              <p className="text-sm text-muted-foreground">
-                Please verify your email to see recommendations.
-              </p>
-              <Button
-                size="sm"
-                className="text-xs bg-amber-600 hover:bg-amber-700"
-                onClick={() => {
-                  sendEmailVerification(auth.currentUser)
-                    .then(() => toast.success("Verification email sent"))
-                    .catch(() =>
-                      toast.error("Failed to send verification email")
-                    );
-                }}
+      {/* Right Content - WhoToFollow */}
+      <div className={showSidebar ? "flex-1" : "w-full"}>
+        <Card className="overflow-hidden shadow-md border-none bg-white">
+          <CardHeader className="p-6 pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="font-semibold text-lg">
+                Who to Follow
+              </CardTitle>
+              <Select
+                value={recommendationType}
+                onValueChange={handleRecommendationTypeChange}
               >
-                Verify Email
-              </Button>
+                <SelectTrigger className="w-[140px] h-8 text-xs">
+                  <SelectValue placeholder="Filter by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="location">Location Based</SelectItem>
+                  <SelectItem value="activity">Activity Based</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          ) : loading && businesses.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 space-y-3">
-              <Loader/>
-              <p className="text-sm text-muted-foreground">
-                Loading recommendations...
-              </p>
-            </div>
-          ) : businesses.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 space-y-2 text-center">
-              <RefreshCw className="h-8 w-8 text-muted-foreground/50" />
-              <p className="text-sm text-muted-foreground">
-                No recommendations found
-              </p>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => fetchRecommendedBusinesses(0)}
-                className="text-xs"
-              >
-                Refresh
-              </Button>
-            </div>
-          ) : (
-            <>
-              <div className="flex flex-col items-center gap-2">
-                {businesses.length === 0 && !loading ? (
-                  <div className="text-center p-4">
-                    {recommendationType === "location" ? (
-                      <p className="text-muted-foreground text-sm">
-                        No nearby businesses found. Try enabling location access
-                        or switch to Activity Based recommendations.
-                      </p>
-                    ) : (
-                      <p className="text-muted-foreground text-sm">
-                        No businesses with recent activity found. Try switching
-                        to Location Based recommendations.
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  businesses.map((business) => (
-                    <div
-                      className="flex items-center justify-between gap-4 border p-3 rounded-md w-full"
-                      key={`${business.id}-${offset}`}
-                    >
-                      <div className="flex flex-col justify-center w-full gap-2">
-                        <div className="flex items-center gap-2">
-                          <Link
-                            href={`/${business.username}?user=${business.id}`}
-                            className="grid gap-0.5 text-sm"
-                          >
-                            <span className="font-medium">
-                              {business.businessName}
-                            </span>
-                            <span className="text-muted-foreground">
-                              @{business.username}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {business.businessType}
-                              {business.distance_km && (
-                                <span
-                                  className={`${
-                                    business.distance_km > 4
-                                      ? "text-amber-600"
-                                      : "text-emerald-600"
-                                  }`}
-                                >
-                                  {` • ${business.distance_km}km away`}
-                                </span>
-                              )}
-                              {business.business_plan && (
-                                <span
-                                  className={`${
-                                    business.business_plan === "premium"
-                                      ? "text-amber-600"
-                                      : business.business_plan === "standard"
-                                        ? "text-blue-600"
-                                        : ""
-                                  }`}
-                                >
-                                  {` • ${
-                                    business.business_plan
-                                      .charAt(0)
-                                      .toUpperCase() +
-                                    business.business_plan.slice(1)
-                                  } plan`}
-                                </span>
-                              )}
-                            </span>
-                            {business.recommendation_type && (
-                              <span className="text-xs text-muted-foreground capitalize">
-                                {getRecommendationTypeLabel(
-                                  business.recommendation_type
-                                )}
-                                {recommendationType === "location"
-                                  ? " • Within range"
-                                  : business.has_activity
-                                    ? " • Active business"
-                                    : ""}
-                              </span>
-                            )}
-                          </Link>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className={`${
-                            following.has(business.id)
-                              ? "bg-red-500 text-primary-foreground hover:bg-red-400 hover:text-white"
-                              : ""
-                          }`}
-                          onClick={() =>
-                            following.has(business.id)
-                              ? handleUnfollow(business.id)
-                              : handleFollow(business.id)
-                          }
-                        >
-                          {following.has(business.id) ? "Unfollow" : "Follow"}
-                        </Button>
-                      </div>
-                    </div>
-                  ))
-                )}
+            <Separator className="my-3" />
+          </CardHeader>
+
+          <CardContent className="p-6 pt-0">
+            {userEmailStatus() === false ? (
+              <div className="flex flex-col gap-4 items-center py-6 px-2 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Please verify your email to see recommendations.
+                </p>
+                <Button
+                  size="sm"
+                  className="text-xs bg-amber-600 hover:bg-amber-700"
+                  onClick={() => {
+                    sendEmailVerification(auth.currentUser)
+                      .then(() => toast.success("Verification email sent"))
+                      .catch(() =>
+                        toast.error("Failed to send verification email")
+                      );
+                  }}
+                >
+                  Verify Email
+                </Button>
               </div>
-
-              {hasMore && (
+            ) : loading && businesses.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 space-y-3">
+                <Loader/>
+                <p className="text-sm text-muted-foreground">
+                  Loading recommendations...
+                </p>
+              </div>
+            ) : businesses.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 space-y-2 text-center">
+                <RefreshCw className="h-8 w-8 text-muted-foreground/50" />
+                <p className="text-sm text-muted-foreground">
+                  No recommendations found
+                </p>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={handleLoadMore}
-                  disabled={loading}
-                  className="w-full mt-4 text-xs h-8"
+                  onClick={() => fetchRecommendedBusinesses(0)}
+                  className="text-xs"
                 >
-                  {loading ? (
-                    <>
-                      <Loader/>
-                      Loading...
-                    </>
-                  ) : (
-                    "Load More"
-                  )}
+                  Refresh
                 </Button>
-              )}
-            </>
-          )}
-        </CardContent>
-      </Card>
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-col items-center gap-2">
+                  {businesses.length === 0 && !loading ? (
+                    <div className="text-center p-4">
+                      {recommendationType === "location" ? (
+                        <p className="text-muted-foreground text-sm">
+                          No nearby businesses found. Try enabling location access
+                          or switch to Activity Based recommendations.
+                        </p>
+                      ) : (
+                        <p className="text-muted-foreground text-sm">
+                          No businesses with recent activity found. Try switching
+                          to Location Based recommendations.
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    businesses.map((business) => (
+                      <div
+                        className="flex items-center justify-between gap-4 border border-gray-200 bg-white hover:bg-gray-50 transition-colors p-4 rounded-lg w-full"
+                        key={`${business.id}-${offset}`}
+                      >
+                        <div className="flex items-center w-full gap-3">
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage src={business.profilePic || "/avatar.png"} alt={business.businessName || business.username} />
+                            <AvatarFallback>
+                              {(business.businessName || business.username || "U").charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <Link
+                            href={`/${business.username}?user=${business.id}`}
+                            className="flex-1 min-w-0"
+                          >
+                            <div className="truncate font-medium">
+                              {business.businessName || business.username}
+                            </div>
+                            <div className="text-xs text-muted-foreground truncate">
+                              {business.recommendation_type === "activity"
+                                ? `Activity Based${business.has_activity ? " • Active business" : ""}`
+                                : getRecommendationTypeLabel(business.recommendation_type || recommendationType)}
+                            </div>
+                          </Link>
+                          <Button
+                            size="sm"
+                            className={
+                              following.has(business.id)
+                                ? "bg-red-500 text-white hover:bg-red-400"
+                                : "bg-gray-100 hover:bg-gray-200 text-gray-900 border border-gray-200"
+                            }
+                            onClick={() =>
+                              following.has(business.id)
+                                ? handleUnfollow(business.id)
+                                : handleFollow(business.id)
+                            }
+                          >
+                            {following.has(business.id) ? "Unfollow" : "Follow"}
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {hasMore && (
+                  <Button
+                    size="sm"
+                    onClick={handleLoadMore}
+                    disabled={loading}
+                    className="w-full mt-4 text-xs h-8 bg-gray-100 hover:bg-gray-200 text-gray-900"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader/>
+                        Loading...
+                      </>
+                    ) : (
+                      "Load More"
+                    )}
+                  </Button>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

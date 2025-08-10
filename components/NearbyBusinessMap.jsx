@@ -42,7 +42,10 @@ const userIcon = L.divIcon({
   iconAnchor: [12, 12],
 });
 
-export default function NearbyBusinessMap() {
+export default function NearbyBusinessMap({
+  heightClass = "h-[320px] sm:h-[360px] md:h-[420px] lg:h-[500px]",
+  className = "",
+}) {
   const [userLocation, setUserLocation] = useState(null);
   const [businesses, setBusinesses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -177,7 +180,7 @@ export default function NearbyBusinessMap() {
       <MapContainer
         center={[userLocation.lat, userLocation.lng]}
         zoom={13}
-        style={{ height: "400px", width: "100%", borderRadius: "0.5rem" }}
+        style={{ height: "100%", width: "100%", borderRadius: "0.5rem" }}
       >
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
@@ -245,47 +248,47 @@ export default function NearbyBusinessMap() {
   };
 
   return (
-    <Card className="mt-4 top-20 ">
+    <Card className={`mt-4 ${className}`}>
       <CardHeader>
         <CardTitle className="text-xl">Nearby Businesses</CardTitle>
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="h-[400px] flex items-center justify-center">
+          <div className={`${heightClass} flex items-center justify-center`}>
             <p>Loading map...</p>
           </div>
         ) : !userLocation ? (
-          <div className="h-[400px] flex items-center justify-center">
+          <div className={`${heightClass} flex items-center justify-center`}>
             <p>Location not available</p>
           </div>
         ) : !businesses.length ? (
-          <div className="h-[400px] flex items-center justify-center">
+          <div className={`${heightClass} flex items-center justify-center`}>
             <p>No nearby businesses found</p>
           </div>
         ) : (
-          <>
-            <div className="mb-4">
-              <div className="flex flex-col gap-2 text-sm text-gray-600">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#4B5563]" />
-                  <span>Free Plan (2km radius)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#2563EB]" />
-                  <span>Standard Plan (4km radius)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#059669]" />
-                  <span>Premium Plan (8km radius)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-[#DC2626]" />
-                  <span>Your Location</span>
-                </div>
+          <div className="grid grid-cols-1 lg:grid-cols-10 gap-4 items-start">
+            <div className="flex flex-col gap-2 text-sm text-gray-600 lg:col-span-3">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-[#4B5563]" />
+                <span>Free Plan (2km radius)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-[#2563EB]" />
+                <span>Standard Plan (4km radius)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-[#059669]" />
+                <span>Premium Plan (8km radius)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-[#DC2626]" />
+                <span>Your Location</span>
               </div>
             </div>
-            <MapComponent />
-          </>
+            <div className={`w-full lg:col-span-7 ${heightClass}`}>
+              <MapComponent />
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>

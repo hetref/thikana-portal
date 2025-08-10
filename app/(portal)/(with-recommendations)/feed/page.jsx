@@ -6,7 +6,6 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
-import Sidebar from "@/components/Sidebar";
 import { auth, db } from "@/lib/firebase";
 import {
   collection,
@@ -22,7 +21,6 @@ import {
   setDoc,
   writeBatch,
 } from "firebase/firestore";
-import Chatbot from "@/components/Chatbot";
 import PostCard from "@/components/PostCard";
 import { userEmailStatus } from "@/utils/userStatus";
 import { sendEmailVerification } from "firebase/auth";
@@ -30,8 +28,7 @@ import { Button } from "@/components/ui/button";
 import toast from "react-hot-toast";
 import Loader from "@/components/Loader";
 import PostCardSkeleton from "@/components/PostCardSkeleton";
-import NearbyBusinessMap from "@/components/NearbyBusinessMap";
-import WhoToFollowSkeleton from "@/components/WhoToFollowSkeleton";
+import Header from "@/components/header";
 
 // Import new utilities
 import { useLocationManager, LOCATION_STATES } from "@/lib/useLocationManager";
@@ -448,26 +445,12 @@ const FeedPage = () => {
   // Show loading skeleton
   if (loading && posts.length === 0) {
     return (
-      <div className="flex items-center justify-center w-full">
-        <div className="max-w-7xl w-full">
-          <div className="container grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6 py-8">
-            <aside className="hidden md:block">
-              <Sidebar />
-            </aside>
-            <main className="space-y-6">
-              {Array(5)
-                .fill(0)
-                .map((_, index) => (
-                  <PostCardSkeleton key={index} />
-                ))}
-            </main>
-          </div>
-        </div>
-        <aside>
-          <div className="fixed bottom-4 right-4">
-            <Chatbot />
-          </div>
-        </aside>
+      <div className="w-full">
+        {Array(5)
+          .fill(0)
+          .map((_, index) => (
+            <PostCardSkeleton key={index} />
+          ))}
       </div>
     );
   }
@@ -475,138 +458,108 @@ const FeedPage = () => {
   // Show empty state
   if (!loading && posts.length === 0) {
     return (
-      <div className="flex items-center justify-center w-full">
-        <div className="max-w-7xl w-full">
-          <div className="container grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6 py-8">
-            <aside className="hidden md:block">
-              <Sidebar />
-            </aside>
-            <main className="flex flex-col justify-center items-center min-h-[50vh] space-y-4">
-              {error ? (
-                <>
-                  <p className="text-red-500 text-center">{error}</p>
-                  <Button
-                    onClick={handleManualRefresh}
-                    className="bg-blue-600 hover:bg-blue-700"
-                  >
-                    Try Again
-                  </Button>
-                </>
-              ) : (
-                <p className="text-gray-500">No posts found.</p>
-              )}
-            </main>
-          </div>
+      <div className="w-full">
+        <div className="flex flex-col justify-center items-center min-h-[50vh] space-y-4">
+          {error ? (
+            <>
+              <p className="text-red-500 text-center">{error}</p>
+              <Button
+                onClick={handleManualRefresh}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                Try Again
+              </Button>
+            </>
+          ) : (
+            <p className="text-gray-500">No posts found.</p>
+          )}
         </div>
-        <aside>
-          <div className="fixed bottom-4 right-4">
-            <Chatbot />
-          </div>
-        </aside>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center justify-center w-full">
-      <div className="max-w-7xl w-full">
-        <div className="container grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6 py-8">
-          <aside className="hidden md:block">
-            <div className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto">
-              <div className="mb-6">
-                <Sidebar />
-              </div>
-              <div className="h-[500px]">
-                <NearbyBusinessMap />
-              </div>
-            </div>
-          </aside>
-          <main className="space-y-6">
-            {/* Location prompt - only shows when explicitly needed */}
-            {renderLocationPrompt()}
+    <div className="w-full">
+      
+      {/* Location prompt - only shows when explicitly needed */}
+      {renderLocationPrompt()}
 
-            {/* Location status indicator - only when location is active and ready */}
-            {isGranted && isLocationReady && (
-              <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
-                <div className="flex items-start space-x-3">
-                  <div className="text-blue-500 mt-0.5">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                      <circle cx="12" cy="10" r="3"></circle>
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm text-blue-600 font-medium">
-                      Showing posts from businesses near you
-                    </p>
-                    <div className="mt-2 text-xs text-blue-500 space-y-1">
-                      <p>• Free plan businesses within 2km</p>
-                      <p>• Standard plan businesses within 4km</p>
-                      <p>• Premium plan businesses within 8km</p>
-                    </div>
-                  </div>
-                  <Button
-                    onClick={handleManualRefresh}
-                    disabled={loading}
-                    className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 border-0 h-8 px-3"
-                  >
-                    {loading ? "Refreshing..." : "Refresh"}
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* Posts */}
-            {posts.map((post) => (
-              <PostCard
-                key={post.postId}
-                post={post}
-                onLike={() => handlePostLike(post)}
-                onView={() => handlePostView(post.postId)}
-                showDistance={post.isLocationBased}
-                distanceText={post.distanceText}
-              />
-            ))}
-
-            {/* Load more button */}
-            {hasMore && (
-              <button
-                onClick={loadMore}
-                disabled={loading}
-                className="w-full py-3 mt-6 text-blue-600 hover:text-blue-800 disabled:opacity-50 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+      {/* Location status indicator - only when location is active and ready */}
+      {isGranted && isLocationReady && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
+          <div className="flex items-start space-x-3">
+            <div className="text-blue-500 mt-0.5">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               >
-                {loading ? "Loading..." : "Load More Posts"}
-              </button>
-            )}
-
-            {/* Development info */}
-            {process.env.NODE_ENV === "development" && (
-              <div className="text-xs text-gray-500 text-center space-y-1">
-                <p>Location Status: {locationPermission}</p>
-                <p>
-                  Auto-refresh: {autoRefreshEnabled ? "Enabled" : "Disabled"}{" "}
-                  (every {AUTO_REFRESH_INTERVAL / 60000} minutes)
-                </p>
-              </div>
-            )}
-          </main>
-          <aside>
-            <div className="fixed bottom-4 right-4">
-              <Chatbot />
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                <circle cx="12" cy="10" r="3"></circle>
+              </svg>
             </div>
-          </aside>
+            <div className="flex-1">
+              <p className="text-sm text-blue-600 font-medium">
+                Showing posts from businesses near you
+              </p>
+              <div className="mt-2 text-xs text-blue-500 space-y-1">
+                <p>• Free plan businesses within 2km</p>
+                <p>• Standard plan businesses within 4km</p>
+                <p>• Premium plan businesses within 8km</p>
+              </div>
+            </div>
+            <Button
+              onClick={handleManualRefresh}
+              disabled={loading}
+              className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 border-0 h-8 px-3"
+            >
+              {loading ? "Refreshing..." : "Refresh"}
+            </Button>
+          </div>
         </div>
+      )}
+
+      {/* Posts - centered container */}
+      <div className="flex flex-col items-center space-y-6">
+        {posts.map((post) => (
+          <PostCard
+            key={post.postId}
+            post={post}
+            onLike={() => handlePostLike(post)}
+            onView={() => handlePostView(post.postId)}
+            showDistance={post.isLocationBased}
+            distanceText={post.distanceText}
+          />
+        ))}
       </div>
+
+      {/* Load more button */}
+      {hasMore && (
+        <button
+          onClick={loadMore}
+          disabled={loading}
+          className="w-full py-3 mt-6 text-blue-600 hover:text-blue-800 disabled:opacity-50 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+        >
+          {loading ? "Loading..." : "Load More Posts"}
+        </button>
+      )}
+
+      {/* Development info */}
+      {process.env.NODE_ENV === "development" && (
+        <div className="text-xs text-gray-500 text-center space-y-1">
+          <p>Location Status: {locationPermission}</p>
+          <p>
+            Auto-refresh: {autoRefreshEnabled ? "Enabled" : "Disabled"}{" "}
+            (every {AUTO_REFRESH_INTERVAL / 60000} minutes)
+          </p>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Card, CardContent } from "./ui/card";
-import { Avatar, AvatarImage } from "./ui/avatar";
+import Image from "next/image";
+import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar";
 import { Button } from "./ui/button";
-import { Heart, MessageCircle, MapPin, Send, Bookmark, MoreVertical } from "lucide-react";
+import { Heart, MessageCircle, MapPin, Share2, Bookmark, MoreVertical } from "lucide-react";
 import { Input } from "./ui/input";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
@@ -16,12 +16,17 @@ import {
   arrayUnion,
   onSnapshot,
   deleteDoc,
+  collection,
+  getDocs,
+  query,
+  orderBy,
 } from "firebase/firestore";
 import toast from "react-hot-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "./ui/alert-dialog";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
+import { CommentsSection } from "./comments-section";
 
 function PostCard({ post, onLike, onView, showDistance, distanceText }) {
   const [isLikeProcessing, setIsLikeProcessing] = useState(false);
@@ -31,7 +36,21 @@ function PostCard({ post, onLike, onView, showDistance, distanceText }) {
   const [commentsCount, setCommentsCount] = useState(post?.commentsCount || 0);
   const [isSaved, setIsSaved] = useState(false);
   const [isSaveProcessing, setIsSaveProcessing] = useState(false);
+  const [comments, setComments] = useState([]);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [showFullDescription, setShowFullDescription] = useState(false);
   const router = useRouter();
+  
+  // Function to truncate text to 50 words
+  const truncateText = (text, maxWords = 50) => {
+    if (!text) return "";
+    
+    const words = text.trim().split(/\s+/);
+    if (words.length <= maxWords) return text;
+    
+    const truncatedWords = words.slice(0, maxWords);
+    return truncatedWords.join(' ') + '...';
+  };
   
   // Edit and delete states
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -175,10 +194,47 @@ function PostCard({ post, onLike, onView, showDistance, distanceText }) {
     }
   };
 
+  // Fetch comments for this post
+  const fetchComments = async () => {
+    if (!post?.postId || loadingComments) return;
+
+    try {
+      setLoadingComments(true);
+      const commentsRef = collection(db, "posts", post.postId, "comments");
+      const commentsSnapshot = await getDocs(commentsRef);
+      
+      const allComments = [];
+      commentsSnapshot.docs.forEach(doc => {
+        const userData = doc.data();
+        if (userData.comments && Array.isArray(userData.comments)) {
+          allComments.push(...userData.comments);
+        }
+      });
+
+      // Sort comments by timestamp (newest first)
+      allComments.sort((a, b) => {
+        const timeA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp);
+        const timeB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp);
+        return timeB - timeA;
+      });
+
+      setComments(allComments);
+    } catch (error) {
+      console.error("Error fetching comments:", error);
+    } finally {
+      setLoadingComments(false);
+    }
+  };
+
   const handleCommentClick = (e) => {
     e.stopPropagation();
     e.preventDefault();
     setShowCommentBox(!showCommentBox);
+    
+    // Fetch comments when opening comment section
+    if (!showCommentBox && comments.length === 0) {
+      fetchComments();
+    }
   };
 
   const handleViewComments = (e) => {
@@ -243,8 +299,10 @@ function PostCard({ post, onLike, onView, showDistance, distanceText }) {
       });
 
       setComment("");
-      setShowCommentBox(false);
       toast.success("Comment added successfully");
+      
+      // Refresh comments after adding new one
+      fetchComments();
     } catch (error) {
       console.error("Error submitting comment:", error);
       toast.error("Failed to add comment");
@@ -331,22 +389,51 @@ function PostCard({ post, onLike, onView, showDistance, distanceText }) {
 
   return (
     <>
-      <Card
-        className="cursor-pointer hover:shadow-md transition-shadow"
-        onClick={onView}
-      >
-        <CardContent className="pt-6">
-          {/* Post Header */}
-          <div className="flex justify-between items-start mb-4">
-            <div className="flex gap-3">
-              <Avatar className="h-10 w-10">
-                <AvatarImage
-                  src={post?.authorProfileImage || "/default-avatar.png"}
-                  alt={post?.authorName || "User"}
-                />
+      <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-lg overflow-hidden max-w-[1000px] w-full flex flex-col md:flex-row mb-6">
+        {/* Left side - Image */}
+        <div className="relative w-full md:w-[80%] aspect-[4/3] md:aspect-auto md:h-[600px] overflow-hidden rounded-tl-3xl rounded-bl-3xl rounded-br-3xl">
+          {post?.mediaUrl ? (
+            <>
+              {/* Blurred cover background to avoid empty bars when using contain */}
+              <div
+                className="absolute inset-0 bg-center bg-cover blur-xl scale-110 opacity-60"
+                style={{ backgroundImage: `url(${post.mediaUrl})` }}
+                aria-hidden
+              />
+              {/* Actual image shown fully */}
+              <Image
+                src={post.mediaUrl}
+                alt="Post content"
+                fill
+                className="object-contain cursor-pointer rounded-tl-3xl rounded-bl-3xl rounded-br-3xl"
+                onClick={onView}
+                sizes="(max-width: 768px) 100vw, 800px"
+                priority={false}
+              />
+            </>
+          ) : (
+            <div 
+              className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center cursor-pointer rounded-tl-3xl rounded-bl-3xl rounded-br-3xl"
+              onClick={onView}
+            >
+              <span className="text-gray-500 dark:text-gray-400">No image</span>
+            </div>
+          )}
+        </div>
+
+        {/* Right side - Content */}
+        <div className="w-full md:w-1/2 p-6 flex flex-col">
+          {/* Header with avatar and user info */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <Avatar className="w-10 h-10">
+                <AvatarImage src={post?.authorProfileImage || "/placeholder.svg?height=40&width=40"} />
+                <AvatarFallback>
+                  {post?.authorName?.charAt(0) || post?.authorUsername?.charAt(0) || "U"}
+                </AvatarFallback>
               </Avatar>
               <div>
-                <p className="font-semibold">{post?.authorName || "Anonymous"}</p>
+                <span className="font-semibold text-lg">{post?.authorName || "Anonymous"}</span>
                 <p className="text-sm text-muted-foreground">
                   @{post?.authorUsername || "user"}
                 </p>
@@ -386,100 +473,124 @@ function PostCard({ post, onLike, onView, showDistance, distanceText }) {
             </div>
           </div>
 
-          {/* Post Content */}
-          <div className="space-y-4">
-            <h3 className="font-semibold text-lg">{post?.title || post?.caption || ""}</h3>
-            <p>{post?.content || post?.description || "No description"}</p>
-            {/* Image */}
-            {post?.mediaUrl && (
-              <div className="relative rounded-lg overflow-hidden bg-muted">
-                <div className="relative aspect-[16/9]">
-                  <img
-                    src={post?.mediaUrl}
-                    alt="Post content"
-                    className="object-cover w-full h-full"
-                  />
-                </div>
-              </div>
-            )}
+          {/* Post content */}
+          <div className="mb-4">
+            <h3 className="font-semibold text-lg mb-2">{post?.title || post?.caption || ""}</h3>
+            <div className="text-gray-700 dark:text-gray-300 mb-2">
+              <p className="whitespace-pre-line">
+                {showFullDescription 
+                  ? (post?.content || post?.description || "No description")
+                  : truncateText(post?.content || post?.description || "No description")
+                }
+              </p>
+              {/* Show "read more" button if text is truncated */}
+              {(post?.content || post?.description) && 
+               (post?.content || post?.description).trim().split(/\s+/).length > 50 && (
+                <Button
+                  variant="link"
+                  className="p-0 h-auto text-sm text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-500 mt-2"
+                  onClick={() => setShowFullDescription(!showFullDescription)}
+                >
+                  {showFullDescription ? "Show less" : "Read more"}
+                </Button>
+              )}
+            </div>
+            {/* You can add hashtags here if needed */}
+            <div className="text-blue-500 dark:text-blue-400 text-sm mb-4">
+              {/* Add hashtags from post data if available */}
+            </div>
           </div>
 
-          {/* Post Actions */}
-          <div className="flex items-center justify-between mt-4">
+          {/* Action buttons */}
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                className={`flex items-center gap-1 ${
-                  post?.isLiked ? "text-red-500" : ""
-                }`}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="w-10 h-10 hover:bg-gray-100 dark:hover:bg-gray-700"
                 onClick={handleLike}
                 disabled={isLikeProcessing}
               >
-                <Heart
-                  className={`h-5 w-5 ${post?.isLiked ? "fill-current" : ""}`}
+                <Heart 
+                  className={`w-6 h-6 ${post?.isLiked ? "fill-red-500 text-red-500" : "hover:text-red-500"}`} 
                 />
-                <span>{post?.likes}</span>
+                <span className="sr-only">Like</span>
               </Button>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                className="flex items-center gap-1"
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="w-10 h-10 hover:bg-gray-100 dark:hover:bg-gray-700"
                 onClick={handleCommentClick}
               >
-                <MessageCircle className="h-5 w-5" />
-                <span>{commentsCount}</span>
+                <MessageCircle className="w-6 h-6 hover:text-blue-500" />
+                <span className="sr-only">Comment</span>
               </Button>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                className={`flex items-center gap-1 ${isSaved ? "text-yellow-500" : ""}`}
-                onClick={handleSave}
-                disabled={isSaveProcessing}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="w-10 h-10 hover:bg-gray-100 dark:hover:bg-gray-700"
               >
-                <Bookmark
-                  className={`h-5 w-5 ${isSaved ? "fill-current" : ""}`}
-                />
-                <span>Save</span>
+                <Share2 className="w-6 h-6 hover:text-green-500" />
+                <span className="sr-only">Share</span>
               </Button>
             </div>
-
-            <div className="text-sm text-muted-foreground">
-              {post?.createdAt
-                ? new Date(
-                    typeof post.createdAt === "object" && post.createdAt.toDate
-                      ? post.createdAt.toDate()
-                      : post.createdAt
-                  ).toLocaleDateString()
-                : ""}
-            </div>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="w-10 h-10 hover:bg-gray-100 dark:hover:bg-gray-700"
+              onClick={handleSave}
+              disabled={isSaveProcessing}
+            >
+              <Bookmark 
+                className={`w-6 h-6 ${isSaved ? "fill-yellow-500 text-yellow-500" : "hover:text-yellow-500"}`} 
+              />
+              <span className="sr-only">Save</span>
+            </Button>
           </div>
 
-          {/* Comment box */}
-          {showCommentBox && (
-            <div className="mt-4 pt-4 border-t">
-              <form onSubmit={handleSubmitComment} className="flex gap-2">
-                <Input
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  placeholder="Add a comment..."
-                  className="flex-1"
-                />
-                <Button
-                  type="submit"
-                  size="sm"
-                  variant="secondary"
-                  disabled={!comment.trim() || isSubmitting}
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </form>
-            </div>
+          {/* Likes count */}
+          <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+            {post?.likes > 0 && (
+              <>
+                Liked by <span className="font-semibold">{post.likes}</span> {post.likes === 1 ? 'person' : 'people'}
+              </>
+            )}
+          </div>
+
+          {/* View comments button */}
+          {commentsCount > 0 && (
+            <Button 
+              variant="link" 
+              className="p-0 h-auto text-sm text-gray-500 dark:text-gray-400 justify-start mb-4"
+              onClick={handleCommentClick}
+            >
+              View all {commentsCount} comments
+            </Button>
           )}
-        </CardContent>
-      </Card>
+
+          {/* Post timestamp */}
+          <div className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+            {post?.createdAt
+              ? new Date(
+                  typeof post.createdAt === "object" && post.createdAt.toDate
+                    ? post.createdAt.toDate()
+                    : post.createdAt
+                ).toLocaleDateString()
+              : ""}
+          </div>
+
+          {/* Comments section */}
+          {showCommentBox && (
+            <CommentsSection
+              comments={comments}
+              comment={comment}
+              setComment={setComment}
+              onSubmitComment={handleSubmitComment}
+              isSubmitting={isSubmitting}
+            />
+          )}
+        </div>
+      </div>
 
       {/* Edit Dialog */}
       <AlertDialog open={showEditDialog} onOpenChange={setShowEditDialog}>

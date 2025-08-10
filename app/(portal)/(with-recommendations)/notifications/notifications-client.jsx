@@ -24,6 +24,20 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import NotificationsSkeleton from "@/components/NotificationsSkeleton";
+import {
+  Bell,
+  BellRing,
+  CheckCheck,
+  Send,
+  MessageCircle,
+  Package,
+  Tag,
+  Settings,
+  Users,
+  Smartphone,
+  Mail,
+  Sparkles,
+} from "lucide-react";
 
 export default function NotificationsClient() {
   const [notifications, setNotifications] = useState([]);
@@ -115,17 +129,38 @@ export default function NotificationsClient() {
   const getNotificationTypeIcon = (type) => {
     switch (type) {
       case "message":
-        return "💬";
+        return <MessageCircle className="w-4 h-4 text-blue-600" />;
       case "order_update":
-        return "📦";
+        return <Package className="w-4 h-4 text-green-600" />;
       case "promotion":
-        return "🏷️";
+        return <Tag className="w-4 h-4 text-purple-600" />;
       case "system":
-        return "⚙️";
+        return <Settings className="w-4 h-4 text-gray-600" />;
       case "follower":
-        return "👥";
+        return <Users className="w-4 h-4 text-orange-600" />;
+      case "test":
+        return <Sparkles className="w-4 h-4 text-pink-600" />;
       default:
-        return "🔔";
+        return <Bell className="w-4 h-4 text-gray-600" />;
+    }
+  };
+
+  const getNotificationBgColor = (type) => {
+    switch (type) {
+      case "message":
+        return "bg-blue-50 border-blue-100";
+      case "order_update":
+        return "bg-green-50 border-green-100";
+      case "promotion":
+        return "bg-purple-50 border-purple-100";
+      case "system":
+        return "bg-gray-50 border-gray-100";
+      case "follower":
+        return "bg-orange-50 border-orange-100";
+      case "test":
+        return "bg-pink-50 border-pink-100";
+      default:
+        return "bg-gray-50 border-gray-100";
     }
   };
 
@@ -139,148 +174,249 @@ export default function NotificationsClient() {
   const renderNotificationList = (items) => {
     if (items.length === 0) {
       return (
-        <div className="text-center py-8 text-muted-foreground">
-          No notifications to display
+        <div className="text-center py-12">
+          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+            <Bell className="w-8 h-8 text-gray-400" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            No notifications yet
+          </h3>
+          <p className="text-gray-500">
+            When you receive notifications, they'll appear here
+          </p>
         </div>
       );
     }
 
     return (
-      <div className="space-y-4">
+      <div className="space-y-3">
         {items.map((notification) => (
-          <Card
+          <div
             key={notification.id}
-            className={`cursor-pointer hover:bg-accent/50 transition-colors ${
+            className={`group relative rounded-xl border transition-all duration-200 cursor-pointer hover:shadow-md ${
               notification.isRead
-                ? "opacity-70"
-                : "bg-accent/10 border-primary/20"
+                ? "bg-white border-gray-100 opacity-75"
+                : `${getNotificationBgColor(notification.type)} shadow-sm hover:shadow-lg`
             }`}
             onClick={() =>
               !notification.isRead && handleMarkAsRead(notification.id)
             }
           >
-            <CardContent className="p-4">
-              <div className="flex-1">
-                <div className="flex justify-between items-center mb-1">
-                  <div className="font-semibold flex items-center gap-2">
-                    <span className="mr-1">
-                      {getNotificationTypeIcon(notification.type)}
-                    </span>
-                    {notification.title || notification.type}
-                    {!notification.isRead && (
-                      <Badge variant="default" className="text-xs">
-                        New
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {notification.timestamp}
-                  </div>
+            <div className="p-5">
+              <div className="flex items-start gap-4">
+                {/* Icon */}
+                <div className={`p-2.5 rounded-lg ${
+                  notification.isRead ? "bg-gray-100" : "bg-white/80"
+                } flex-shrink-0`}>
+                  {getNotificationTypeIcon(notification.type)}
                 </div>
-                <p className="text-sm">{notification.message}</p>
-                <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                  <span>From: {notification.sender}</span>
-                  {notification.whatsapp && (
-                    <Badge variant="outline" className="text-xs">
-                      WhatsApp
-                    </Badge>
-                  )}
-                  {notification.email && (
-                    <Badge variant="outline" className="text-xs">
-                      Email
-                    </Badge>
-                  )}
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <h4 className="font-semibold text-gray-900 text-base leading-tight">
+                      {notification.title || notification.type}
+                    </h4>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {!notification.isRead && (
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      )}
+                      <span className="text-xs text-gray-500 font-medium">
+                        {notification.timestamp}
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="text-gray-700 text-sm leading-relaxed mb-3">
+                    {notification.message}
+                  </p>
+
+                  {/* Footer */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500">
+                        From: {notification.sender}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      {notification.whatsapp && (
+                        <div className="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-md">
+                          <Smartphone className="w-3 h-3" />
+                          <span className="text-xs font-medium">WhatsApp</span>
+                        </div>
+                      )}
+                      {notification.email && (
+                        <div className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-md">
+                          <Mail className="w-3 h-3" />
+                          <span className="text-xs font-medium">Email</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         ))}
       </div>
     );
   };
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-center">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50/30">
+      <div className="px-6 md:px-10 py-8 w-full">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div>
-              <CardTitle className="text-2xl font-bold">
+              <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+                <div className="p-2 bg-blue-100 rounded-xl">
+                  <BellRing className="w-6 h-6 text-blue-600" />
+                </div>
                 Notifications
-              </CardTitle>
-              <CardDescription>
-                Stay updated with your latest activities
-              </CardDescription>
+              </h1>
+              <p className="text-gray-600">
+                Stay updated with your latest activities and messages
+              </p>
             </div>
+
             {unreadCount > 0 && (
               <Button
                 variant="outline"
                 onClick={handleMarkAllAsRead}
                 disabled={markAllLoading}
-                size="sm"
+                className="flex items-center gap-2 px-6 py-3 rounded-xl border-2 hover:bg-green-50 hover:border-green-200 transition-all duration-200"
               >
-                {markAllLoading ? "Marking..." : "Mark all as read"}
+                <CheckCheck className="w-4 h-4" />
+                <span className="font-medium">
+                  {markAllLoading ? "Marking..." : "Mark all as read"}
+                </span>
               </Button>
             )}
           </div>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="all" className="mb-4">
-            <TabsList className="w-full">
-              <TabsTrigger value="all" className="flex-1">
-                All ({notifications.length})
-              </TabsTrigger>
-              <TabsTrigger value="unread" className="flex-1">
-                Unread ({unreadCount})
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="all" className="mt-4">
-              {renderNotificationList(notifications)}
-            </TabsContent>
-            <TabsContent value="unread" className="mt-4">
-              {renderNotificationList(
-                notifications.filter((notif) => !notif.isRead)
+
+          {/* Stats */}
+          {notifications.length > 0 && (
+            <div className="flex items-center gap-6 mt-6">
+              <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg border border-gray-200 shadow-sm">
+                <Bell className="w-4 h-4 text-gray-500" />
+                <span className="text-sm font-medium text-gray-700">
+                  {notifications.length} total
+                </span>
+              </div>
+              {unreadCount > 0 && (
+                <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                  <span className="text-sm font-medium text-blue-700">
+                    {unreadCount} unread
+                  </span>
+                </div>
               )}
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-        <CardFooter className="flex-col space-y-4">
-          <Input
-            type="text"
-            placeholder="Enter test notification message"
-            value={testMessage}
-            onChange={(e) => setTestMessage(e.target.value)}
-          />
-          <div className="flex items-center space-x-6 w-full">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="send-whatsapp"
-                checked={sendWhatsApp}
-                onCheckedChange={setSendWhatsApp}
-              />
-              <Label htmlFor="send-whatsapp">WhatsApp</Label>
             </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="send-email"
-                checked={sendEmail}
-                onCheckedChange={setSendEmail}
-              />
-              <Label htmlFor="send-email">Email</Label>
+          )}
+        </div>
+
+        {/* Main Content */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-6">
+            <Tabs defaultValue="all" className="w-full">
+              <TabsList className="flex w-full bg-gray-100 rounded-xl p-1 mb-6 gap-1">
+                <TabsTrigger 
+                  value="all" 
+                  className="rounded-lg font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all duration-200"
+                >
+                  All Notifications ({notifications.length})
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="unread" 
+                  className="rounded-lg font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all duration-200"
+                >
+                  Unread ({unreadCount})
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="all" className="mt-0">
+                {renderNotificationList(notifications)}
+              </TabsContent>
+              
+              <TabsContent value="unread" className="mt-0">
+                {renderNotificationList(
+                  notifications.filter((notif) => !notif.isRead)
+                )}
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          {/* Test Notification Section */}
+          <div className="border-t border-gray-100 bg-gray-50/50">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <Sparkles className="w-5 h-5 text-purple-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">Test Notification</h3>
+                  <p className="text-sm text-gray-600">Send a test notification to verify your settings</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="relative">
+                  <Input
+                    type="text"
+                    placeholder="Enter your test message..."
+                    value={testMessage}
+                    onChange={(e) => setTestMessage(e.target.value)}
+                    className="pl-4 pr-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200"
+                  />
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-3">
+                      <Checkbox
+                        id="send-whatsapp"
+                        checked={sendWhatsApp}
+                        onCheckedChange={setSendWhatsApp}
+                        className="w-5 h-5 rounded border-2 border-gray-300 data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600"
+                      />
+                      <Label htmlFor="send-whatsapp" className="flex items-center gap-2 cursor-pointer">
+                        <Smartphone className="w-4 h-4 text-green-600" />
+                        <span className="font-medium text-gray-700">WhatsApp</span>
+                      </Label>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                      <Checkbox
+                        id="send-email"
+                        checked={sendEmail}
+                        onCheckedChange={setSendEmail}
+                        className="w-5 h-5 rounded border-2 border-gray-300 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                      />
+                      <Label htmlFor="send-email" className="flex items-center gap-2 cursor-pointer">
+                        <Mail className="w-4 h-4 text-blue-600" />
+                        <span className="font-medium text-gray-700">Email</span>
+                      </Label>
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={handleTestNotification}
+                    disabled={testLoading}
+                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-medium transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-60"
+                  >
+                    <Send className="w-4 h-4" />
+                    <span>
+                      {testLoading ? "Sending..." : "Send Test"}
+                    </span>
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
-          <Button
-            onClick={handleTestNotification}
-            disabled={testLoading}
-            className="w-full"
-            variant="outline"
-          >
-            {testLoading
-              ? "Creating Test Notification..."
-              : "Create Test Notification"}
-          </Button>
-        </CardFooter>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

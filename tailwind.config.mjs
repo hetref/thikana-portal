@@ -4,7 +4,8 @@ const {
   
   /** @type {import('tailwindcss').Config} */
   module.exports = {
-	content: [
+      darkMode: ["class"],
+    content: [
 	  "./src/**/*.{ts,tsx}",
 	  "./pages/**/*.{js,ts,jsx,tsx,mdx}",
 	  "./components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -57,7 +58,17 @@ const {
     			'color-2': 'hsl(var(--color-2))',
     			'color-3': 'hsl(var(--color-3))',
     			'color-4': 'hsl(var(--color-4))',
-    			'color-5': 'hsl(var(--color-5))'
+    			'color-5': 'hsl(var(--color-5))',
+    			sidebar: {
+    				DEFAULT: 'hsl(var(--sidebar-background))',
+    				foreground: 'hsl(var(--sidebar-foreground))',
+    				primary: 'hsl(var(--sidebar-primary))',
+    				'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
+    				accent: 'hsl(var(--sidebar-accent))',
+    				'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
+    				border: 'hsl(var(--sidebar-border))',
+    				ring: 'hsl(var(--sidebar-ring))'
+    			}
     		},
     		borderRadius: {
     			lg: 'var(--radius)',

@@ -1,30 +1,17 @@
 "use client";
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  MapPin,
-  Link as LinkIcon,
-  CheckCircle,
-  AlertCircle,
-  ExternalLink,
-  TicketIcon
-} from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { auth, db } from "@/lib/firebase";
 import useGetUser from "@/hooks/useGetUser";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
-import { sendEmailVerification } from "firebase/auth";
-import { useIsBusinessUser } from "@/lib/business-user";
-import toast from "react-hot-toast";
-import { userEmailStatus } from "@/utils/userStatus";
-import { getUnreadNotificationCount } from "@/lib/notifications";
+import BusinessQueryDialog from "@/components/profile/BusinessQueryDialog";
+import { MapPin, Link as LinkIcon, ExternalLink } from "lucide-react";
 import FollowingDialog from "@/components/profile/FollowingDialog";
 import FollowerDialog from "@/components/profile/FollowerDialog";
-import BusinessQueryDialog from "@/components/profile/BusinessQueryDialog";
 
 // Guest sidebar component when user is not logged in
 function DefaultSidebar() {
@@ -59,14 +46,29 @@ function DefaultSidebar() {
   );
 }
 
-export default function Sidebar() {
+export default function Sidebar({ bannerSrc = "" }) {
   const userId = auth.currentUser?.uid || null;
   const user = useGetUser(userId);
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
-  const [notificationCount, setNotificationCount] = useState(0);
-  const { isBusinessUser, loading } = useIsBusinessUser(userId);
+  const { /* isBusinessUser, */ loading } = { loading: false };
   const [showQueryDialog, setShowQueryDialog] = useState(false);
+
+  const gradients = useMemo(
+    () => [
+      "bg-gradient-to-r from-yellow-400 via-amber-500 to-orange-600",
+      "bg-gradient-to-r from-purple-500 via-pink-500 to-red-500",
+      "bg-gradient-to-r from-sky-400 via-cyan-500 to-teal-500",
+      "bg-gradient-to-r from-indigo-500 via-blue-500 to-sky-500",
+      "bg-gradient-to-r from-emerald-400 via-green-500 to-lime-500",
+      "bg-gradient-to-r from-rose-500 via-fuchsia-500 to-purple-500",
+    ],
+    []
+  );
+  const gradientClass = useMemo(
+    () => gradients[Math.floor(Math.random() * gradients.length)],
+    [gradients]
+  );
 
   // Get follower and following counts
   useEffect(() => {
@@ -89,38 +91,10 @@ export default function Sidebar() {
     };
   }, [userId]);
 
-  // Get notification count
-  useEffect(() => {
-    let unsubscribe = () => {};
+  // trimmed unused notification/verification helpers
 
-    if (userId) {
-      unsubscribe = getUnreadNotificationCount((count) => {
-        setNotificationCount(count);
-      }, userId);
-    }
-
-    return () => unsubscribe();
-  }, [userId]);
-
-  const verifyEmailHandler = async () => {
-    if (!auth.currentUser) return;
-
-    try {
-      await sendEmailVerification(auth.currentUser);
-      toast.success("Verification email sent! Please check your inbox.", {
-        duration: 5000,
-      });
-    } catch (error) {
-      toast.error(
-        `Error: ${error.message || "Failed to send verification email"}`
-      );
-    }
-  };
-
-  // Format location for display
   const formatLocation = (location) => {
     if (!location) return null;
-
     if (
       typeof location === "object" &&
       location.latitude &&
@@ -131,17 +105,14 @@ export default function Sidebar() {
         url: `https://maps.google.com/?q=${location.latitude},${location.longitude}`,
       };
     }
-
     return {
       displayText: location,
       url: `https://maps.google.com/search?q=${encodeURIComponent(location)}`,
     };
   };
 
-  // Format website URL
   const formatWebsite = (website) => {
     if (!website) return null;
-
     return {
       displayText: website.replace(/^https?:\/\/(www\.)?/, ""),
       url: website.startsWith("http") ? website : `https://${website}`,
@@ -169,149 +140,103 @@ export default function Sidebar() {
     );
   }
 
-  const location = formatLocation(user.location);
-  const website = formatWebsite(user.website);
-  const isVerified = userEmailStatus();
+  // using compact profile card instead of the previous detailed card
 
   return (
     <div className="sticky top-20">
-      <Card className="overflow-hidden shadow-md border-none">
-        <CardContent className="p-6">
-          <div className="flex flex-col items-center text-center">
-            <Link href="/profile" className="group">
-              <div className="relative flex items-center justify-center">
-                <Avatar className="w-20 h-20 border-2 border-primary/20 transition-transform group-hover:scale-105">
-                  <AvatarImage
-                    src={user.profilePic || ""}
-                    alt={user.fullname || "User"}
-                  />
-                  <AvatarFallback>
-                    {user.name?.[0] || user.username?.[0] || "U"}
-                  </AvatarFallback>
-                </Avatar>
-              </div>
-              <div className="mt-3 space-y-1">
-                <h3 className="font-semibold text-lg transition-colors group-hover:text-primary">
-                  {user.name || "User"}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  @{user.username}
-                </p>
-              </div>
-            </Link>
+      {/* Replaced old profile card with the new dark profile UI */}
 
-            {!isVerified && (
-              <div className="mt-3 w-full">
-                <Button
-                  onClick={verifyEmailHandler}
-                  className="w-full text-xs bg-amber-600 hover:bg-amber-700"
-                  size="sm"
-                >
-                  Verify Email
-                </Button>
-              </div>
-            )}
+      <div className="relative w-full max-w-sm mx-auto rounded-xl overflow-hidden bg-white text-gray-900 shadow-lg">
+        <div className="relative h-40">
+          {bannerSrc ? (
+            <Image
+              src={bannerSrc}
+              alt="Profile banner"
+              fill
+              className="object-cover"
+              priority
+            />
+          ) : (
+            <div className={`h-full w-full ${gradientClass}`} />
+          )}
+        </div>
 
-            <div className="w-full mt-4">
-              <Separator className="my-3" />
-              <div className="grid grid-cols-2 gap-6 py-2">
-                <FollowingDialog
-                  followingCount={followingCount}
-                  userId={userId}
-                  className="flex flex-col items-center hover:text-primary transition-colors cursor-pointer"
-                />
-
-                {isBusinessUser && (
-                  <FollowerDialog
-                    followerCount={followersCount}
-                    userId={userId}
-                    className="flex flex-col items-center hover:text-primary transition-colors cursor-pointer"
-                  />
-                )}
-              </div>
-              <Separator className="my-3" />
-            </div>
-
-            {notificationCount > 0 && (
-              <Link
-                href="/notifications"
-                className="flex items-center justify-between w-full p-2 mb-4 bg-primary/5 rounded-md hover:bg-primary/10 transition-colors"
-              >
-                <span className="text-sm font-medium">Notifications</span>
-                <Badge variant="destructive" className="ml-2">
-                  {notificationCount > 99 ? "99+" : notificationCount}
-                </Badge>
-              </Link>
-            )}
-
-            {isBusinessUser && (
-              <div className="w-full space-y-3 text-sm">
-                {location && (
-                  <div className="flex items-start text-muted-foreground gap-2 group hover:text-foreground transition-colors">
-                    <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
-                    <a
-                      href={location.url}
-                      className="text-left hover:underline flex-1"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {location.displayText}
-                      <ExternalLink className="w-3 h-3 inline ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </a>
-                  </div>
-                )}
-
-                {website && (
-                  <div className="flex items-start text-muted-foreground gap-2 group hover:text-foreground transition-colors">
-                    <LinkIcon className="w-4 h-4 mt-0.5 shrink-0" />
-                    <a
-                      href={website.url}
-                      className="text-left hover:underline flex-1 truncate"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {website.displayText}
-                      <ExternalLink className="w-3 h-3 inline ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </a>
-                  </div>
-                )}
-
-                {user.plan && user.subscriptionStatus === "active" && (
-                  <div className="mt-4">
-                    <Badge
-                      variant="outline"
-                      className="w-full py-1 border-primary/20"
-                    >
-                      {user.plan.charAt(0).toUpperCase() + user.plan.slice(1)}{" "}
-                      Plan
-                    </Badge>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="w-full mt-4">
-              <Link href="/profile/settings">
-                <Button variant="outline" size="sm" className="w-full">
-                  Edit Profile
-                </Button>
-              </Link>
-            </div>
-            <div className="w-full mt-4">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="w-full"
-                onClick={() => setShowQueryDialog(true)}
-              >
-                <TicketIcon className="h-4 w-4 mr-2" />
-                Business query
-              </Button>
-            </div>
-
+        <div className="relative -mt-16 flex justify-between items-end px-6">
+          <FollowerDialog
+            followerCount={followersCount}
+            userId={userId}
+            className="text-center"
+          />
+          <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-lg">
+            <Image
+              src={user.profilePic || "/avatar.png"}
+              alt={user.fullname || user.name || "User"}
+              width={128}
+              height={128}
+              className="object-cover w-full h-full"
+              priority
+            />
           </div>
-        </CardContent>
-      </Card>
+          <FollowingDialog
+            followingCount={followingCount}
+            userId={userId}
+            className="text-center"
+          />
+        </div>
+
+        <div className="p-6 pt-4 flex flex-col items-center">
+          <div className="text-center">
+            <h2 className="text-xl font-bold">{user.name || user.fullname || "User"}</h2>
+            <p className="text-gray-500 text-sm">@{user.username}</p>
+          </div>
+
+          <div className="w-full mt-4 space-y-2">
+            {formatLocation(user.location) && (
+              <div className="flex items-start gap-2 text-gray-600 group hover:text-gray-900 transition-colors">
+                <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
+                <a
+                  href={formatLocation(user.location).url}
+                  className="text-left hover:underline flex-1"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {formatLocation(user.location).displayText}
+                  <ExternalLink className="w-3 h-3 inline ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </a>
+              </div>
+            )}
+
+            {formatWebsite(user.website) && (
+              <div className="flex items-start gap-2 text-gray-600 group hover:text-gray-900 transition-colors">
+                <LinkIcon className="w-4 h-4 mt-0.5 shrink-0" />
+                <a
+                  href={formatWebsite(user.website).url}
+                  className="text-left hover:underline flex-1 truncate"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {formatWebsite(user.website).displayText}
+                  <ExternalLink className="w-3 h-3 inline ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </a>
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-3 w-full mt-6">
+            <Link href="/profile/settings" className="w-full">
+              <Button className="w-full bg-gray-100 hover:bg-gray-200 text-gray-900 py-3 rounded-lg shadow-md">
+                Edit Profile
+              </Button>
+            </Link>
+            <Button
+              className="w-full bg-gray-100 hover:bg-gray-200 text-gray-900 py-3 rounded-lg shadow-md"
+              onClick={() => setShowQueryDialog(true)}
+            >
+              Business Query
+            </Button>
+          </div>
+        </div>
+      </div>
       
       {/* Business Query Dialog */}
       <BusinessQueryDialog 
