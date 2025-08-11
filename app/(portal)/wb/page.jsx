@@ -150,10 +150,10 @@ export default function Home() {
       const pages = [];
       querySnapshot.forEach((doc) => {
         pages.push({ id: doc.id, ...doc.data() });
-      });
+        });
       if (!isProd) console.log('Loaded pages:', pages);
       setUserPages(pages);
-
+      
       // If no pages exist, create a default home page
       if (pages.length === 0) {
         const defaultPage = {
@@ -205,8 +205,8 @@ export default function Home() {
     
     try {
       if (!isProd) {
-        console.log(`Saving page: ${pageName}`);
-        console.log(`HTML length: ${html.length}, CSS length: ${css.length}`);
+      console.log(`Saving page: ${pageName}`);
+      console.log(`HTML length: ${html.length}, CSS length: ${css.length}`);
       }
       // Capture full project data safely
       let projectDataString = null;
@@ -234,7 +234,7 @@ export default function Home() {
         pageProjectData: pageProjectData || null,
         updatedAt: serverTimestamp()
       };
-
+      
       if (existingPageIndex) {
         const pageId = userPages[existingPageIndex].id;
         await setDoc(doc(db, `users/${user.uid}/pages`, pageId), pageData, { merge: true });
@@ -273,9 +273,9 @@ export default function Home() {
         const html = editor.getHtml();
         const css = editor.getCss();
         if (!isProd) {
-          console.log(`HTML length: ${html.length}, CSS length: ${css.length}`);
-          console.log('HTML Preview:', html.substring(0, 100) + '...');
-          console.log('CSS Preview:', css.substring(0, 100) + '...');
+        console.log(`HTML length: ${html.length}, CSS length: ${css.length}`);
+        console.log('HTML Preview:', html.substring(0, 100) + '...');
+        console.log('CSS Preview:', css.substring(0, 100) + '...');
         }
         if (user) {
           (async () => {
@@ -339,10 +339,10 @@ export default function Home() {
     try {
       // Add custom blocks
       editor.Blocks.add('sections', { label: 'Sections', category: 'Sections', content: '', select: true });
-      Object.entries(predefinedSections).forEach(([name, content]) => {
+    Object.entries(predefinedSections).forEach(([name, content]) => {
         editor.Blocks.add(`section-${name}`, { label: name.charAt(0).toUpperCase() + name.slice(1), category: 'Sections', content, select: true });
-      });
-
+    });
+      
       // Helper to apply CSS directly to canvas
       const applyStylesDirectly = (page, css) => {
         try {
@@ -361,7 +361,7 @@ export default function Home() {
           console.error('Error applying styles directly:', err);
         }
       };
-
+      
       // Ensure CSS is applied after frame loads
       editor.on('canvas:frame:load', () => {
         const currentPage = editor.Pages.getSelected();
