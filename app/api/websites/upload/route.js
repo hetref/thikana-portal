@@ -102,8 +102,29 @@ export async function POST(request) {
       return NextResponse.json({ message: "Invalid payload" }, { status: 400 });
     }
 
+    // Authorize: requester must be business owner or member
     const requesterId = decoded.uid;
-    if (requesterId !== businessId) {
+    
+    // Check if the requester is the business owner
+    let isAuthorized = requesterId === businessId;
+    
+    // If not the owner, check if they're a member of this business
+    if (!isAuthorized) {
+      try {
+        const { db } = await import('firebase-admin/firestore');
+        const firestore = db();
+        const userDoc = await firestore.collection('users').doc(requesterId).get();
+        
+        if (userDoc.exists) {
+          const userData = userDoc.data();
+          isAuthorized = userData.role === 'member' && userData.businessId === businessId;
+        }
+      } catch (error) {
+        console.error('Error checking user authorization:', error);
+      }
+    }
+    
+    if (!isAuthorized) {
       return NextResponse.json({ message: "Forbidden" }, { status: 403 });
     }
 
@@ -113,33 +134,71 @@ export async function POST(request) {
     }
 
     const s3 = await getS3ClientForBucket(bucket);
-    const baseKey = `${requesterId}/websites/${websiteId}`;
+    const baseKey = `${businessId}/websites/${websiteId}`;
 
     const desiredKeys = new Set();
     const uploadObject = async (Key, Body) => {
+      console.log(`Uploading: ${Key}`);
       await s3.send(
-        new PutObjectCommand({ Bucket: bucket, Key, Body: Buffer.from(Body, "utf-8"), ContentType: "text/html; charset=utf-8", CacheControl: "no-cache" })
+        new PutObjectCommand({ 
+          Bucket: bucket, 
+          Key, 
+          Body: Buffer.from(Body, "utf-8"), 
+          ContentType: "text/html; charset=utf-8", 
+          CacheControl: "no-cache" 
+        })
       );
       desiredKeys.add(Key);
+      console.log(`Successfully uploaded: ${Key}`);
     };
 
     if (Array.isArray(body.pages) && body.pages.length > 0) {
+      console.log(`Processing ${body.pages.length} pages for website ${websiteId}`);
       const pages = body.pages;
+      
       for (let i = 0; i < pages.length; i++) {
         const page = pages[i];
-        const slug = i === 0 ? "index" : (slugify(page.name || `page-${i + 1}`) || `page-${i + 1}`);
+        console.log(`Processing page ${i + 1}: ${page.name || 'Unnamed'}`);
+        
+        // First page is always index.html, others use slugified names
+        let slug;
+        if (i === 0) {
+          slug = "index";
+        } else {
+          const pageName = page.name || `Page ${i + 1}`;
+          slug = slugify(pageName) || `page-${i + 1}`;
+        }
+        
         const htmlDoc = buildHtmlInline(page.html || "", page.css || "");
-        await uploadObject(`${baseKey}/${slug}.html`, htmlDoc);
+        const key = `${baseKey}/${slug}.html`;
+        
+        await uploadObject(key, htmlDoc);
       }
 
+      // Clean up old files that are no longer needed
+      console.log('Cleaning up old files...');
       const existingKeys = await listAllKeys(s3, bucket, `${baseKey}/`);
-      const toDelete = existingKeys.filter((k) => !desiredKeys.has(k));
-      await deleteKeys(s3, bucket, toDelete);
+      const toDelete = existingKeys.filter((k) => {
+        // Don't delete mediaUploads folder
+        if (k.includes('/mediaUploads/')) return false;
+        return !desiredKeys.has(k);
+      });
+      
+      if (toDelete.length > 0) {
+        console.log(`Deleting ${toDelete.length} old files:`, toDelete);
+        await deleteKeys(s3, bucket, toDelete);
+      }
 
-      return NextResponse.json({ success: true }, { status: 200 });
+      console.log(`Successfully saved ${pages.length} pages for website ${websiteId}`);
+      return NextResponse.json({ 
+        success: true, 
+        message: `Successfully saved ${pages.length} pages`,
+        pages: Array.from(desiredKeys)
+      }, { status: 200 });
     }
 
     // Single page fallback → index.html only
+    console.log('Processing single page fallback');
     const { html, css } = body || {};
     if (typeof html !== "string") {
       return NextResponse.json({ message: "Invalid payload" }, { status: 400 });
@@ -147,13 +206,20 @@ export async function POST(request) {
     const htmlDoc = buildHtmlInline(html, css || "");
     await uploadObject(`${baseKey}/index.html`, htmlDoc);
 
+    // Clean up old files except mediaUploads
     const existingKeys = await listAllKeys(s3, bucket, `${baseKey}/`);
-    const toDelete = existingKeys.filter((k) => !desiredKeys.has(k));
-    await deleteKeys(s3, bucket, toDelete);
+    const toDelete = existingKeys.filter((k) => {
+      if (k.includes('/mediaUploads/')) return false;
+      return !desiredKeys.has(k);
+    });
+    
+    if (toDelete.length > 0) {
+      await deleteKeys(s3, bucket, toDelete);
+    }
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
     console.error("S3 upload error:", error);
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
+    return NextResponse.json({ message: "Internal server error", error: error.message }, { status: 500 });
   }
 } 

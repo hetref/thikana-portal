@@ -185,35 +185,59 @@ export default function WebsiteBuilderPage() {
         
         console.log("Successfully loaded index page");
         
-        // Try to load additional pages
+        // Try to load additional pages with different naming patterns
         let pageNumber = 2;
         let foundAdditionalPages = false;
+        const pagePatterns = [
+          (num) => `page-${num}.html`,
+          (num) => `page${num}.html`,
+          (num) => `page_${num}.html`,
+        ];
         
-        while (pageNumber <= 10) {
-          try {
-            const pageUrl = `${baseUrl}/page-${pageNumber}.html`;
-            console.log("Trying to load:", pageUrl);
-            
-            const pageRes = await fetchWithCorsHandling(pageUrl);
-            
-            if (pageRes.ok) {
-              const pageHtml = await pageRes.text();
-              const { html: pageContent, css: pageCss } = extractInlineStyles(pageHtml);
-              const newPage = ed.Pages.add({ name: `Page ${pageNumber}` });
-              ed.Pages.select(newPage);
-              ed.setComponents(pageContent);
-              ed.setStyle(pageCss);
-              foundAdditionalPages = true;
-              console.log(`Successfully loaded page ${pageNumber}`);
-              pageNumber++;
-            } else {
-              console.log(`No page-${pageNumber}.html found (${pageRes.status})`);
-              break;
+        while (pageNumber <= 20) { // Increased limit
+          let pageFound = false;
+          
+          for (const pattern of pagePatterns) {
+            try {
+              const pageFileName = pattern(pageNumber);
+              const pageUrl = `${baseUrl}/${pageFileName}`;
+              console.log("Trying to load:", pageUrl);
+              
+              const pageRes = await fetchWithCorsHandling(pageUrl);
+              
+              if (pageRes.ok) {
+                const pageHtml = await pageRes.text();
+                console.log(`Found page ${pageNumber} as ${pageFileName}, length:`, pageHtml.length);
+                
+                const { html: pageContent, css: pageCss } = extractInlineStyles(pageHtml);
+                const newPage = ed.Pages.add({ name: `Page ${pageNumber}` });
+                ed.Pages.select(newPage);
+                
+                if (pageContent) {
+                  ed.setComponents(pageContent);
+                }
+                if (pageCss) {
+                  ed.setStyle(pageCss);
+                }
+                
+                foundAdditionalPages = true;
+                pageFound = true;
+                console.log(`Successfully loaded page ${pageNumber} from ${pageFileName}`);
+                break; // Found this page, move to next number
+              } else {
+                console.log(`No ${pageFileName} found (${pageRes.status})`);
+              }
+            } catch (e) {
+              console.log(`Error loading page ${pageNumber} with pattern:`, e.message);
             }
-          } catch (e) {
-            console.log(`Error loading page ${pageNumber}:`, e.message);
-            break;
           }
+          
+          if (!pageFound) {
+            console.log(`No page ${pageNumber} found with any pattern, stopping search`);
+            break; // No more pages found
+          }
+          
+          pageNumber++;
         }
         
         // Select the first page
@@ -260,6 +284,11 @@ export default function WebsiteBuilderPage() {
     setEditor(ed);
     editorReadyRef.current = true;
     
+    // Configure asset manager for media uploads
+    if (businessId) {
+      setupMediaUpload(ed, businessId, websiteId);
+    }
+    
     // If we already have businessId, load content immediately
     if (businessId && !loadAttempted) {
       console.log("BusinessId available, loading content immediately");
@@ -270,31 +299,242 @@ export default function WebsiteBuilderPage() {
     }
   };
 
+  // Setup media upload functionality
+  const setupMediaUpload = (editor, bizId, webId) => {
+    console.log('Setting up media upload for:', bizId, webId);
+    
+    // Configure asset manager
+    const assetManager = editor.AssetManager;
+    
+    // Configure asset manager upload settings
+    assetManager.getConfig().upload = async (files) => {
+      console.log('Asset manager upload called with files:', files);
+      
+      const uploadPromises = Array.from(files).map(async (file) => {
+        try {
+          console.log('Uploading file via asset manager:', file.name);
+          const uploadedAsset = await uploadMediaFile(file, bizId, webId);
+          if (uploadedAsset) {
+            console.log('Upload successful:', uploadedAsset);
+            return {
+              src: uploadedAsset.url,
+              name: uploadedAsset.originalName,
+              type: file.type.startsWith('image/') ? 'image' : 'file',
+              size: uploadedAsset.size,
+              width: 'auto',
+              height: 'auto'
+            };
+          }
+          return null;
+        } catch (error) {
+          console.error('Upload failed for file:', file.name, error);
+          toast.error(`Failed to upload ${file.name}: ${error.message}`);
+          return null;
+        }
+      });
+
+      try {
+        const results = await Promise.all(uploadPromises);
+        const successfulUploads = results.filter(result => result !== null);
+        console.log('Upload results:', successfulUploads);
+        
+        if (successfulUploads.length > 0) {
+          toast.success(`${successfulUploads.length} file(s) uploaded successfully`);
+        }
+        
+        return successfulUploads;
+      } catch (error) {
+        console.error('Batch upload error:', error);
+        toast.error('Upload failed');
+        return [];
+      }
+    };
+
+    // Enable asset manager upload
+    assetManager.getConfig().uploadFile = {
+      enable: true,
+    };
+
+    // Listen for asset manager events
+    editor.on('asset:upload:start', () => {
+      console.log('Asset upload started');
+    });
+
+    editor.on('asset:upload:end', (result) => {
+      console.log('Asset upload ended:', result);
+    });
+
+    editor.on('asset:upload:error', (error) => {
+      console.error('Asset upload error:', error);
+      toast.error('Media upload failed');
+    });
+
+    // Enable drag and drop for media upload on canvas
+    const setupCanvasDragDrop = () => {
+      const canvas = editor.Canvas.getFrameEl();
+      if (canvas && canvas.contentDocument) {
+        const canvasDoc = canvas.contentDocument;
+        
+        // Remove existing listeners to prevent duplicates
+        canvasDoc.removeEventListener('dragover', handleDragOver);
+        canvasDoc.removeEventListener('drop', handleDrop);
+        
+        canvasDoc.addEventListener('dragover', handleDragOver);
+        canvasDoc.addEventListener('drop', handleDrop);
+        
+        console.log('Canvas drag and drop setup complete');
+      }
+    };
+
+    const handleDragOver = (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    };
+
+    const handleDrop = async (e) => {
+      e.preventDefault();
+      const files = Array.from(e.dataTransfer.files);
+      
+      if (files.length > 0) {
+        console.log('Files dropped on canvas:', files.length);
+        
+        for (const file of files) {
+          if (file.type.startsWith('image/')) {
+            try {
+              const uploadedAsset = await uploadMediaFile(file, bizId, webId);
+              if (uploadedAsset) {
+                // Add to asset manager
+                assetManager.add({
+                  type: 'image',
+                  src: uploadedAsset.url,
+                  name: uploadedAsset.originalName,
+                  size: uploadedAsset.size
+                });
+                
+                // Create an image component at drop position
+                const wrapper = editor.getWrapper();
+                const imageComponent = wrapper.append({
+                  type: 'image',
+                  src: uploadedAsset.url,
+                  attributes: {
+                    alt: uploadedAsset.originalName
+                  },
+                  style: {
+                    'max-width': '100%',
+                    'height': 'auto'
+                  }
+                })[0];
+                
+                // Select the newly added component
+                editor.select(imageComponent);
+                
+                toast.success(`${file.name} uploaded and added to page`);
+              }
+            } catch (error) {
+              console.error('Drop upload failed:', error);
+              toast.error(`Failed to upload ${file.name}: ${error.message}`);
+            }
+          } else {
+            toast.error(`${file.name} is not an image file`);
+          }
+        }
+      }
+    };
+
+    // Setup canvas drag and drop initially
+    setupCanvasDragDrop();
+    
+    // Re-setup when canvas is ready or refreshed
+    editor.on('canvas:ready', setupCanvasDragDrop);
+    editor.on('canvas:refresh', setupCanvasDragDrop);
+  };
+
+  // Upload media file to S3
+  const uploadMediaFile = async (file, bizId, webId) => {
+    console.log('Starting upload for:', file.name, 'Size:', file.size, 'Type:', file.type);
+    
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('businessId', bizId);
+      formData.append('websiteId', webId);
+
+      console.log('Uploading to S3 via API...');
+      const idToken = await auth.currentUser.getIdToken();
+      const response = await fetch('/api/websites/media', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+        },
+        body: formData,
+      });
+
+      console.log('Upload response status:', response.status);
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+        console.error('Upload API error:', error);
+        throw new Error(error.message || `HTTP ${response.status}: Upload failed`);
+      }
+
+      const result = await response.json();
+      console.log('Upload successful:', result);
+      
+      if (!result.success || !result.url) {
+        throw new Error('Invalid response from upload API');
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Media upload error:', error);
+      throw error;
+    }
+  };
+
   // Load content when businessId becomes available
   useEffect(() => {
     if (editor && businessId && editorReadyRef.current && !loadAttempted) {
       console.log("BusinessId arrived, loading content");
       loadInitialContent(editor, businessId);
+      // Setup media upload if not already done
+      if (!editor._mediaUploadConfigured) {
+        setupMediaUpload(editor, businessId, websiteId);
+        editor._mediaUploadConfigured = true;
+      }
     }
   }, [businessId, editor, loadAttempted]);
 
   const saveAllPagesToS3 = async () => {
-    if (!editor || !businessId || !websiteId) return;
+    if (!editor || !businessId || !websiteId) {
+      console.error('Save failed: missing editor, businessId, or websiteId');
+      return;
+    }
+    
     try {
       setSaving(true);
       const idToken = await auth.currentUser.getIdToken();
       const pages = editor.Pages.getAll();
       const payloadPages = [];
       
-      for (const page of pages) {
+      console.log(`Preparing to save ${pages.length} pages for website ${websiteId}`);
+      
+      for (let i = 0; i < pages.length; i++) {
+        const page = pages[i];
         editor.Pages.select(page);
-        const name = page.get("name") || "Page";
+        const name = page.get("name") || `Page ${i + 1}`;
         const html = editor.getHtml();
         const css = editor.getCss();
+        
+        console.log(`Page ${i + 1}: "${name}" - HTML: ${html.length} chars, CSS: ${css.length} chars`);
         payloadPages.push({ name, html, css });
       }
       
-      console.log("Saving pages:", payloadPages.length);
+      console.log("Final payload:", {
+        businessId,
+        websiteId,
+        pageCount: payloadPages.length,
+        pages: payloadPages.map(p => ({ name: p.name, htmlLength: p.html.length, cssLength: p.css.length }))
+      });
       
       const res = await fetch("/api/websites/upload", {
         method: "POST",
@@ -302,10 +542,16 @@ export default function WebsiteBuilderPage() {
         body: JSON.stringify({ businessId, websiteId, pages: payloadPages }),
       });
       
+      console.log("Upload response status:", res.status);
+      
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || "Upload failed");
+        console.error("Upload failed:", data);
+        throw new Error(data.message || `HTTP ${res.status}: Upload failed`);
       }
+      
+      const responseData = await res.json();
+      console.log("Upload successful:", responseData);
       
       await setDoc(
         doc(db, "businesses", businessId, "websites", websiteId),
@@ -313,14 +559,14 @@ export default function WebsiteBuilderPage() {
         { merge: true }
       );
       
-      toast.success("Website saved to S3");
+      toast.success(`Website saved successfully! ${payloadPages.length} page${payloadPages.length !== 1 ? 's' : ''} uploaded.`);
       
       // Reset load attempted so it can be reloaded if needed
       setLoadAttempted(false);
       
     } catch (e) {
       console.error("Save error:", e);
-      toast.error(e.message || "Failed to save");
+      toast.error(e.message || "Failed to save website");
     } finally {
       setSaving(false);
     }
@@ -355,6 +601,37 @@ export default function WebsiteBuilderPage() {
                 ],
               },
             },
+            plugins: [
+              'gjs-blocks-basic',
+              'gjs-plugin-forms',
+              'gjs-component-countdown',
+              'gjs-plugin-export',
+              'gjs-style-bg'
+            ],
+            pluginsOpts: {
+              'gjs-blocks-basic': { flexGrid: true },
+              'gjs-plugin-forms': {},
+              'gjs-component-countdown': {},
+              'gjs-plugin-export': {},
+              'gjs-style-bg': {}
+            },
+            assetManager: {
+              upload: true,
+              uploadText: 'Drop files here or click to upload',
+              multiUpload: true,
+              autoAdd: true,
+              dropzone: true,
+              openAssetsOnDrop: 1,
+              uploadFile: {
+                enable: true,
+              },
+              assets: []
+            },
+            canvas: {
+              styles: [
+                'https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css'
+              ]
+            }
           }}
         />
       </div>

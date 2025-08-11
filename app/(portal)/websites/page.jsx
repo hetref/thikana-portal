@@ -189,6 +189,9 @@ export default function WebsitesPage() {
                             <Button variant="outline" size="sm" onClick={() => router.push(`/websites/${w.id}`)}>
                               Open
                             </Button>
+                            <Button variant="outline" size="sm" onClick={() => router.push(`/websites/${w.id}/details`)}>
+                              Details
+                            </Button>
                             <Button variant="outline" size="icon" onClick={() => handleDeleteWebsite(w.id)}>
                               <Trash2 className="w-4 h-4" />
                             </Button>
