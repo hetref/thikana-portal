@@ -29,11 +29,10 @@ import toast from "react-hot-toast";
 import { sendNotificationToUser } from "@/lib/notifications";
 import Loader from "@/components/Loader";
 
-const FollowingDialog = ({ followingCount, userId, className, viewOnly = false }) => {
+const FollowingDialog = ({ followingCount, userId, className, viewOnly = false, open, onOpenChange, children }) => {
   const [following, setFollowing] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [loadingId, setLoadingId] = useState(null); // Track which button is loading
   const currentUser = auth.currentUser;
@@ -42,6 +41,9 @@ const FollowingDialog = ({ followingCount, userId, className, viewOnly = false }
   // Determine if the current user is the owner of this profile
   const isOwner = currentUser && currentUser.uid === userId;
   const canView = viewOnly || isOwner; // Allow viewing if viewOnly is true or if user is owner
+  
+  // Check if this is a controlled dialog (used externally)
+  const isControlled = open !== undefined && onOpenChange !== undefined;
 
   useEffect(() => {
     const fetchFollowing = async () => {
@@ -141,17 +143,32 @@ const FollowingDialog = ({ followingCount, userId, className, viewOnly = false }
   };
 
   return (
-    <Dialog open={open} onOpenChange={canView ? setOpen : undefined}>
-      <DialogTrigger className={className} disabled={!canView}>
-        <div
-          className={`flex flex-col items-center transition-colors duration-200 ${
-            canView ? "hover:text-blue-600 cursor-pointer" : "cursor-default"
-          }`}
-        >
-          <div className="font-semibold text-lg text-gray-900">{followingCount}</div>
-          <div className="text-sm text-gray-500">Following</div>
-        </div>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={canView ? onOpenChange : undefined}>
+      {/* Only render DialogTrigger if not controlled */}
+      {!isControlled && (
+        children ? (
+          <DialogTrigger asChild disabled={!canView}>
+            {React.isValidElement(children)
+              ? React.cloneElement(children, {
+                  className: [children.props.className, className]
+                    .filter(Boolean)
+                    .join(" "),
+                })
+              : children}
+          </DialogTrigger>
+        ) : (
+        <DialogTrigger className={className} disabled={!canView}>
+          <div
+            className={`flex flex-col items-center transition-colors duration-200 ${
+              canView ? "hover:text-blue-600 cursor-pointer" : "cursor-default"
+            }`}
+          >
+            <div className="font-semibold text-lg text-gray-900">{followingCount}</div>
+            <div className="text-sm text-gray-500">Following</div>
+          </div>
+        </DialogTrigger>
+        )
+      )}
       {canView && (
         <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col p-0">
           {/* Header */}

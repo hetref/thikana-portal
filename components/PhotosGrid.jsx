@@ -293,8 +293,7 @@ export default function PhotosGrid({ userId }) {
   return (
     <div className="w-full space-y-4">
       {/* Controls */}
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium">Photos ({photos.length})</h3>
+      <div className="flex justify-end items-center">
         {canDelete && (
           <Button
             size="sm"

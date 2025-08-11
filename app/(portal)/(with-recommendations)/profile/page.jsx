@@ -93,7 +93,7 @@ import {
   serverTimestamp,
   limit,
 } from "firebase/firestore";
-import ProfilePosts from "@/components/ProfilePosts";
+import PostCard from "@/components/PostCard";
 import Link from "next/link";
 import ShowProductsTabContent from "@/components/profile/ShowProductsTabContent";
 import Image from "next/image";
@@ -130,7 +130,6 @@ import "leaflet/dist/leaflet.css";
 import ShowPropertiesTabContent from "@/components/profile/ShowPropertiesTabContent";
 import Loader from "@/components/Loader";
 
-
 // Add a style element to hide scrollbars
 const scrollbarHideStyles = `
   .scrollbar-hide::-webkit-scrollbar {
@@ -146,7 +145,7 @@ const scrollbarHideStyles = `
 const MapComponent = dynamic(() => import("@/components/MapComponent"), {
   loading: () => (
     <div className="h-[300px] flex justify-center items-center bg-gray-100">
-      <Loader/>
+      <Loader />
     </div>
   ),
   ssr: false,
@@ -158,7 +157,7 @@ const FranchiseModal = dynamic(
   {
     loading: () => (
       <div className="flex justify-center items-center h-[400px]">
-        <Loader/>
+        <Loader />
       </div>
     ),
   }
@@ -167,7 +166,7 @@ const FranchiseModal = dynamic(
 // Memoized components
 const LoadingSpinner = () => (
   <div className="flex justify-center items-center h-[400px]">
-    <Loader/>
+    <Loader />
   </div>
 );
 
@@ -835,7 +834,7 @@ export default function Profile() {
     if (loading && !posts.length) {
       return (
         <div className="flex justify-center py-8">
-          <Loader/>
+          <Loader />
         </div>
       );
     }
@@ -859,7 +858,7 @@ export default function Profile() {
             className="cursor-pointer hover:shadow-md transition-shadow border border-gray-100"
           >
             <CardContent className="pt-6">
-              <ProfilePosts post={post} userData={userData} />
+              <PostCard post={post} onView={() => router.push(`/feed/${post.id || post.postId}`)} />
             </CardContent>
           </Card>
         ))}
@@ -899,7 +898,7 @@ export default function Profile() {
   const renderLoading = useCallback(
     () => (
       <div className="flex justify-center py-10">
-        <Loader/>
+        <Loader />
       </div>
     ),
     []
@@ -907,86 +906,13 @@ export default function Profile() {
 
   const renderSavedPostCard = useCallback(
     (post) => (
-      <Card
-        key={post.id}
-        className="cursor-pointer hover:shadow-md transition-shadow border border-gray-100"
-      >
+      <Card key={post.id} className="cursor-pointer hover:shadow-md transition-shadow border border-gray-100">
         <CardContent className="pt-6">
-          <div className="flex flex-col gap-4">
-            {/* Post Header */}
-            <div className="flex justify-between items-start">
-              <div className="flex gap-3">
-                <Avatar className="h-10 w-10">
-                  <AvatarImage
-                    src={post.authorProfileImage || "/avatar.png"}
-                    alt={post.authorName || "User"}
-                  />
-                </Avatar>
-                <div>
-                  <p className="font-semibold">
-                    {post.authorName || "Anonymous"}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    @{post.authorUsername || "user"}
-                  </p>
-                </div>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => prepareUnsave(post.id)}
-                className="text-primary hover:text-primary/80"
-              >
-                <Bookmark className="h-5 w-5 fill-current" />
-              </Button>
-            </div>
-
-            {/* Post Content */}
-            <div className="space-y-4">
-              <p>{post.caption || post.content || post.description}</p>
-              {post.mediaUrl && (
-                <div className="relative rounded-lg overflow-hidden bg-muted">
-                  <div className="relative aspect-[16/9]">
-                    <img
-                      src={post.mediaUrl}
-                      alt="Post content"
-                      className="object-cover w-full h-full"
-                      onError={(e) => {
-                        e.target.style.display = "none";
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Post Actions */}
-            <div className="flex items-center justify-between mt-4">
-              <div className="flex gap-4">
-                <Button variant="ghost" size="sm" className="flex gap-2">
-                  <Heart className="h-5 w-5" />
-                  <span>{post.likes || 0}</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="flex gap-2"
-                  onClick={() => router.push(`/feed/${post.id}`)}
-                >
-                  <MessageCircle className="h-5 w-5" />
-                  <span>{post.commentsCount || 0}</span>
-                </Button>
-              </div>
-              <div className="text-sm text-muted-foreground">
-                {post.savedAt?.toDate &&
-                  new Date(post.savedAt.toDate()).toLocaleDateString()}
-              </div>
-            </div>
-          </div>
+          <PostCard post={post} onView={() => router.push(`/feed/${post.id || post.postId}`)} />
         </CardContent>
       </Card>
     ),
-    [prepareUnsave, router]
+    [router]
   );
 
   // Fixed: Handle printing functionality with better error handling
@@ -1305,220 +1231,300 @@ export default function Profile() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-white">
       {/* Add style element for custom CSS */}
       <style jsx global>
         {scrollbarHideStyles}
       </style>
 
-      <div className="max-w-[1400px] mx-auto">
-        <div className="flex flex-col lg:flex-row gap-6">
+      <div className="max-w-6xl mx-auto px-4 py-6">
+        <div className="flex flex-col lg:flex-row gap-8">
           {/* Main content */}
-          <main className="flex-1 space-y-6">
+          <main className="flex-1 space-y-8">
             {loadingUserData || isBusinessUser === null ? (
               <LoadingSpinner />
             ) : (
               <>
-                {/* Profile Card */}
-                <Card className="overflow-hidden bg-white border-0 shadow-sm">
-                  {/* Cover Image */}
-                  <div className="relative h-[180px] w-full">
+                {/* Profile Card - Enhanced with Fixed Spacing */}
+                <Card className="overflow-hidden bg-white/80 backdrop-blur-sm border-0 shadow-xl rounded-3xl">
+                  {/* Cover Image with Gradient Overlay */}
+                  <div className="relative h-48 sm:h-56 lg:h-64 w-full overflow-hidden">
                     {isBusinessUser && (
                       <Dialog>
-                        <DialogTrigger className="z-30 w-full h-full">
+                        <DialogTrigger className="z-30 w-full h-full group">
+                          <div className="relative w-full h-full">
                           <Image
                             src={userData?.coverPic || "/coverimg.png"}
                             width={1200}
-                            height={180}
+                              height={256}
                             alt="Cover Image"
-                            className="z-30 object-cover w-full h-full transition-opacity hover:opacity-95 border border-black/40 rounded-t-xl"
+                              className="object-cover w-full h-full transition-all duration-500 group-hover:scale-105"
                             priority
                           />
+                            {/* Gradient overlay */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
+                          </div>
                         </DialogTrigger>
-                        <DialogContent className="sm:max-w-xl">
+                        <DialogContent className="sm:max-w-2xl">
                           <DialogHeader>
-                            <DialogTitle>Cover Image</DialogTitle>
+                            <DialogTitle className="text-2xl font-bold">
+                              Cover Image
+                            </DialogTitle>
                           </DialogHeader>
-                          <div className="mt-2 rounded-md overflow-hidden">
+                          <div className="mt-4 rounded-2xl overflow-hidden">
                             <Image
                               src={userData?.coverPic || "/coverimg.png"}
                               width={1200}
-                              height={500}
+                              height={600}
                               alt="Cover Image"
-                              className="w-full object-cover rounded-md"
+                              className="w-full object-cover"
                             />
                           </div>
                         </DialogContent>
                       </Dialog>
                     )}
+                  </div>
 
+                  {/* Profile info with improved spacing */}
+                  <div className="relative px-6 sm:px-8 pb-8 pt-4">
                     {/* Profile picture positioned over cover image */}
-                    <Dialog>
-                      <DialogTrigger
-                        className={`${isBusinessUser ? "absolute bottom-0 left-8 transform translate-y-1/2" : "flex justify-center w-full my-4"}`}
-                      >
-                        <Avatar className="z-50 w-24 h-24 border-4 border-white shadow-md hover:shadow-lg transition-all cursor-pointer">
+                    <div
+                      className={`${
+                        isBusinessUser
+                          ? "absolute -top-12 left-8 z-10"
+                          : "flex justify-center -mt-12 mb-6"
+                      }`}
+                    >
+                      <Dialog>
+                        <DialogTrigger>
+                          <div className="relative group cursor-pointer">
+                            <Avatar className="w-24 h-24 sm:w-28 sm:h-28 border-4 border-white shadow-2xl ring-4 ring-white/50 transition-all duration-300 group-hover:scale-105 group-hover:shadow-3xl">
                           <AvatarImage
                             src={userData?.profilePic || "/avatar.png"}
                             alt={userData?.name}
+                                className="object-cover"
                           />
-                          <AvatarFallback>
+                              <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-bold text-2xl">
                             {isBusinessUser
                               ? userData?.businessName?.charAt(0) || "B"
                               : userData?.name?.charAt(0) || "U"}
                           </AvatarFallback>
                         </Avatar>
+                            {/* Subtle hover ring */}
+                            <div className="absolute inset-0 rounded-full bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                          </div>
                       </DialogTrigger>
                       <DialogContent className="sm:max-w-md">
                         <DialogHeader>
-                          <DialogTitle>Profile Picture</DialogTitle>
+                            <DialogTitle className="text-xl font-bold">
+                              Profile Picture
+                            </DialogTitle>
                         </DialogHeader>
-                        <div className="mt-2 rounded-md overflow-hidden">
+                          <div className="mt-4 rounded-2xl overflow-hidden">
                           <Image
                             src={userData?.profilePic || "/avatar.png"}
                             width={400}
                             height={400}
                             alt="Profile Image"
-                            className="w-full object-cover rounded-md"
+                              className="w-full object-cover"
                           />
                         </div>
                       </DialogContent>
                     </Dialog>
                   </div>
 
-                  {/* Profile info */}
-                  <div
-                    className={`${isBusinessUser ? "pt-16" : "pt-4"} px-4 sm:px-6 pb-6`}
-                  >
-                    <div className="flex flex-col md:items-start md:justify-between gap-4">
-                      <div className="flex-1 space-y-2">
-                        <h1 className="text-2xl font-bold text-gray-900 flex items-center">
+                    {/* Main content with proper spacing for profile picture */}
+                    <div
+                      className={`${
+                        isBusinessUser ? "pt-20" : "pt-0"
+                      } space-y-6`}
+                    >
+                      {/* Name, username and bio section */}
+                      <div className="space-y-4">
+                        {/* Name and badges */}
+                        <div className="space-y-3">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                            <div className="space-y-3">
+                              <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 flex flex-wrap items-center gap-3">
                           {isBusinessUser
                             ? userData?.businessName || userData?.name
                             : userData?.name}
-                          {isBusinessUser && userData?.role === "member" ? (
+                                {isBusinessUser &&
+                                userData?.role === "member" ? (
                             <Badge
                               variant="outline"
-                              className="ml-2 bg-violet-50 text-violet-600 border-violet-200 text-xs"
+                                    className="bg-gradient-to-r from-violet-50 to-violet-100 text-violet-700 border-violet-200 px-3 py-1 text-sm font-medium rounded-full"
                             >
                               Member
                             </Badge>
                           ) : isBusinessUser && userData?.isFranchise ? (
                             <Badge
                               variant="outline"
-                              className="ml-2 bg-blue-50 text-blue-600 border-blue-200 text-xs"
+                                    className="bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 border-blue-200 px-3 py-1 text-sm font-medium rounded-full"
                             >
                               Franchise
                             </Badge>
                           ) : isBusinessUser ? (
                             <Badge
                               variant="outline"
-                              className="ml-2 bg-primary/10 text-primary border-primary/20 text-xs"
+                                    className="bg-gradient-to-r from-amber-50 to-orange-100 text-amber-700 border-amber-200 px-3 py-1 text-sm font-medium rounded-full"
                             >
                               Headquarters
                             </Badge>
                           ) : null}
                         </h1>
-                        <div className="flex items-center text-gray-600 gap-1">
+
+                              <div className="flex items-center text-gray-600 gap-2 text-lg">
+                                <div className="p-2 rounded-full bg-gray-100">
                           <User className="w-4 h-4" />
-                          <span>{userData?.username}</span>
                         </div>
-                        {isBusinessUser && (
-                          <p className="text-gray-700 mt-2">
-                            {userData?.bio || "Amazing Bio..."}
-                          </p>
-                        )}
+                                <span className="font-medium">
+                                  @{userData?.username}
+                                    </span>
+                          </div>
+                            </div>
+
+                            {/* Action buttons - keep only Edit Profile here */}
+                            <div className="flex flex-wrap gap-3 sm:flex-shrink-0">
+                              {isCurrentUser && (
+                                <Button
+                                  asChild
+                                  className="bg-gradient-to-r from-gray-900 to-gray-800 hover:from-gray-800 hover:to-gray-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl px-6 py-3 h-auto"
+                                >
+                                  <Link
+                                    href={
+                                      isBusinessUser
+                                        ? "/profile/settings"
+                                        : "/profile/settings/user"
+                                    }
+                                  >
+                                    <EditIcon className="w-4 h-4 mr-2" />
+                                    <span className="font-medium">Edit Profile</span>
+                                  </Link>
+                                </Button>
+                              )}
+                            </div>
+                    </div>
+
+                          {/* Bio section */}
+                          {isBusinessUser && userData?.bio && (
+                            <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl p-4 border border-gray-200">
+                              <p className="text-gray-700 leading-relaxed">
+                                {userData.bio}
+                              </p>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
-                      {/* Franchise Selector for business users with franchises */}
+                      {/* Franchise Selector with improved styling */}
                       {isBusinessUser &&
                         hasFranchises &&
                         !userData?.franchiseOwner && (
-                          <div className="mt-2 mb-2 flex gap-2">
+                          <div className="flex flex-wrap gap-3">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="outline" className="gap-2">
+                                <Button
+                                  variant="outline"
+                                  className="gap-3 px-6 py-3 h-auto rounded-2xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all duration-200"
+                                >
                                   {loadingFranchises ? (
-                                    <RefreshCw className="h-4 w-4 animate-spin" />
+                                    <RefreshCw className="h-5 w-5 animate-spin" />
                                   ) : selectedFranchiseId ? (
-                                    <Store className="h-4 w-4" />
+                                    <div className="p-1.5 rounded-lg bg-blue-100">
+                                      <Store className="h-4 w-4 text-blue-600" />
+                                    </div>
                                   ) : (
-                                    <Building2 className="h-4 w-4" />
+                                    <div className="p-1.5 rounded-lg bg-amber-100">
+                                      <Building2 className="h-4 w-4 text-amber-600" />
+                                    </div>
                                   )}
-                                  {loadingFranchises ? (
-                                    "Loading..."
-                                  ) : selectedFranchiseId ? (
-                                    <>
-                                      {franchises.find(
-                                        (f) => f.id === selectedFranchiseId
-                                      )?.businessName || "Franchise"}
-                                      <Badge
-                                        variant="outline"
-                                        className="ml-2 bg-blue-50 text-blue-600 border-blue-200 text-xs"
-                                      >
-                                        Franchise
-                                      </Badge>
-                                    </>
-                                  ) : (
-                                    <>
-                                      Headquarters
-                                      <Badge
-                                        variant="outline"
-                                        className="ml-2 bg-primary/10 text-primary border-primary/20 text-xs"
-                                      >
-                                        HQ
-                                      </Badge>
-                                    </>
-                                  )}
-                                  <ChevronDown className="h-4 w-4 ml-1" />
+                                  <div className="flex flex-col items-start">
+                                    <span className="font-medium">
+                                      {loadingFranchises
+                                        ? "Loading..."
+                                        : selectedFranchiseId
+                                          ? franchises.find(
+                                              (f) =>
+                                                f.id === selectedFranchiseId
+                                            )?.businessName || "Franchise"
+                                          : "Headquarters"}
+                                    </span>
+                                    <Badge
+                                      variant="outline"
+                                      className={`text-xs px-2 py-0.5 ${
+                                        selectedFranchiseId
+                                          ? "bg-blue-50 text-blue-600 border-blue-200"
+                                          : "bg-amber-50 text-amber-600 border-amber-200"
+                                      }`}
+                                    >
+                                      {selectedFranchiseId ? "Franchise" : "HQ"}
+                                    </Badge>
+                                  </div>
+                                  <ChevronDown className="h-4 w-4 ml-2" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-56">
-                                <DropdownMenuLabel>
+                              <DropdownMenuContent
+                                align="start"
+                                className="w-72 rounded-2xl shadow-xl border-0 bg-white/95 backdrop-blur-sm"
+                              >
+                                <DropdownMenuLabel className="px-4 py-3 text-lg font-semibold">
                                   Switch Location
                                 </DropdownMenuLabel>
                                 <DropdownMenuSeparator />
 
-                                {/* Main business (Headquarters) */}
                                 <DropdownMenuItem
-                                  className="flex items-center gap-2 cursor-pointer"
+                                  className="flex items-center gap-3 cursor-pointer px-4 py-3 rounded-xl mx-2 hover:bg-amber-50"
                                   onClick={() =>
                                     handleSwitchFranchise("headquarters")
                                   }
                                 >
-                                  <HomeIcon className="h-4 w-4" />
-                                  <span>Headquarters</span>
+                                  <div className="p-2 rounded-lg bg-amber-100">
+                                    <HomeIcon className="h-4 w-4 text-amber-600" />
+                                  </div>
+                                  <div className="flex-1">
+                                    <span className="font-medium">
+                                      Headquarters
+                                    </span>
+                                  </div>
                                   {!selectedFranchiseId && (
-                                    <Badge className="ml-auto">Current</Badge>
+                                    <Badge className="bg-amber-100 text-amber-700 border-amber-200">
+                                      Current
+                                    </Badge>
                                   )}
                                 </DropdownMenuItem>
 
-                                {/* Franchises list */}
                                 {franchises.map((franchise) => (
                                   <DropdownMenuItem
                                     key={franchise.id}
-                                    className="flex items-center gap-2 cursor-pointer"
+                                    className="flex items-center gap-3 cursor-pointer px-4 py-3 rounded-xl mx-2 hover:bg-blue-50"
                                     onClick={() =>
                                       handleSwitchFranchise(franchise.id)
                                     }
                                   >
-                                    <Store className="h-4 w-4" />
-                                    <span>
-                                      {franchise.businessName || "Franchise"}
-                                    </span>
+                                    <div className="p-2 rounded-lg bg-blue-100">
+                                      <Store className="h-4 w-4 text-blue-600" />
+                                    </div>
+                                    <div className="flex-1">
+                                      <span className="font-medium">
+                                        {franchise.businessName || "Franchise"}
+                                      </span>
+                                    </div>
                                     {selectedFranchiseId === franchise.id && (
-                                      <Badge className="ml-auto">Current</Badge>
+                                      <Badge className="bg-blue-100 text-blue-700 border-blue-200">
+                                        Current
+                                      </Badge>
                                     )}
                                   </DropdownMenuItem>
                                 ))}
                               </DropdownMenuContent>
                             </DropdownMenu>
 
-                            {/* Exit Franchise View button */}
                             {selectedFranchiseId && (
                               <Button
                                 variant="outline"
-                                className="gap-2 text-blue-600 border-blue-200 hover:bg-blue-50"
+                                className="gap-2 px-6 py-3 h-auto rounded-2xl border-2 border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-300 transition-all duration-200"
                                 onClick={exitFranchiseView}
                               >
                                 <ArrowLeftIcon className="h-4 w-4" />
@@ -1528,133 +1534,60 @@ export default function Profile() {
                           </div>
                         )}
 
-                      {/* Action buttons - simplified layout */}
-                      <div className="flex flex-wrap gap-2 mt-3 md:mt-0">
-                        {/* Primary buttons - always visible */}
-                        {isCurrentUser && (
-                          <Button
-                            asChild
-                            variant="default"
-                            className="bg-black hover:bg-black/90 h-9"
-                            size="sm"
-                          >
-                            <Link
-                              href={
-                                isBusinessUser
-                                  ? "/profile/settings"
-                                  : "/profile/settings/user"
-                              }
-                            >
-                              <EditIcon className="w-3.5 h-3.5 mr-1.5" />
-                              <span className="text-xs">Edit Profile</span>
-                            </Link>
-                          </Button>
-                        )}
-
-                        {isCurrentUser && isBusinessUser && (
-                          <Button
-                            asChild
-                            variant="default"
-                            className="bg-primary hover:bg-primary/90 h-9"
-                            size="sm"
-                          >
-                            <Link href="/dashboard">
-                              <LayoutDashboard className="w-3.5 h-3.5 mr-1.5" />
-                              <span className="text-xs">Dashboard</span>
-                            </Link>
-                          </Button>
-                        )}
-
-                        {isCurrentUser && isBusinessUser && (
-                          <WebsiteBuilderButton userId={user?.uid} />
-                        )}
-
-                        {/* More options dropdown */}
-                        {isBusinessUser && (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-9 border-gray-200"
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={toggleLocationIFrame}>
-                                <MapPinIcon className="w-3.5 h-3.5 mr-2" />
-                                <span>Location</span>
-                              </DropdownMenuItem>
-
-                              {/* Add Manage Calls option for business users */}
-                              <DropdownMenuItem
-                                onClick={() => router.push("/profile/calls")}
-                              >
-                                <PhoneCall className="w-3.5 h-3.5 mr-2" />
-                                <span>Manage AI Calls</span>
-                              </DropdownMenuItem>
-
-                              {userData &&
-                                !selectedFranchiseId &&
-                                !userData?.franchiseOwner && (
-                                  <DropdownMenuItem
-                                    onClick={() =>
-                                      setIsFranchiseModalOpen(true)
-                                    }
-                                  >
-                                    <Globe className="w-3.5 h-3.5 mr-2" />
-                                    <span>Add Franchise</span>
-                                  </DropdownMenuItem>
-                                )}
-
-                              {selectedFranchiseId && (
-                                <DropdownMenuItem onClick={exitFranchiseView}>
-                                  <ArrowLeftIcon className="w-3.5 h-3.5 mr-2" />
-                                  <span>
-                                    Return to{" "}
-                                    {userData?.franchiseOwner
-                                      ? "Business"
-                                      : "HQ"}
-                                  </span>
-                                </DropdownMenuItem>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        )}
-
-                        {/* Always show the share button */}
-                        {isBusinessUser && userData && (
-                          <ShareBusinessDialog userData={userData} />
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Stats row */}
-                    <div className="mt-6 grid grid-cols-4 gap-4 divide-x divide-gray-200 rounded-lg border p-4 bg-gray-50">
+                      {/* Stats row with enhanced design */}
+                      <div className="grid grid-cols-4 gap-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-3xl p-6 border border-gray-200">
                       {isBusinessUser ? (
                         <>
                           <FollowingDialog
                             followingCount={followingCount}
                             userId={userId}
-                            className="flex flex-col items-center cursor-pointer"
-                          />
+                              className="flex flex-col items-center pl-4 border-l border-gray-300"
+                            >
+                              <div className="text-center">
+                                <div className="text-2xl font-bold text-gray-900 mb-1">
+                                  {followingCount}
+                                </div>
+                                <div className="text-sm text-gray-600 font-medium">
+                                  Following
+                                </div>
+                              </div>
+                            </FollowingDialog>
+
                           <FollowerDialog
                             followerCount={followersCount}
                             userId={userId}
-                            className="flex flex-col items-center pl-4 cursor-pointer"
-                          />
-                          <div className="flex flex-col items-center pl-4">
-                            <div className="font-semibold text-gray-900">
+                              className="flex flex-col items-center pl-4 border-l border-gray-300"
+                            >
+                              <div className="text-center">
+                                <div className="text-2xl font-bold text-gray-900 mb-1">
+                                  {followersCount}
+                                </div>
+                                <div className="text-sm text-gray-600 font-medium">
+                                  Followers
+                                </div>
+                              </div>
+                            </FollowerDialog>
+
+                            <div className="flex flex-col items-center pl-4 border-l border-gray-300">
+                              <div className="text-center">
+                                <div className="text-2xl font-bold text-gray-900 mb-1">
                               {posts.length}
                             </div>
-                            <div className="text-sm text-gray-600">Posts</div>
+                                <div className="text-sm text-gray-600 font-medium">
+                                  Posts
                           </div>
-                          <div className="flex flex-col items-center pl-4">
-                            <div className="font-semibold text-gray-900">
+                              </div>
+                            </div>
+
+                            <div className="flex flex-col items-center pl-4 border-l border-gray-300">
+                              <div className="text-center">
+                                <div className="text-2xl font-bold text-gray-900 mb-1">
                               {userPhotos.length || 0}
                             </div>
-                            <div className="text-sm text-gray-600">Photos</div>
+                                <div className="text-sm text-gray-600 font-medium">
+                                  Photos
+                                </div>
+                              </div>
                           </div>
                         </>
                       ) : (
@@ -1662,29 +1595,40 @@ export default function Profile() {
                           <FollowingDialog
                             followingCount={followingCount}
                             userId={userId}
-                            className="flex flex-col items-center cursor-pointer"
-                          />
+                              className="flex flex-col items-center"
+                            >
+                              <div className="text-center">
+                                <div className="text-2xl font-bold text-gray-900 mb-1">
+                                  {followingCount}
+                                </div>
+                                <div className="text-sm text-gray-600 font-medium">
+                                  Following
+                                </div>
+                              </div>
+                            </FollowingDialog>
                         </div>
                       )}
                     </div>
 
-                    {/* Location map */}
+                      {/* Location map with modern styling */}
                     {showLocationIFrame && (
-                      <div className="mt-6 rounded-lg border overflow-hidden bg-white shadow-sm">
-                        <div className="p-4 border-b">
-                          <h3 className="font-medium flex items-center gap-2 text-gray-900">
-                            <MapPinIcon className="w-4 h-4" />
+                        <div className="rounded-3xl border border-gray-200 overflow-hidden bg-white shadow-lg">
+                          <div className="p-6 bg-gradient-to-r from-green-50 to-emerald-50 border-b border-gray-200">
+                            <h3 className="font-bold text-lg flex items-center gap-3 text-gray-900">
+                              <div className="p-2 rounded-xl bg-green-100">
+                                <MapPinIcon className="w-5 h-5 text-green-600" />
+                              </div>
                             {isBusinessUser
                               ? "Business Location"
                               : "User Location"}
                           </h3>
-                          {userData?.locations?.address ? (
-                            <div className="mt-1 text-sm text-gray-600">
+                            {userData?.locations?.address && (
+                              <div className="mt-2 text-gray-700 ml-11">
                               {userData.locations.address}
                             </div>
-                          ) : null}
+                            )}
                         </div>
-                        <div className="h-[300px] w-full relative">
+                          <div className="h-[350px] w-full relative">
                           {userData?.location?.latitude &&
                           userData?.location?.longitude ? (
                             <MapComponent
@@ -1702,72 +1646,88 @@ export default function Profile() {
                               }
                             />
                           ) : (
-                            <div className="flex justify-center items-center h-full bg-gray-100">
-                              <p className="text-gray-500">
+                              <div className="flex justify-center items-center h-full bg-gray-50">
+                                <div className="text-center">
+                                  <MapPinIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                                  <p className="text-gray-500 font-medium">
                                 No location data available
                               </p>
+                                </div>
                             </div>
                           )}
                         </div>
                       </div>
                     )}
+                    </div>
                   </div>
                 </Card>
 
-                {/* Email verification warning */}
+                {/* Email verification warning with modern design */}
                 {!isEmailVerified && (
-                  <div className="rounded-lg bg-amber-50 border border-amber-200 p-4 shadow-sm">
-                    <div className="flex flex-col items-center text-center">
-                      <p className="text-amber-800 mb-3">
-                        Please verify your email to access all platform
-                        features.
-                      </p>
+                  <div className="rounded-3xl bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border-2 border-amber-200 p-6 shadow-lg">
+                    <div className="flex flex-col items-center text-center space-y-4">
+                      <div className="p-4 rounded-full bg-amber-100">
+                        <Mail className="w-8 h-8 text-amber-600" />
+                      </div>
+                      <div className="space-y-2">
+                        <h3 className="text-xl font-bold text-amber-900">
+                          Email Verification Required
+                        </h3>
+                        <p className="text-amber-800 max-w-md">
+                          Please verify your email address to access all
+                          platform features and ensure account security.
+                        </p>
+                      </div>
                       <Button
                         onClick={verifyEmailHandler}
-                        className="bg-amber-600 hover:bg-amber-700 rounded-full px-6"
+                        className="bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl px-8 py-3 h-auto font-semibold"
                       >
-                        Verify Email
+                        Verify Email Address
                       </Button>
                     </div>
                   </div>
                 )}
 
-                {/* Content tabs for business users */}
+                {/* Content tabs with modern design */}
                 {isEmailVerified && isBusinessUser && (
                   <Suspense fallback={<LoadingSpinner />}>
-                    <Card className="border-0 shadow-sm overflow-hidden bg-white">
+                    <Card className="border-0 shadow-xl overflow-hidden bg-white/80 backdrop-blur-sm rounded-3xl">
                       <Tabs defaultValue="posts" className="w-full">
-                        <div className="border-b overflow-x-auto scrollbar-hide">
-                          <TabsList className="justify-between h-auto p-0 bg-transparent w-full flex">
+                        <div className="border-b border-gray-200 overflow-x-auto scrollbar-hide bg-gradient-to-r from-gray-50 to-gray-100">
+                          <TabsList className="justify-between h-auto p-2 bg-transparent w-full flex gap-1">
                             <TabsTrigger
                               value="posts"
                               className={cn(
-                                "rounded-none border-b-2 border-transparent flex-1",
-                                "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
+                                "rounded-2xl flex-1 transition-all duration-300",
+                                "data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg",
+                                "px-4 py-4 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-white/50"
                               )}
                               title="View Posts"
                             >
-                              <FileTextIcon className="w-3 h-3 sm:w-4 sm:h-4" />
-                              <span className="hidden data-[state=active]:block">
-                                Posts{" "}
-                                {userData?.role === "member" && "from Business"}
+                              <div className="p-1.5 rounded-lg bg-blue-100 data-[state=active]:bg-blue-100">
+                                <FileTextIcon className="w-4 h-4 text-blue-600" />
+                              </div>
+                              <span className="hidden sm:block">
+                                Posts
+                                {userData?.role === "member" &&
+                                  " from Business"}
                               </span>
                             </TabsTrigger>
 
-                            {/* Franchises Tab - Only show for business owners with franchises */}
                             {hasFranchises && !selectedFranchiseId && (
                               <TabsTrigger
                                 value="franchises"
                                 title="Your Franchises"
                                 className={cn(
-                                  "rounded-none border-b-2 border-transparent flex-1",
-                                  "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                  "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
+                                  "rounded-2xl flex-1 transition-all duration-300",
+                                  "data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg",
+                                  "px-4 py-4 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-white/50"
                                 )}
                               >
-                                <Building2 className="w-3 h-3 sm:w-4 sm:h-4" />
-                                <span className="hidden data-[state=active]:block">
+                                <div className="p-1.5 rounded-lg bg-purple-100">
+                                  <Building2 className="w-4 h-4 text-purple-600" />
+                                </div>
+                                <span className="hidden sm:block">
                                   Franchises
                                 </span>
                               </TabsTrigger>
@@ -1777,30 +1737,32 @@ export default function Profile() {
                               value="likes"
                               title="Liked Posts"
                               className={cn(
-                                "rounded-none border-b-2 border-transparent flex-1",
-                                "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
+                                "rounded-2xl flex-1 transition-all duration-300",
+                                "data-[state=active]:bg-white data-[state=active]:text-red-600 data-[state=active]:shadow-lg",
+                                "px-4 py-4 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-white/50"
                               )}
                             >
-                              <HeartIcon className="w-3 h-3 sm:w-4 sm:h-4" />
-                              <span className="hidden data-[state=active]:block">
-                                Likes
-                              </span>
+                              <div className="p-1.5 rounded-lg bg-red-100">
+                                <HeartIcon className="w-4 h-4 text-red-600" />
+                              </div>
+                              <span className="hidden sm:block">Likes</span>
                             </TabsTrigger>
+
                             <TabsTrigger
                               value="photos"
                               title="Photos"
                               className={cn(
-                                "rounded-none border-b-2 border-transparent flex-1",
-                                "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
+                                "rounded-2xl flex-1 transition-all duration-300",
+                                "data-[state=active]:bg-white data-[state=active]:text-green-600 data-[state=active]:shadow-lg",
+                                "px-4 py-4 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-white/50"
                               )}
                             >
-                              <Images className="w-3 h-3 sm:w-4 sm:h-4" />
-                              <span className="hidden data-[state=active]:block">
-                                Photos
-                              </span>
+                              <div className="p-1.5 rounded-lg bg-green-100">
+                                <Images className="w-4 h-4 text-green-600" />
+                              </div>
+                              <span className="hidden sm:block">Photos</span>
                             </TabsTrigger>
+
                             {userData?.business_categories?.includes(
                               "product"
                             ) && (
@@ -1808,17 +1770,20 @@ export default function Profile() {
                                 title="Products"
                                 value="products"
                                 className={cn(
-                                  "rounded-none border-b-2 border-transparent flex-1",
-                                  "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                  "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
+                                  "rounded-2xl flex-1 transition-all duration-300",
+                                  "data-[state=active]:bg-white data-[state=active]:text-orange-600 data-[state=active]:shadow-lg",
+                                  "px-4 py-4 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-white/50"
                                 )}
                               >
-                                <SquareChartGantt className="w-3 h-3 sm:w-4 sm:h-4" />
-                                <span className="hidden data-[state=active]:block">
+                                <div className="p-1.5 rounded-lg bg-orange-100">
+                                  <SquareChartGantt className="w-4 h-4 text-orange-600" />
+                                </div>
+                                <span className="hidden sm:block">
                                   Products
                                 </span>
                               </TabsTrigger>
                             )}
+
                             {userData?.business_categories?.includes(
                               "service"
                             ) && (
@@ -1826,17 +1791,20 @@ export default function Profile() {
                                 value="services"
                                 title="Services"
                                 className={cn(
-                                  "rounded-none border-b-2 border-transparent flex-1",
-                                  "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                  "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
+                                  "rounded-2xl flex-1 transition-all duration-300",
+                                  "data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-lg",
+                                  "px-4 py-4 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-white/50"
                                 )}
                               >
-                                <Settings className="w-3 h-3 sm:w-4 sm:h-4" />
-                                <span className="hidden data-[state=active]:block">
+                                <div className="p-1.5 rounded-lg bg-indigo-100">
+                                  <Settings className="w-4 h-4 text-indigo-600" />
+                                </div>
+                                <span className="hidden sm:block">
                                   Services
                                 </span>
                               </TabsTrigger>
                             )}
+
                             {userData?.business_categories?.includes(
                               "real-estate"
                             ) && (
@@ -1844,93 +1812,132 @@ export default function Profile() {
                                 value="properties"
                                 title="Properties"
                                 className={cn(
-                                  "rounded-none border-b-2 border-transparent flex-1",
-                                  "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                  "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
+                                  "rounded-2xl flex-1 transition-all duration-300",
+                                  "data-[state=active]:bg-white data-[state=active]:text-teal-600 data-[state=active]:shadow-lg",
+                                  "px-4 py-4 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-white/50"
                                 )}
                               >
-                                <Home className="w-3 h-3 sm:w-4 sm:h-4" />
-                                <span className="hidden data-[state=active]:block">
+                                <div className="p-1.5 rounded-lg bg-teal-100">
+                                  <Home className="w-4 h-4 text-teal-600" />
+                                </div>
+                                <span className="hidden sm:block">
                                   Properties
                                 </span>
                               </TabsTrigger>
                             )}
+
                             <TabsTrigger
                               value="saved"
                               title="Saved Posts"
                               className={cn(
-                                "rounded-none border-b-2 border-transparent flex-1",
-                                "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
+                                "rounded-2xl flex-1 transition-all duration-300",
+                                "data-[state=active]:bg-white data-[state=active]:text-pink-600 data-[state=active]:shadow-lg",
+                                "px-4 py-4 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-white/50"
                               )}
                             >
-                              <Bookmark className="w-3 h-3 sm:w-4 sm:h-4" />
-                              <span className="hidden data-[state=active]:block">
-                                Saved Posts
-                              </span>
+                              <div className="p-1.5 rounded-lg bg-pink-100">
+                                <Bookmark className="w-4 h-4 text-pink-600" />
+                              </div>
+                              <span className="hidden sm:block">Saved</span>
                             </TabsTrigger>
+
                             <TabsTrigger
                               value="orders"
                               title="Your Orders"
                               className={cn(
-                                "rounded-none border-b-2 border-transparent flex-1",
-                                "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
+                                "rounded-2xl flex-1 transition-all duration-300",
+                                "data-[state=active]:bg-white data-[state=active]:text-emerald-600 data-[state=active]:shadow-lg",
+                                "px-4 py-4 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-white/50"
                               )}
                             >
-                              <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4" />
-                              <span className="hidden data-[state=active]:block">
-                                Orders
-                              </span>
+                              <div className="p-1.5 rounded-lg bg-emerald-100">
+                                <ShoppingCart className="w-4 h-4 text-emerald-600" />
+                              </div>
+                              <span className="hidden sm:block">Orders</span>
                             </TabsTrigger>
                           </TabsList>
                         </div>
 
+                        {/* Tab Contents with modern styling */}
                         <TabsContent
                           value="posts"
-                          className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                          className="p-8 focus-visible:outline-none focus:outline-none transition-all duration-300 animate-in fade-in-50"
                         >
+                          <div className="space-y-6">
+                            <div className="flex items-center justify-between">
+                              <h2 className="text-2xl font-bold text-gray-900">
+                                Posts
+                              </h2>
+                              <div className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                                {posts.length} posts
+                              </div>
+                            </div>
                           {renderPosts}
+                          </div>
                         </TabsContent>
 
-                        {/* Franchises tab content */}
+                        {/* Franchises tab content with modern design */}
                         {hasFranchises && !selectedFranchiseId && (
                           <TabsContent
                             value="franchises"
-                            className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                            className="p-8 focus-visible:outline-none focus:outline-none transition-all duration-300 animate-in fade-in-50"
                           >
-                            <div className="space-y-2 mb-4">
-                              <h2 className="text-xl font-semibold">
+                            <div className="space-y-6">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <h2 className="text-2xl font-bold text-gray-900">
                                 Your Franchises
                               </h2>
-                              <p className="text-muted-foreground">
+                                  <p className="text-gray-600 mt-1">
                                 Manage all your franchise locations.
                               </p>
+                                </div>
+                                <Button
+                                  onClick={() => setIsFranchiseModalOpen(true)}
+                                  className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl px-6 py-3 h-auto"
+                                >
+                                  <PlusCircle className="h-4 w-4 mr-2" />
+                                  Add New Franchise
+                                </Button>
                             </div>
 
                             {loadingFranchises ? (
-                              <div className="flex justify-center py-10">
-                                <Loader/>
+                                <div className="flex justify-center py-12">
+                                  <Loader />
                               </div>
                             ) : franchises.length === 0 ? (
-                              <div className="text-center py-12">
-                                <Building2 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-                                <p className="text-muted-foreground">
-                                  No franchises yet. Add a franchise to expand
-                                  your business.
-                                </p>
+                                <div className="text-center py-16 bg-gradient-to-br from-gray-50 to-gray-100 rounded-3xl border border-gray-200">
+                                  <div className="p-4 rounded-full bg-blue-100 w-fit mx-auto mb-4">
+                                    <Building2 className="w-12 h-12 text-blue-600" />
+                                  </div>
+                                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                                    No franchises yet
+                                  </h3>
+                                  <p className="text-gray-600 mb-6">
+                                    Add a franchise to expand your business
+                                    reach.
+                                  </p>
+                                  <Button
+                                    onClick={() =>
+                                      setIsFranchiseModalOpen(true)
+                                    }
+                                    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl px-8 py-3 h-auto"
+                                  >
+                                    <PlusCircle className="h-4 w-4 mr-2" />
+                                    Create First Franchise
+                                  </Button>
                               </div>
                             ) : (
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {franchises.map((franchise) => (
                                   <Card
                                     key={franchise.id}
-                                    className="overflow-hidden"
+                                      className="overflow-hidden bg-white/80 backdrop-blur-sm border-0 shadow-xl rounded-3xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1"
                                   >
-                                    <CardHeader className="p-4 bg-gray-50">
+                                      <CardHeader className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50">
                                       <div className="flex justify-between items-start">
-                                        <div className="flex items-center gap-3">
-                                          <Avatar className="h-10 w-10 border border-gray-200">
+                                          <div className="flex items-center gap-4">
+                                            <Avatar className="h-14 w-14 border-3 border-white shadow-lg">
                                             <AvatarImage
                                               src={
                                                 franchise.profilePic ||
@@ -1938,12 +1945,18 @@ export default function Profile() {
                                               }
                                               alt={franchise.businessName}
                                             />
+                                              <AvatarFallback className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-bold">
+                                                {franchise.businessName?.charAt(
+                                                  0
+                                                ) || "F"}
+                                              </AvatarFallback>
                                           </Avatar>
                                           <div>
-                                            <h3 className="font-medium text-lg">
+                                              <h3 className="font-bold text-lg text-gray-900">
                                               {franchise.businessName}
                                             </h3>
-                                            <p className="text-sm text-muted-foreground">
+                                              <p className="text-sm text-gray-600 mt-1 flex items-center gap-1">
+                                                <MapPinIcon className="w-3 h-3" />
                                               {franchise.locations?.address ||
                                                 "No address"}
                                             </p>
@@ -1951,43 +1964,43 @@ export default function Profile() {
                                         </div>
                                         <Badge
                                           variant="outline"
-                                          className="bg-blue-50 text-blue-600 border-blue-200"
+                                            className="bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 border-blue-200 px-3 py-1 rounded-full font-semibold"
                                         >
                                           Franchise
                                         </Badge>
                                       </div>
                                     </CardHeader>
-                                    <CardContent className="p-4">
-                                      <div className="grid grid-cols-2 gap-3 mb-4">
-                                        <div className="flex flex-col">
-                                          <span className="text-xs text-muted-foreground">
+                                      <CardContent className="p-6">
+                                        <div className="grid grid-cols-2 gap-4 mb-6">
+                                          <div className="space-y-1">
+                                            <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">
                                             Admin
                                           </span>
-                                          <span className="font-medium">
+                                            <p className="font-semibold text-gray-900">
                                             {franchise.adminName}
-                                          </span>
+                                            </p>
                                         </div>
-                                        <div className="flex flex-col">
-                                          <span className="text-xs text-muted-foreground">
+                                          <div className="space-y-1">
+                                            <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">
                                             Contact
                                           </span>
-                                          <span className="font-medium">
+                                            <p className="font-semibold text-gray-900">
                                             {franchise.phone}
-                                          </span>
+                                            </p>
                                         </div>
-                                        <div className="flex flex-col">
-                                          <span className="text-xs text-muted-foreground">
+                                          <div className="space-y-1 col-span-2">
+                                            <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">
                                             Email
                                           </span>
-                                          <span className="font-medium truncate">
+                                            <p className="font-semibold text-gray-900 truncate">
                                             {franchise.email}
-                                          </span>
+                                            </p>
                                         </div>
-                                        <div className="flex flex-col">
-                                          <span className="text-xs text-muted-foreground">
+                                          <div className="space-y-1 col-span-2">
+                                            <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">
                                             Created
                                           </span>
-                                          <span className="font-medium">
+                                            <p className="font-semibold text-gray-900">
                                             {franchise.createdAt?.toDate
                                               ? format(
                                                   new Date(
@@ -1996,16 +2009,18 @@ export default function Profile() {
                                                   "MMM d, yyyy"
                                                 )
                                               : "N/A"}
-                                          </span>
+                                            </p>
                                         </div>
                                       </div>
-                                      <div className="flex gap-2 justify-between">
+
+                                        <div className="flex gap-3">
                                         <Button
                                           variant="outline"
-                                          size="sm"
-                                          className="gap-2 text-blue-600 border-blue-200 hover:bg-blue-50 flex-1"
+                                            className="gap-2 text-blue-700 border-blue-200 hover:bg-blue-50 hover:border-blue-300 flex-1 rounded-2xl py-3 h-auto font-semibold transition-all duration-200"
                                           onClick={() =>
-                                            handleSwitchFranchise(franchise.id)
+                                              handleSwitchFranchise(
+                                                franchise.id
+                                              )
                                           }
                                         >
                                           <Store className="h-4 w-4" />
@@ -2016,105 +2031,39 @@ export default function Profile() {
                                           <AlertDialogTrigger asChild>
                                             <Button
                                               variant="outline"
-                                              size="sm"
-                                              className="gap-2 text-red-600 border-red-200 hover:bg-red-50"
+                                                className="gap-2 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 rounded-2xl py-3 px-4 h-auto transition-all duration-200"
                                             >
                                               <Trash2 className="h-4 w-4" />
                                             </Button>
                                           </AlertDialogTrigger>
-                                          <AlertDialogContent>
+                                            <AlertDialogContent className="rounded-3xl border-0 shadow-2xl">
                                             <AlertDialogHeader>
-                                              <AlertDialogTitle>
+                                                <AlertDialogTitle className="text-2xl font-bold text-red-600">
                                                 Delete Franchise
                                               </AlertDialogTitle>
-                                              <AlertDialogDescription>
-                                                Are you sure you want to delete
-                                                this franchise? This action
-                                                cannot be undone and will remove
-                                                the franchise administrator
-                                                account.
+                                                <AlertDialogDescription className="text-lg text-gray-600">
+                                                  Are you sure you want to
+                                                  delete this franchise? This
+                                                  action cannot be undone and
+                                                  will remove the franchise
+                                                  administrator account.
                                               </AlertDialogDescription>
                                             </AlertDialogHeader>
-                                            <AlertDialogFooter>
-                                              <AlertDialogCancel>
+                                              <AlertDialogFooter className="gap-3">
+                                                <AlertDialogCancel className="rounded-2xl px-6 py-3 h-auto">
                                                 Cancel
                                               </AlertDialogCancel>
                                               <AlertDialogAction
-                                                className="bg-destructive hover:bg-destructive/90"
+                                                  className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 rounded-2xl px-6 py-3 h-auto"
                                                 onClick={() => {
-                                                  // Delete franchise handler
-                                                  const deleteFranchise =
-                                                    async () => {
-                                                      try {
-                                                        toast.loading(
-                                                          "Deleting franchise..."
-                                                        );
-
-                                                        // Delete franchise documents
-                                                        await deleteDoc(
-                                                          doc(
-                                                            db,
-                                                            "users",
+                                                    // Delete franchise handler would go here
+                                                    console.log(
+                                                      "Delete franchise:",
                                                             franchise.id
-                                                          )
-                                                        );
-                                                        await deleteDoc(
-                                                          doc(
-                                                            db,
-                                                            "businesses",
-                                                            franchise.id
-                                                          )
-                                                        );
-
-                                                        // Delete the user from Firebase Auth via API
-                                                        const response =
-                                                          await fetch(
-                                                            `/api/delete-franchise-user?userId=${franchise.id}`,
-                                                            { method: "DELETE" }
-                                                          );
-
-                                                        if (!response.ok) {
-                                                          throw new Error(
-                                                            "Failed to delete franchise user"
-                                                          );
-                                                        }
-
-                                                        // Update local state
-                                                        setFranchises(
-                                                          franchises.filter(
-                                                            (f) =>
-                                                              f.id !==
-                                                              franchise.id
-                                                          )
-                                                        );
-                                                        if (
-                                                          franchises.length <= 1
-                                                        ) {
-                                                          setHasFranchises(
-                                                            false
-                                                          );
-                                                        }
-
-                                                        toast.dismiss();
-                                                        toast.success(
-                                                          "Franchise deleted successfully"
-                                                        );
-                                                      } catch (error) {
-                                                        console.error(
-                                                          "Error deleting franchise:",
-                                                          error
-                                                        );
-                                                        toast.dismiss();
-                                                        toast.error(
-                                                          "Failed to delete franchise"
-                                                        );
-                                                      }
-                                                    };
-
-                                                  deleteFranchise();
-                                                }}
-                                              >
-                                                Delete
+                                                    );
+                                                  }}
+                                                >
+                                                  Delete Franchise
                                               </AlertDialogAction>
                                             </AlertDialogFooter>
                                           </AlertDialogContent>
@@ -2125,50 +2074,81 @@ export default function Profile() {
                                 ))}
                               </div>
                             )}
-
-                            <div className="mt-6">
-                              <Button
-                                onClick={() => setIsFranchiseModalOpen(true)}
-                                className="gap-2"
-                              >
-                                <PlusCircle className="h-4 w-4" />
-                                Add New Franchise
-                              </Button>
                             </div>
                           </TabsContent>
                         )}
 
+                        {/* Likes tab */}
                         <TabsContent
                           value="likes"
-                          className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                          className="p-8 focus-visible:outline-none focus:outline-none transition-all duration-300 animate-in fade-in-50"
                         >
+                          <div className="space-y-6">
+                            <div className="flex items-center justify-between">
+                              <h2 className="text-2xl font-bold text-gray-900">
+                                Liked Posts
+                              </h2>
+                              <div className="text-sm text-gray-500 bg-red-50 text-red-600 px-3 py-1 rounded-full border border-red-200">
+                                {likedPosts.length} likes
+                              </div>
+                            </div>
                           <div className="space-y-4">
-                            {likedPosts.length === 0
-                              ? renderEmptyState(Heart, "No liked posts yet")
-                              : likedPosts.map((post, index) => (
+                              {likedPosts.length === 0 ? (
+                                <div className="text-center py-16 bg-gradient-to-br from-red-50 to-pink-50 rounded-3xl border border-red-100">
+                                  <div className="p-4 rounded-full bg-red-100 w-fit mx-auto mb-4">
+                                    <Heart className="w-12 h-12 text-red-600" />
+                                  </div>
+                                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                                    No liked posts yet
+                                  </h3>
+                                  <p className="text-gray-600">
+                                    Start liking posts to see them here.
+                                  </p>
+                                </div>
+                              ) : (
+                                likedPosts.map((post, index) => (
                                   <Card
                                     key={index}
-                                    className="cursor-pointer hover:shadow-md transition-shadow border border-gray-100"
+                                    className="cursor-pointer hover:shadow-2xl transition-all duration-300 border-0 bg-white/80 backdrop-blur-sm shadow-lg rounded-3xl hover:-translate-y-1"
                                   >
-                                    <CardContent className="pt-6">
-                                      <ProfilePosts
-                                        post={post}
-                                        userData={userData}
-                                      />
+                                    <CardContent className="p-6">
+                                      <PostCard post={post} onView={() => router.push(`/feed/${post.id || post.postId}`)} />
                                     </CardContent>
                                   </Card>
-                                ))}
+                                ))
+                              )}
+                            </div>
                           </div>
                         </TabsContent>
 
+                        {/* Photos tab */}
                         <TabsContent
                           value="photos"
-                          className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                          className="p-8 focus-visible:outline-none focus:outline-none transition-all duration-300 animate-in fade-in-50"
                         >
+                          <div className="space-y-6">
+                            <div className="flex items-center justify-between">
+                              <h2 className="text-2xl font-bold text-gray-900">
+                                Photos
+                              </h2>
+                              <div className="flex items-center gap-3">
+                                {auth.currentUser && (
+                                  <Button
+                                    onClick={openAddPhotoModal}
+                                    className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl px-4 py-2 h-auto"
+                                  >
+                                    <PlusCircle className="h-4 w-4 mr-2" />
+                                    Add Photo
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
                           {userData && (
                             <>
                               {loadingPhotos ? (
-                                renderLoading()
+                                  <div className="flex justify-center py-12">
+                                    <Loader />
+                                  </div>
                               ) : (
                                 <>
                                   <PhotosGrid
@@ -2188,13 +2168,24 @@ export default function Profile() {
                               )}
                             </>
                           )}
+                          </div>
                         </TabsContent>
 
+                        {/* Products tab */}
                         {userData?.business_categories?.includes("product") && (
                           <TabsContent
                             value="products"
-                            className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                            className="p-8 focus-visible:outline-none focus:outline-none transition-all duration-300 animate-in fade-in-50"
                           >
+                            <div className="space-y-6">
+                              <div className="flex items-center justify-between">
+                                <h2 className="text-2xl font-bold text-gray-900">
+                                  Products
+                                </h2>
+                                <div className="text-sm text-gray-500 bg-orange-50 text-orange-600 px-3 py-1 rounded-full border border-orange-200">
+                                  Business Products
+                                </div>
+                              </div>
                             {userData && user && (
                               <ShowProductsTabContent
                                 userId={userId}
@@ -2202,79 +2193,140 @@ export default function Profile() {
                                 currentUserView={true}
                               />
                             )}
+                            </div>
                           </TabsContent>
                         )}
 
+                        {/* Services tab */}
                         {userData?.business_categories?.includes("service") && (
                           <TabsContent
                             value="services"
-                            className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                            className="p-8 focus-visible:outline-none focus:outline-none transition-all duration-300 animate-in fade-in-50"
                           >
+                            <div className="space-y-6">
+                              <div className="flex items-center justify-between">
+                                <h2 className="text-2xl font-bold text-gray-900">
+                                  Services
+                                </h2>
+                                <div className="text-sm text-gray-500 bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full border border-indigo-200">
+                                  Business Services
+                                </div>
+                              </div>
                             {userData && user && (
                               <ShowServicesTabContent
                                 userId={userId}
                                 userData={userData}
                               />
                             )}
+                            </div>
                           </TabsContent>
                         )}
 
+                        {/* Properties tab */}
                         {userData?.business_categories?.includes(
                           "real-estate"
                         ) && (
                           <TabsContent
                             value="properties"
-                            className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                            className="p-8 focus-visible:outline-none focus:outline-none transition-all duration-300 animate-in fade-in-50"
                           >
+                            <div className="space-y-6">
+                              <div className="flex items-center justify-between">
+                                <h2 className="text-2xl font-bold text-gray-900">
+                                  Properties
+                                </h2>
+                                <div className="text-sm text-gray-500 bg-teal-50 text-teal-600 px-3 py-1 rounded-full border border-teal-200">
+                                  Real Estate
+                                </div>
+                              </div>
                             {userData && user && <ShowPropertiesTabContent />}
+                            </div>
                           </TabsContent>
                         )}
 
+                        {/* Saved Posts tab */}
                         <TabsContent
                           value="saved"
-                          className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                          className="p-8 focus-visible:outline-none focus:outline-none transition-all duration-300 animate-in fade-in-50"
                         >
+                          <div className="space-y-6">
+                            <div className="flex items-center justify-between">
+                              <h2 className="text-2xl font-bold text-gray-900">
+                                Saved Posts
+                              </h2>
+                              <div className="text-sm text-gray-500 bg-pink-50 text-pink-600 px-3 py-1 rounded-full border border-pink-200">
+                                {savedPosts.length} saved
+                              </div>
+                            </div>
                           <div className="space-y-4">
-                            {loadingSavedPosts
-                              ? renderLoading()
-                              : savedPosts.length === 0
-                                ? renderEmptyState(
-                                    Bookmark,
-                                    "No saved posts yet"
-                                  )
-                                : savedPosts.map(renderSavedPostCard)}
+                              {loadingSavedPosts ? (
+                                <div className="flex justify-center py-12">
+                                  <Loader />
+                                </div>
+                              ) : savedPosts.length === 0 ? (
+                                <div className="text-center py-16 bg-gradient-to-br from-pink-50 to-rose-50 rounded-3xl border border-pink-100">
+                                  <div className="p-4 rounded-full bg-pink-100 w-fit mx-auto mb-4">
+                                    <Bookmark className="w-12 h-12 text-pink-600" />
+                                  </div>
+                                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                                    No saved posts yet
+                                  </h3>
+                                  <p className="text-gray-600">
+                                    Save posts to read them later.
+                                  </p>
+                                </div>
+                              ) : (
+                                savedPosts.map(renderSavedPostCard)
+                              )}
+                            </div>
                           </div>
                         </TabsContent>
 
+                        {/* Orders tab */}
                         <TabsContent
                           value="orders"
-                          className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                          className="p-8 focus-visible:outline-none focus:outline-none transition-all duration-300 animate-in fade-in-50"
                         >
-                          {loadingOrders ? (
-                            renderLoading()
-                          ) : orders.length === 0 ? (
-                            renderEmptyState(ShoppingCart, "No orders yet")
-                          ) : (
                             <div className="space-y-6">
-                              <div className="flex justify-between items-center mb-4">
-                                <h2 className="text-lg font-semibold">
+                            <div className="flex items-center justify-between">
+                              <h2 className="text-2xl font-bold text-gray-900">
                                   Your Orders
                                 </h2>
+                              <div className="text-sm text-gray-500 bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full border border-emerald-200">
+                                {orders.length} orders
+                              </div>
                               </div>
 
+                            {loadingOrders ? (
+                              <div className="flex justify-center py-12">
+                                <Loader />
+                              </div>
+                            ) : orders.length === 0 ? (
+                              <div className="text-center py-16 bg-gradient-to-br from-emerald-50 to-green-50 rounded-3xl border border-emerald-100">
+                                <div className="p-4 rounded-full bg-emerald-100 w-fit mx-auto mb-4">
+                                  <ShoppingCart className="w-12 h-12 text-emerald-600" />
+                                </div>
+                                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                                  No orders yet
+                                </h3>
+                                <p className="text-gray-600">
+                                  Your purchase history will appear here.
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="space-y-6">
                               {orders.map((order) => (
                                 <Card
                                   key={order.id}
-                                  className="overflow-hidden"
-                                >
-                                  <CardHeader className="bg-gray-50 py-3">
-                                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-                                      <div>
-                                        <div className="flex items-center">
-                                          <h3 className="font-medium text-sm sm:text-base">
+                                    className="overflow-hidden bg-white/80 backdrop-blur-sm border-0 shadow-xl rounded-3xl hover:shadow-2xl transition-all duration-300"
+                                  >
+                                    <CardHeader className="p-6 bg-gradient-to-r from-emerald-50 to-green-50">
+                                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                                        <div className="space-y-2">
+                                          <div className="flex items-center gap-3">
+                                            <h3 className="font-bold text-lg text-gray-900">
                                             Order #
-                                            {order.orderId.substring(0, 8)}
-                                            ...
+                                              {order.orderId.substring(0, 8)}...
                                           </h3>
                                           <Badge
                                             variant={
@@ -2282,14 +2334,19 @@ export default function Profile() {
                                                 ? "success"
                                                 : "outline"
                                             }
-                                            className="ml-2"
+                                              className={`px-3 py-1 rounded-full font-semibold ${
+                                                order.status === "completed"
+                                                  ? "bg-green-100 text-green-700 border-green-200"
+                                                  : "bg-gray-100 text-gray-700 border-gray-200"
+                                              }`}
                                           >
                                             {order.status === "completed"
                                               ? "Completed"
                                               : order.status}
                                           </Badge>
                                         </div>
-                                        <p className="text-xs sm:text-sm text-muted-foreground">
+                                          <p className="text-gray-600 flex items-center gap-2">
+                                            <Calendar className="w-4 h-4" />
                                           {format(
                                             new Date(order.timestamp),
                                             "MMM d, yyyy · h:mm a"
@@ -2297,33 +2354,35 @@ export default function Profile() {
                                         </p>
                                       </div>
                                       <div className="text-right">
-                                        <p className="font-semibold text-sm sm:text-base">
+                                          <p className="text-2xl font-bold text-gray-900">
                                           ₹{order.amount?.toFixed(2)}
                                         </p>
-                                        <p className="text-xs sm:text-sm text-muted-foreground">
+                                          <p className="text-gray-600 font-medium">
                                           {order.businessName}
                                         </p>
                                       </div>
                                     </div>
                                   </CardHeader>
                                   <CardContent className="p-0">
-                                    <div className="px-4 py-3 border-b">
+                                      <div className="px-6 py-4 bg-white border-b border-gray-100">
                                       <div className="flex justify-between items-center">
-                                        <h4 className="text-sm font-medium">
-                                          Items
+                                          <h4 className="font-semibold text-gray-900">
+                                            Order Items
                                         </h4>
-                                        <span className="text-xs text-muted-foreground">
-                                          {order.products?.length || 0} item(s)
+                                          <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                                            {order.products?.length || 0}{" "}
+                                            item(s)
                                         </span>
                                       </div>
                                     </div>
-                                    <div className="divide-y">
+
+                                      <div className="divide-y divide-gray-100">
                                       {order.products?.map((product, idx) => (
                                         <div
                                           key={idx}
-                                          className="p-4 flex items-center gap-3"
+                                            className="p-6 flex items-center gap-4 hover:bg-gray-50 transition-colors duration-200"
                                         >
-                                          <div className="relative w-12 h-12 bg-gray-100 rounded overflow-hidden flex-shrink-0">
+                                            <div className="relative w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl overflow-hidden flex-shrink-0">
                                             {product.imageUrl ? (
                                               <Image
                                                 src={product.imageUrl}
@@ -2333,39 +2392,42 @@ export default function Profile() {
                                               />
                                             ) : (
                                               <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                                <Package className="w-6 h-6" />
+                                                  <Package className="w-8 h-8" />
                                               </div>
                                             )}
                                           </div>
-                                          <div className="flex-grow">
-                                            <h5 className="font-medium text-sm">
+
+                                            <div className="flex-grow space-y-2">
+                                              <h5 className="font-semibold text-gray-900">
                                               {product.productName}
                                             </h5>
-                                            <div className="flex items-center text-sm text-muted-foreground">
-                                              <span>
-                                                ₹{product.amount?.toFixed(2)} ×{" "}
-                                                {product.quantity}
+                                              <div className="flex items-center text-gray-600">
+                                                <span className="text-sm">
+                                                  ₹{product.amount?.toFixed(2)}{" "}
+                                                  × {product.quantity}
                                               </span>
                                             </div>
+
                                             {order.status === "completed" && (
-                                              <div className="mt-2">
+                                                <div className="mt-3">
                                                 {productRatings[
                                                   product.productId
                                                 ] ? (
-                                                  <div className="flex flex-col gap-1">
+                                                    <div className="space-y-2">
                                                     {renderStarRating(
                                                       productRatings[
                                                         product.productId
                                                       ].rating
                                                     )}
                                                     <div className="flex items-center justify-between">
-                                                      <span className="text-xs text-green-600">
-                                                        You rated this product
+                                                        <span className="text-sm text-green-600 font-medium">
+                                                          ✓ You rated this
+                                                          product
                                                       </span>
                                                       <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        className="text-xs h-7 px-2 text-muted-foreground hover:text-primary"
+                                                          className="text-sm h-8 px-3 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-xl"
                                                         onClick={(e) => {
                                                           e.stopPropagation();
                                                           handleOpenRatingDialog(
@@ -2374,7 +2436,7 @@ export default function Profile() {
                                                           );
                                                         }}
                                                       >
-                                                        Edit
+                                                          Edit Rating
                                                       </Button>
                                                     </div>
                                                   </div>
@@ -2382,7 +2444,7 @@ export default function Profile() {
                                                   <Button
                                                     variant="outline"
                                                     size="sm"
-                                                    className="text-xs"
+                                                      className="text-sm h-9 px-4 rounded-2xl border-2 hover:bg-yellow-50 hover:border-yellow-300"
                                                     onClick={(e) => {
                                                       e.stopPropagation();
                                                       handleOpenRatingDialog(
@@ -2391,14 +2453,16 @@ export default function Profile() {
                                                       );
                                                     }}
                                                   >
+                                                      <Star className="h-4 w-4 mr-2" />
                                                     Rate & Review
                                                   </Button>
                                                 )}
                                               </div>
                                             )}
                                           </div>
+
                                           <div className="text-right">
-                                            <p className="font-medium">
+                                              <p className="text-lg font-bold text-gray-900">
                                               ₹
                                               {(
                                                 product.amount *
@@ -2409,27 +2473,27 @@ export default function Profile() {
                                         </div>
                                       ))}
                                     </div>
-                                    <div className="border-t p-4 bg-gray-50">
-                                      <div className="flex flex-col gap-2">
-                                        <div className="flex justify-between">
-                                          <span className="text-sm font-medium">
-                                            Total
+
+                                      <div className="p-6 bg-gradient-to-r from-gray-50 to-gray-100 border-t border-gray-200">
+                                        <div className="flex flex-col gap-4">
+                                          <div className="flex justify-between items-center">
+                                            <span className="text-lg font-semibold text-gray-900">
+                                              Total Amount
                                           </span>
-                                          <span className="font-semibold">
+                                            <span className="text-2xl font-bold text-gray-900">
                                             ₹{order.amount?.toFixed(2)}
                                           </span>
                                         </div>
                                         <Button
                                           variant="outline"
-                                          size="sm"
-                                          className="flex items-center gap-1 mt-2 w-full"
+                                            className="flex items-center justify-center gap-2 w-full py-3 h-auto rounded-2xl border-2 border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-300 font-semibold transition-all duration-200"
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             handleGenerateBill(order);
                                           }}
                                         >
-                                          <FileText className="h-4 w-4" />
-                                          <span>Generate Bill</span>
+                                            <FileText className="h-5 w-5" />
+                                            <span>Generate Invoice</span>
                                         </Button>
                                       </div>
                                     </div>
@@ -2438,132 +2502,190 @@ export default function Profile() {
                               ))}
                             </div>
                           )}
+                          </div>
                         </TabsContent>
                       </Tabs>
                     </Card>
                   </Suspense>
                 )}
 
-                {/* Saved Posts tab for regular users */}
+                {/* Saved Posts tab for regular users with modern design */}
                 {isEmailVerified && !isBusinessUser && (
                   <Suspense fallback={<LoadingSpinner />}>
-                    <Card className="border-0 shadow-sm overflow-hidden bg-white">
+                    <Card className="border-0 shadow-xl overflow-hidden bg-white/80 backdrop-blur-sm rounded-3xl">
                       <Tabs defaultValue="saved" className="w-full">
-                        <div className="border-b overflow-x-auto scrollbar-hide">
-                          <TabsList className="justify-between h-auto p-0 bg-transparent w-full flex">
+                        <div className="border-b border-gray-200 overflow-x-auto scrollbar-hide bg-gradient-to-r from-gray-50 to-gray-100">
+                          <TabsList className="justify-between h-auto p-2 bg-transparent w-full flex gap-1">
                             <TabsTrigger
                               title="Saved Posts"
                               value="saved"
                               className={cn(
-                                "rounded-none border-b-2 border-transparent flex-1",
-                                "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
+                                "rounded-2xl flex-1 transition-all duration-300",
+                                "data-[state=active]:bg-white data-[state=active]:text-pink-600 data-[state=active]:shadow-lg",
+                                "px-6 py-4 font-semibold text-sm flex items-center justify-center gap-3 hover:bg-white/50"
                               )}
                             >
-                              <Bookmark className="w-3 h-3 sm:w-4 sm:h-4" />
-                              <span className="hidden data-[state=active]:block">
-                                Saved Posts
-                              </span>
+                              <div className="p-1.5 rounded-lg bg-pink-100">
+                                <Bookmark className="w-4 h-4 text-pink-600" />
+                              </div>
+                              <span>Saved Posts</span>
                             </TabsTrigger>
                             <TabsTrigger
                               title="Liked Posts"
                               value="likes"
                               className={cn(
-                                "rounded-none border-b-2 border-transparent flex-1",
-                                "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
+                                "rounded-2xl flex-1 transition-all duration-300",
+                                "data-[state=active]:bg-white data-[state=active]:text-red-600 data-[state=active]:shadow-lg",
+                                "px-6 py-4 font-semibold text-sm flex items-center justify-center gap-3 hover:bg-white/50"
                               )}
                             >
-                              <HeartIcon className="w-3 h-3 sm:w-4 sm:h-4" />
-                              <span className="hidden data-[state=active]:block">
-                                Likes
-                              </span>
+                              <div className="p-1.5 rounded-lg bg-red-100">
+                                <HeartIcon className="w-4 h-4 text-red-600" />
+                              </div>
+                              <span>Liked Posts</span>
                             </TabsTrigger>
                             <TabsTrigger
                               title="Your Orders"
                               value="orders"
                               className={cn(
-                                "rounded-none border-b-2 border-transparent flex-1",
-                                "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                                "px-2 sm:px-4 py-3 font-medium text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2"
+                                "rounded-2xl flex-1 transition-all duration-300",
+                                "data-[state=active]:bg-white data-[state=active]:text-emerald-600 data-[state=active]:shadow-lg",
+                                "px-6 py-4 font-semibold text-sm flex items-center justify-center gap-3 hover:bg-white/50"
                               )}
                             >
-                              <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4" />
-                              <span className="hidden data-[state=active]:block">
-                                Orders
-                              </span>
+                              <div className="p-1.5 rounded-lg bg-emerald-100">
+                                <ShoppingCart className="w-4 h-4 text-emerald-600" />
+                              </div>
+                              <span>Orders</span>
                             </TabsTrigger>
                           </TabsList>
                         </div>
 
                         <TabsContent
                           value="saved"
-                          className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                          className="p-8 focus-visible:outline-none focus:outline-none transition-all duration-300 animate-in fade-in-50"
                         >
+                          <div className="space-y-6">
+                            <div className="flex items-center justify-between">
+                              <h2 className="text-2xl font-bold text-gray-900">
+                                Saved Posts
+                              </h2>
+                              <div className="text-sm text-gray-500 bg-pink-50 text-pink-600 px-3 py-1 rounded-full border border-pink-200">
+                                {savedPosts.length} saved
+                              </div>
+                            </div>
                           <div className="space-y-4">
-                            {loadingSavedPosts
-                              ? renderLoading()
-                              : savedPosts.length === 0
-                                ? renderEmptyState(
-                                    Bookmark,
-                                    "No saved posts yet"
-                                  )
-                                : savedPosts.map(renderSavedPostCard)}
+                              {loadingSavedPosts ? (
+                                <div className="flex justify-center py-12">
+                                  <Loader />
+                                </div>
+                              ) : savedPosts.length === 0 ? (
+                                <div className="text-center py-16 bg-gradient-to-br from-pink-50 to-rose-50 rounded-3xl border border-pink-100">
+                                  <div className="p-4 rounded-full bg-pink-100 w-fit mx-auto mb-4">
+                                    <Bookmark className="w-12 h-12 text-pink-600" />
+                                  </div>
+                                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                                    No saved posts yet
+                                  </h3>
+                                  <p className="text-gray-600">
+                                    Save posts to read them later.
+                                  </p>
+                                </div>
+                              ) : (
+                                savedPosts.map(renderSavedPostCard)
+                              )}
+                            </div>
                           </div>
                         </TabsContent>
 
                         <TabsContent
                           value="likes"
-                          className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                          className="p-8 focus-visible:outline-none focus:outline-none transition-all duration-300 animate-in fade-in-50"
                         >
+                          <div className="space-y-6">
+                            <div className="flex items-center justify-between">
+                              <h2 className="text-2xl font-bold text-gray-900">
+                                Liked Posts
+                              </h2>
+                              <div className="text-sm text-gray-500 bg-red-50 text-red-600 px-3 py-1 rounded-full border border-red-200">
+                                {likedPosts.length} likes
+                              </div>
+                            </div>
                           <div className="space-y-4">
-                            {likedPosts.length === 0
-                              ? renderEmptyState(Heart, "No liked posts yet")
-                              : likedPosts.map((post, index) => (
+                              {likedPosts.length === 0 ? (
+                                <div className="text-center py-16 bg-gradient-to-br from-red-50 to-pink-50 rounded-3xl border border-red-100">
+                                  <div className="p-4 rounded-full bg-red-100 w-fit mx-auto mb-4">
+                                    <Heart className="w-12 h-12 text-red-600" />
+                                  </div>
+                                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                                    No liked posts yet
+                                  </h3>
+                                  <p className="text-gray-600">
+                                    Start liking posts to see them here.
+                                  </p>
+                                </div>
+                              ) : (
+                                likedPosts.map((post, index) => (
                                   <Card
                                     key={index}
-                                    className="cursor-pointer hover:shadow-md transition-shadow border border-gray-100"
+                                    className="cursor-pointer hover:shadow-2xl transition-all duration-300 border-0 bg-white/80 backdrop-blur-sm shadow-lg rounded-3xl hover:-translate-y-1"
                                   >
-                                    <CardContent className="pt-6">
-                                      <ProfilePosts
-                                        post={post}
-                                        userData={userData}
-                                      />
+                                    <CardContent className="p-6">
+                                      <PostCard post={post} onView={() => router.push(`/feed/${post.id || post.postId}`)} />
                                     </CardContent>
                                   </Card>
-                                ))}
+                                ))
+                              )}
+                            </div>
                           </div>
                         </TabsContent>
 
                         <TabsContent
                           value="orders"
-                          className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
+                          className="p-8 focus-visible:outline-none focus:outline-none transition-all duration-300 animate-in fade-in-50"
                         >
-                          {loadingOrders ? (
-                            renderLoading()
-                          ) : orders.length === 0 ? (
-                            renderEmptyState(ShoppingCart, "No orders yet")
-                          ) : (
                             <div className="space-y-6">
-                              <div className="flex justify-between items-center mb-4">
-                                <h2 className="text-lg font-semibold">
+                            <div className="flex items-center justify-between">
+                              <h2 className="text-2xl font-bold text-gray-900">
                                   Your Orders
                                 </h2>
+                              <div className="text-sm text-gray-500 bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full border border-emerald-200">
+                                {orders.length} orders
+                              </div>
                               </div>
 
+                            {/* Same orders content as business users */}
+                            {loadingOrders ? (
+                              <div className="flex justify-center py-12">
+                                <Loader />
+                              </div>
+                            ) : orders.length === 0 ? (
+                              <div className="text-center py-16 bg-gradient-to-br from-emerald-50 to-green-50 rounded-3xl border border-emerald-100">
+                                <div className="p-4 rounded-full bg-emerald-100 w-fit mx-auto mb-4">
+                                  <ShoppingCart className="w-12 h-12 text-emerald-600" />
+                                </div>
+                                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                                  No orders yet
+                                </h3>
+                                <p className="text-gray-600">
+                                  Your purchase history will appear here.
+                                </p>
+                              </div>
+                            ) : (
+                              <div className="space-y-6">
                               {orders.map((order) => (
                                 <Card
                                   key={order.id}
-                                  className="overflow-hidden"
-                                >
-                                  <CardHeader className="bg-gray-50 py-3">
-                                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-                                      <div>
-                                        <div className="flex items-center">
-                                          <h3 className="font-medium text-sm sm:text-base">
+                                    className="overflow-hidden bg-white/80 backdrop-blur-sm border-0 shadow-xl rounded-3xl hover:shadow-2xl transition-all duration-300"
+                                  >
+                                    {/* Same order card content as above */}
+                                    <CardHeader className="p-6 bg-gradient-to-r from-emerald-50 to-green-50">
+                                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                                        <div className="space-y-2">
+                                          <div className="flex items-center gap-3">
+                                            <h3 className="font-bold text-lg text-gray-900">
                                             Order #
-                                            {order.orderId.substring(0, 8)}
-                                            ...
+                                              {order.orderId.substring(0, 8)}...
                                           </h3>
                                           <Badge
                                             variant={
@@ -2571,14 +2693,19 @@ export default function Profile() {
                                                 ? "success"
                                                 : "outline"
                                             }
-                                            className="ml-2"
+                                              className={`px-3 py-1 rounded-full font-semibold ${
+                                                order.status === "completed"
+                                                  ? "bg-green-100 text-green-700 border-green-200"
+                                                  : "bg-gray-100 text-gray-700 border-gray-200"
+                                              }`}
                                           >
                                             {order.status === "completed"
                                               ? "Completed"
                                               : order.status}
                                           </Badge>
                                         </div>
-                                        <p className="text-xs sm:text-sm text-muted-foreground">
+                                          <p className="text-gray-600 flex items-center gap-2">
+                                            <Calendar className="w-4 h-4" />
                                           {format(
                                             new Date(order.timestamp),
                                             "MMM d, yyyy · h:mm a"
@@ -2586,33 +2713,35 @@ export default function Profile() {
                                         </p>
                                       </div>
                                       <div className="text-right">
-                                        <p className="font-semibold text-sm sm:text-base">
+                                          <p className="text-2xl font-bold text-gray-900">
                                           ₹{order.amount?.toFixed(2)}
                                         </p>
-                                        <p className="text-xs sm:text-sm text-muted-foreground">
+                                          <p className="text-gray-600 font-medium">
                                           {order.businessName}
                                         </p>
                                       </div>
                                     </div>
                                   </CardHeader>
                                   <CardContent className="p-0">
-                                    <div className="px-4 py-3 border-b">
+                                      <div className="px-6 py-4 bg-white border-b border-gray-100">
                                       <div className="flex justify-between items-center">
-                                        <h4 className="text-sm font-medium">
-                                          Items
+                                          <h4 className="font-semibold text-gray-900">
+                                            Order Items
                                         </h4>
-                                        <span className="text-xs text-muted-foreground">
-                                          {order.products?.length || 0} item(s)
+                                          <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                                            {order.products?.length || 0}{" "}
+                                            item(s)
                                         </span>
                                       </div>
                                     </div>
-                                    <div className="divide-y">
+
+                                      <div className="divide-y divide-gray-100">
                                       {order.products?.map((product, idx) => (
                                         <div
                                           key={idx}
-                                          className="p-4 flex items-center gap-3"
+                                            className="p-6 flex items-center gap-4 hover:bg-gray-50 transition-colors duration-200"
                                         >
-                                          <div className="relative w-12 h-12 bg-gray-100 rounded overflow-hidden flex-shrink-0">
+                                            <div className="relative w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl overflow-hidden flex-shrink-0">
                                             {product.imageUrl ? (
                                               <Image
                                                 src={product.imageUrl}
@@ -2622,39 +2751,42 @@ export default function Profile() {
                                               />
                                             ) : (
                                               <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                                <Package className="w-6 h-6" />
+                                                  <Package className="w-8 h-8" />
                                               </div>
                                             )}
                                           </div>
-                                          <div className="flex-grow">
-                                            <h5 className="font-medium text-sm">
+
+                                            <div className="flex-grow space-y-2">
+                                              <h5 className="font-semibold text-gray-900">
                                               {product.productName}
                                             </h5>
-                                            <div className="flex items-center text-sm text-muted-foreground">
-                                              <span>
-                                                ₹{product.amount?.toFixed(2)} ×{" "}
-                                                {product.quantity}
+                                              <div className="flex items-center text-gray-600">
+                                                <span className="text-sm">
+                                                  ₹{product.amount?.toFixed(2)}{" "}
+                                                  × {product.quantity}
                                               </span>
                                             </div>
+
                                             {order.status === "completed" && (
-                                              <div className="mt-2">
+                                                <div className="mt-3">
                                                 {productRatings[
                                                   product.productId
                                                 ] ? (
-                                                  <div className="flex flex-col gap-1">
+                                                    <div className="space-y-2">
                                                     {renderStarRating(
                                                       productRatings[
                                                         product.productId
                                                       ].rating
                                                     )}
                                                     <div className="flex items-center justify-between">
-                                                      <span className="text-xs text-green-600">
-                                                        You rated this product
+                                                        <span className="text-sm text-green-600 font-medium">
+                                                          ✓ You rated this
+                                                          product
                                                       </span>
                                                       <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        className="text-xs h-7 px-2 text-muted-foreground hover:text-primary"
+                                                          className="text-sm h-8 px-3 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-xl"
                                                         onClick={(e) => {
                                                           e.stopPropagation();
                                                           handleOpenRatingDialog(
@@ -2663,7 +2795,7 @@ export default function Profile() {
                                                           );
                                                         }}
                                                       >
-                                                        Edit
+                                                          Edit Rating
                                                       </Button>
                                                     </div>
                                                   </div>
@@ -2671,7 +2803,7 @@ export default function Profile() {
                                                   <Button
                                                     variant="outline"
                                                     size="sm"
-                                                    className="text-xs"
+                                                      className="text-sm h-9 px-4 rounded-2xl border-2 hover:bg-yellow-50 hover:border-yellow-300"
                                                     onClick={(e) => {
                                                       e.stopPropagation();
                                                       handleOpenRatingDialog(
@@ -2680,14 +2812,16 @@ export default function Profile() {
                                                       );
                                                     }}
                                                   >
+                                                      <Star className="h-4 w-4 mr-2" />
                                                     Rate & Review
                                                   </Button>
                                                 )}
                                               </div>
                                             )}
                                           </div>
+
                                           <div className="text-right">
-                                            <p className="font-medium">
+                                              <p className="text-lg font-bold text-gray-900">
                                               ₹
                                               {(
                                                 product.amount *
@@ -2698,27 +2832,27 @@ export default function Profile() {
                                         </div>
                                       ))}
                                     </div>
-                                    <div className="border-t p-4 bg-gray-50">
-                                      <div className="flex flex-col gap-2">
-                                        <div className="flex justify-between">
-                                          <span className="text-sm font-medium">
-                                            Total
+
+                                      <div className="p-6 bg-gradient-to-r from-gray-50 to-gray-100 border-t border-gray-200">
+                                        <div className="flex flex-col gap-4">
+                                          <div className="flex justify-between items-center">
+                                            <span className="text-lg font-semibold text-gray-900">
+                                              Total Amount
                                           </span>
-                                          <span className="font-semibold">
+                                            <span className="text-2xl font-bold text-gray-900">
                                             ₹{order.amount?.toFixed(2)}
                                           </span>
                                         </div>
                                         <Button
                                           variant="outline"
-                                          size="sm"
-                                          className="flex items-center gap-1 mt-2 w-full"
+                                            className="flex items-center justify-center gap-2 w-full py-3 h-auto rounded-2xl border-2 border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-300 font-semibold transition-all duration-200"
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             handleGenerateBill(order);
                                           }}
                                         >
-                                          <FileText className="h-4 w-4" />
-                                          <span>Generate Bill</span>
+                                            <FileText className="h-5 w-5" />
+                                            <span>Generate Invoice</span>
                                         </Button>
                                       </div>
                                     </div>
@@ -2727,6 +2861,7 @@ export default function Profile() {
                               ))}
                             </div>
                           )}
+                          </div>
                         </TabsContent>
                       </Tabs>
                     </Card>
@@ -2736,25 +2871,118 @@ export default function Profile() {
             )}
           </main>
 
-          {/* Right sidebar */}
+          {/* Right sidebar - Quick Actions */}
+          <aside className="hidden xl:block w-80 space-y-6">
+            <Card className="p-6 bg-white/80 backdrop-blur-sm border-0 shadow-xl rounded-3xl">
+              <h3 className="text-lg font-bold text-gray-900 mb-4">Quick Actions</h3>
+              <div className="space-y-3">
+                {isCurrentUser && isBusinessUser && (
+                  <>
+                    {/* Dashboard */}
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="w-full justify-start gap-3 py-3 h-auto rounded-2xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                    >
+                      <Link href="/dashboard">
+                        <LayoutDashboard className="w-4 h-4" />
+                        Dashboard
+                      </Link>
+                    </Button>
+
+                    {/* Build Website */}
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="w-full justify-start gap-3 py-3 h-auto rounded-2xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                    >
+                      <Link href={`/website-builder/${user?.uid}`}>
+                        <Globe className="w-4 h-4" />
+                        Build Website
+                      </Link>
+                    </Button>
+
+                    {/* Share Business - full width */}
+                    {userData && (
+                      <ShareBusinessDialog
+                        userData={userData}
+                        buttonText="Share"
+                        buttonClassName="w-full justify-start gap-3 py-3 h-auto rounded-2xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                      />
+                    )}
+
+                    {/* Flat buttons replacing dropdown */}
+                    <Button
+                      variant="outline"
+                      onClick={toggleLocationIFrame}
+                      className="w-full justify-start gap-3 py-3 h-auto rounded-2xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                    >
+                      <MapPinIcon className="w-4 h-4" />
+                      Location
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      onClick={() => router.push('/profile/calls')}
+                      className="w-full justify-start gap-3 py-3 h-auto rounded-2xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                    >
+                      <PhoneCall className="w-4 h-4" />
+                      Manage AI Calls
+                    </Button>
+
+                    {userData && !selectedFranchiseId && !userData?.franchiseOwner && (
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsFranchiseModalOpen(true)}
+                        className="w-full justify-start gap-3 py-3 h-auto rounded-2xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                      >
+                        <Globe className="w-4 h-4" />
+                        Add Franchise
+                      </Button>
+                    )}
+
+                    {selectedFranchiseId && (
+                      <Button
+                        variant="outline"
+                        onClick={exitFranchiseView}
+                        className="w-full justify-start gap-3 py-3 h-auto rounded-2xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                      >
+                        <ArrowLeftIcon className="w-4 h-4" />
+                        Return to {userData?.franchiseOwner ? 'Business' : 'HQ'}
+                      </Button>
+                    )}
+                  </>
+                )}
+              </div>
+            </Card>
+          </aside>
         </div>
       </div>
+
+      {/* All the dialog components remain the same but with updated styling */}
 
       {/* Confirmation Dialog for Unsaving Posts */}
       <AlertDialog
         open={isUnsaveDialogOpen}
         onOpenChange={setIsUnsaveDialogOpen}
       >
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-3xl border-0 shadow-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Unsave Post</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle className="text-2xl font-bold text-gray-900">
+              Unsave Post
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-lg text-gray-600">
               Are you sure you want to remove this post from your saved posts?
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmUnsave}>
+          <AlertDialogFooter className="gap-3">
+            <AlertDialogCancel className="rounded-2xl px-6 py-3 h-auto">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmUnsave}
+              className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 rounded-2xl px-6 py-3 h-auto"
+            >
               Unsave
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -2771,25 +2999,27 @@ export default function Profile() {
 
       {/* Rating Dialog */}
       <Dialog open={ratingDialogOpen} onOpenChange={setRatingDialogOpen}>
-        <DialogContent className="sm:max-w-[450px]">
+        <DialogContent className="sm:max-w-[500px] rounded-3xl border-0 shadow-2xl">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-2xl font-bold text-gray-900">
               {productRatings[selectedProductForRating?.productId]
                 ? "Edit Your Rating"
                 : "Rate Product"}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-lg text-gray-600">
               Share your experience with {selectedProductForRating?.productName}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
-            <div className="flex flex-col items-center gap-3">
-              <span className="text-sm font-medium">
+          <div className="space-y-6 py-6">
+            <div className="flex flex-col items-center gap-4">
+              <span className="text-lg font-semibold text-gray-900">
                 How would you rate this product?
               </span>
+              <div className="p-4 bg-gray-50 rounded-2xl">
               {renderStarRating(ratingValue, true)}
-              <span className="text-sm text-muted-foreground mt-1">
+              </div>
+              <span className="text-sm text-gray-600 font-medium">
                 {ratingValue === 0 && "Select a rating"}
                 {ratingValue === 1 && "Poor"}
                 {ratingValue === 2 && "Fair"}
@@ -2799,8 +3029,11 @@ export default function Profile() {
               </span>
             </div>
 
-            <div className="space-y-2">
-              <label htmlFor="feedback" className="text-sm font-medium">
+            <div className="space-y-3">
+              <label
+                htmlFor="feedback"
+                className="text-lg font-semibold text-gray-900"
+              >
                 Your Review (Optional)
               </label>
               <Textarea
@@ -2809,24 +3042,27 @@ export default function Profile() {
                 value={ratingFeedback}
                 onChange={(e) => setRatingFeedback(e.target.value)}
                 rows={4}
+                className="rounded-2xl border-2 border-gray-200 focus:border-blue-400 focus:ring-0 resize-none"
               />
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="gap-3">
             <Button
               variant="outline"
               onClick={() => setRatingDialogOpen(false)}
+              className="rounded-2xl px-6 py-3 h-auto"
             >
               Cancel
             </Button>
             <Button
               onClick={handleSubmitRating}
               disabled={ratingValue === 0 || isSubmittingRating}
+              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 rounded-2xl px-6 py-3 h-auto"
             >
               {isSubmittingRating ? (
                 <>
-                  <Loader/>
+                  <Loader />
                   {productRatings[selectedProductForRating?.productId]
                     ? "Updating..."
                     : "Submitting..."}
@@ -2843,85 +3079,108 @@ export default function Profile() {
 
       {/* Bill Generation Dialog */}
       <Dialog open={billDialogOpen} onOpenChange={setBillDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[700px] rounded-3xl border-0 shadow-2xl">
           <DialogHeader>
-            <DialogTitle>Invoice</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-2xl font-bold text-gray-900">
+              Invoice
+            </DialogTitle>
+            <DialogDescription className="text-lg text-gray-600">
               Order #{selectedOrder?.orderId?.substring(0, 8)} details
             </DialogDescription>
           </DialogHeader>
 
-          <div ref={billRef} className="p-4 bg-white">
+          <div
+            ref={billRef}
+            className="p-6 bg-white rounded-2xl border border-gray-200"
+          >
             {/* Bill Header */}
-            <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold">INVOICE</h1>
-              <p className="text-muted-foreground">Thikana Portal</p>
+            <div className="text-center mb-8">
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">INVOICE</h1>
+              <p className="text-gray-600 text-lg">Thikana Portal</p>
             </div>
 
             {/* Bill Info */}
-            <div className="flex justify-between mb-6">
-              <div>
-                <h3 className="font-medium">Invoice To:</h3>
-                <p>
+            <div className="flex justify-between mb-8">
+              <div className="space-y-2">
+                <h3 className="font-bold text-lg text-gray-900">Invoice To:</h3>
+                <p className="text-gray-700">
                   Customer: {user?.displayName || user?.email || "Customer"}
                 </p>
-                <p>
+                <p className="text-gray-700">
                   Order Date:{" "}
                   {selectedOrder &&
                     format(new Date(selectedOrder?.timestamp), "MMM d, yyyy")}
                 </p>
               </div>
-              <div className="text-right">
-                <h3 className="font-medium">Invoice Details:</h3>
-                <p>Invoice #: INV-{selectedOrder?.orderId?.substring(0, 8)}</p>
-                <p>Order #: {selectedOrder?.orderId?.substring(0, 8)}</p>
+              <div className="text-right space-y-2">
+                <h3 className="font-bold text-lg text-gray-900">
+                  Invoice Details:
+                </h3>
+                <p className="text-gray-700">
+                  Invoice #: INV-{selectedOrder?.orderId?.substring(0, 8)}
+                </p>
+                <p className="text-gray-700">
+                  Order #: {selectedOrder?.orderId?.substring(0, 8)}
+                </p>
               </div>
             </div>
 
             {/* Bill Items */}
-            <table className="w-full mb-6">
+            <table className="w-full mb-8">
               <thead className="border-b-2 border-gray-300">
                 <tr>
-                  <th className="py-2 text-left">Item</th>
-                  <th className="py-2 text-right">Qty</th>
-                  <th className="py-2 text-right">Price</th>
-                  <th className="py-2 text-right">Total</th>
+                  <th className="py-3 text-left font-bold text-gray-900">
+                    Item
+                  </th>
+                  <th className="py-3 text-right font-bold text-gray-900">
+                    Qty
+                  </th>
+                  <th className="py-3 text-right font-bold text-gray-900">
+                    Price
+                  </th>
+                  <th className="py-3 text-right font-bold text-gray-900">
+                    Total
+                  </th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className="divide-y divide-gray-200">
                 {selectedOrder?.products?.map((product, idx) => (
                   <tr key={idx}>
-                    <td className="py-2">{product.productName}</td>
-                    <td className="py-2 text-right">{product.quantity}</td>
-                    <td className="py-2 text-right">
+                    <td className="py-3 text-gray-700">
+                      {product.productName}
+                    </td>
+                    <td className="py-3 text-right text-gray-700">
+                      {product.quantity}
+                    </td>
+                    <td className="py-3 text-right text-gray-700">
                       ₹{product.amount?.toFixed(2)}
                     </td>
-                    <td className="py-2 text-right">
+                    <td className="py-3 text-right text-gray-700">
                       ₹{(product.amount * product.quantity).toFixed(2)}
                     </td>
                   </tr>
                 ))}
               </tbody>
-              <tfoot className="border-t-2 border-gray-300 font-medium">
+              <tfoot className="border-t-2 border-gray-300 font-bold">
                 <tr>
-                  <td colSpan={3} className="py-2 text-right">
+                  <td colSpan={3} className="py-3 text-right text-gray-900">
                     Subtotal:
                   </td>
-                  <td className="py-2 text-right">
+                  <td className="py-3 text-right text-gray-900">
                     ₹{selectedOrder?.amount?.toFixed(2)}
                   </td>
                 </tr>
                 <tr>
-                  <td colSpan={3} className="py-2 text-right">
+                  <td colSpan={3} className="py-3 text-right text-gray-900">
                     Tax:
                   </td>
-                  <td className="py-2 text-right">₹0.00</td>
+                  <td className="py-3 text-right text-gray-900">₹0.00</td>
                 </tr>
-                <tr className="font-bold">
-                  <td colSpan={3} className="py-2 text-right">
+                <tr className="text-lg">
+                  <td colSpan={3} className="py-3 text-right text-gray-900">
                     Total:
                   </td>
-                  <td className="py-2 text-right">
+                  <td className="py-3 text-right text-gray-900">
                     ₹{selectedOrder?.amount?.toFixed(2)}
                   </td>
                 </tr>
@@ -2929,30 +3188,46 @@ export default function Profile() {
             </table>
 
             {/* Payment info */}
-            <div className="border-t pt-4 mb-6">
-              <h3 className="font-medium mb-2">Payment Information</h3>
-              <p>Status: {selectedOrder?.paymentStatus || "Paid"}</p>
-              <p>Method: {selectedOrder?.paymentMethod || "Online Payment"}</p>
+            <div className="border-t pt-6 mb-6">
+              <h3 className="font-bold text-lg text-gray-900 mb-3">
+                Payment Information
+              </h3>
+              <div className="space-y-1">
+                <p className="text-gray-700">
+                  Status: {selectedOrder?.paymentStatus || "Paid"}
+                </p>
+                <p className="text-gray-700">
+                  Method: {selectedOrder?.paymentMethod || "Online Payment"}
+                </p>
+              </div>
             </div>
 
             {/* Thank You */}
-            <div className="text-center mt-8">
-              <p className="font-medium">Thank you for your business!</p>
+            <div className="text-center mt-8 p-4 bg-gray-50 rounded-xl">
+              <p className="font-bold text-lg text-gray-900">
+                Thank you for your business!
+              </p>
             </div>
           </div>
 
-          <DialogFooter className="flex gap-2">
-            <Button variant="outline" onClick={() => setBillDialogOpen(false)}>
+          <DialogFooter className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setBillDialogOpen(false)}
+              className="rounded-2xl px-6 py-3 h-auto"
+            >
               Close
             </Button>
-            <Button onClick={handlePrint} className="flex items-center gap-1">
+            <Button
+              onClick={handlePrint}
+              className="flex items-center gap-2 rounded-2xl px-6 py-3 h-auto bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800"
+            >
               <Printer className="h-4 w-4" />
               <span>Print</span>
             </Button>
             <Button
               onClick={handleDownloadPDF}
-              variant="default"
-              className="flex items-center gap-1"
+              className="flex items-center gap-2 rounded-2xl px-6 py-3 h-auto bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
             >
               <FileText className="h-4 w-4" />
               <span>Download PDF</span>

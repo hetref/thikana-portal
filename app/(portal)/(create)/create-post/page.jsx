@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState, useRef } from "react";
-import { Wand2, MoreVertical } from "lucide-react";
+import { Wand2, Upload, FileImage, Edit3, Trash2, X, Sparkles } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,12 +14,6 @@ import { useRouter } from "next/navigation";
 import ReactCrop, { centerCrop, makeAspectCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 import { toast } from "react-hot-toast";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -304,88 +298,180 @@ const CreatePost = () => {
   };
 
   return (
-    <>
-      <Card className="max-w-5xl mx-auto my-8 shadow-md">
-        <CardHeader>
-          <CardTitle className="text-center text-2xl">Create Post</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Left column - Image uploader */}
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="image">Upload Image</Label>
-                  <Input
+    <div className="min-h-screen bg-white">
+      <div className="max-w-7xl mx-auto px-4 py-12">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center gap-3 mb-4">
+            <div className="p-3 bg-gradient-to-r from-orange-500 to-red-600 rounded-xl">
+              <Sparkles className="w-6 h-6 text-white" />
+            </div>
+            <h1 className="text-4xl font-bold text-gray-900">Create Post</h1>
+          </div>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Share your story with the world. Upload an image and craft compelling content that engages your audience.
+          </p>
+        </div>
+
+        {/* Main Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-12">
+          {/* Image Upload Section - Left */}
+          <div className="lg:col-span-3">
+            <div className="space-y-8">
+              <div>
+                <h2 className="text-2xl font-semibold text-gray-900 mb-2">Upload Image</h2>
+                <p className="text-gray-600">Choose a high-quality image that represents your content</p>
+              </div>
+
+              {/* File Upload Area - Only show if no preview */}
+              {!formData.preview && !showCropper && (
+                <div className="relative group">
+                  <input
                     id="image"
                     type="file"
                     accept="image/*"
                     onChange={handleImageChange}
                     required
-                    className="mb-2"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                   />
-                  {showCropper && imgSrc && (
-                    <div className="mt-4">
-                      <ReactCrop
-                        crop={crop}
-                        onChange={(c) => setCrop(c)}
-                        aspect={16 / 9}
-                        className="max-w-full"
-                      >
-                        <img
-                          ref={imgRef}
-                          src={imgSrc}
-                          onLoad={onImageLoad}
-                          alt="Crop me"
-                          className="max-w-full"
-                        />
-                      </ReactCrop>
-                      <div className="mt-4 flex justify-end">
-                        <Button
-                          type="button"
-                          onClick={handleCropComplete}
-                          className="bg-blue-600 hover:bg-blue-700"
-                        >
-                          Apply Crop
-                        </Button>
+                  <div className="border-2 border-dashed border-gray-200 rounded-2xl p-12 bg-gradient-to-br from-orange-50 to-red-50 hover:from-orange-100 hover:to-red-100 hover:border-orange-300 transition-all duration-300 group-hover:scale-[1.02]">
+                    <div className="flex flex-col items-center space-y-4">
+                      <div className="p-4 bg-white rounded-full shadow-sm border-2 border-orange-100">
+                        <Upload className="w-8 h-8 text-orange-500" />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-lg font-medium text-gray-900">Click to upload</p>
+                        <p className="text-sm text-orange-600 mt-1">PNG, JPG up to 10MB</p>
                       </div>
                     </div>
-                  )}
-                  {formData.preview && !showCropper && (
-                    <div className="mt-4">
-                      <img
-                        src={formData.preview}
-                        alt="Preview"
-                        className="w-full h-auto rounded-lg border object-cover aspect-[16/7] min-h-[350px] md:min-h-[450px]"
-                      />
-                    </div>
-                  )}
-                  {!formData.preview && !showCropper && (
-                    <div className="w-full h-[350px] md:h-[450px] aspect-[16/7] flex items-center justify-center border border-dashed rounded-lg bg-gray-50">
-                      <p className="text-gray-400 text-center px-4">
-                        Upload an image to preview it here
-                      </p>
-                    </div>
-                  )}
+                  </div>
                 </div>
+              )}
+
+              {/* Image Cropper */}
+              {showCropper && imgSrc && (
+                <div className="bg-white border-2 border-orange-200 rounded-2xl p-6 shadow-lg">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                      <div className="p-2 bg-gradient-to-r from-orange-400 to-red-500 rounded-lg">
+                        <Edit3 className="w-4 h-4 text-white" />
+                      </div>
+                      Crop Image
+                    </h3>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowCropper(false)}
+                      className="text-gray-500 hover:text-red-500 hover:bg-red-50"
+                    >
+                      <X className="w-5 h-5" />
+                    </Button>
+                  </div>
+                  <div className="space-y-4">
+                    <ReactCrop
+                      crop={crop}
+                      onChange={(c) => setCrop(c)}
+                      aspect={16 / 9}
+                      className="max-w-full rounded-lg overflow-hidden"
+                    >
+                      <img
+                        ref={imgRef}
+                        src={imgSrc}
+                        onLoad={onImageLoad}
+                        alt="Crop preview"
+                        className="max-w-full"
+                      />
+                    </ReactCrop>
+                    <div className="flex justify-end">
+                      <Button
+                        type="button"
+                        onClick={handleCropComplete}
+                        className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
+                      >
+                        Apply Crop
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Image Preview */}
+              {formData.preview && !showCropper && (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                      <div className="p-2 bg-gradient-to-r from-orange-500 to-red-500 rounded-lg">
+                        <FileImage className="w-4 h-4 text-white" />
+                      </div>
+                      Image Preview
+                    </h3>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setFormData(prev => ({ ...prev, image: null, preview: null }));
+                        setImgSrc("");
+                      }}
+                      className="gap-2 text-amber-600 border-amber-200 hover:bg-amber-50 hover:border-amber-300"
+                    >
+                      <Upload className="w-4 h-4" />
+                      Change Image
+                    </Button>
+                  </div>
+                  <div className="relative overflow-hidden rounded-2xl shadow-xl ring-4 ring-orange-100">
+                    <img
+                      src={formData.preview}
+                      alt="Preview"
+                      className="w-full object-cover aspect-[16/9] transition-transform duration-300 hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-orange-900/20 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
+                  </div>
+                </div>
+              )}
+
+              {!formData.preview && !showCropper && (
+                <div className="aspect-[16/9] flex items-center justify-center border-2 border-dashed border-orange-200 rounded-2xl bg-gradient-to-br from-orange-50 to-red-50">
+                  <div className="text-center space-y-3">
+                    <div className="p-4 bg-white rounded-full shadow-sm border-2 border-orange-100">
+                      <FileImage className="w-16 h-16 text-orange-400 mx-auto" />
+                    </div>
+                    <p className="text-orange-600 font-medium">Image preview will appear here</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Content Section - Right */}
+          <div className="lg:col-span-2">
+            <div className="sticky top-8 space-y-8">
+              <div>
+                <h2 className="text-2xl font-semibold text-gray-900 mb-2">Content Details</h2>
+                <p className="text-gray-600">Add engaging title and description for your post</p>
               </div>
 
-              {/* Right column - Post details */}
               <div className="space-y-6">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="title" className="text-base font-medium">Post Title</Label>
+                {/* Title Input */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="title" className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+                      Post Title
+                    </Label>
                     {formData.preview && (
                       <Button
                         type="button"
-                        variant="ghost"
-                        size="icon"
+                        variant="outline"
+                        size="sm"
                         onClick={() => generateContent("title")}
                         disabled={loading.isGenerating}
-                        className="h-8 w-8"
-                        title="Generate title"
+                        className="gap-2 border-amber-200 text-amber-700 hover:bg-gradient-to-r hover:from-amber-50 hover:to-orange-50 hover:border-amber-300 transition-all duration-200"
                       >
-                        <Wand2 className="h-4 w-4" />
+                        <div className={`${loading.isGenerating ? 'animate-spin' : ''}`}>
+                          <Wand2 className="h-4 w-4" />
+                        </div>
+                        {loading.isGenerating ? "Generating..." : "AI Generate"}
                       </Button>
                     )}
                   </div>
@@ -396,26 +482,31 @@ const CreatePost = () => {
                       setFormData((prev) => ({ ...prev, title: e.target.value }))
                     }
                     required
-                    placeholder="Enter a catchy title for your post"
-                    className="h-11"
+                    placeholder="Enter an engaging title..."
+                    className="h-12 text-base border-gray-200 focus:border-orange-500 focus:ring-orange-500 rounded-xl"
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="description" className="text-base font-medium">Description</Label>
+                {/* Description Input */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="description" className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+                      Description
+                    </Label>
                     <Button
                       type="button"
-                      variant="ghost"
-                      size="icon"
+                      variant="outline"
+                      size="sm"
                       onClick={() => generateContent("description")}
                       disabled={
                         loading.isGenerating || (!formData.title && !formData.preview)
                       }
-                      className="h-8 w-8"
-                      title="Generate description"
+                      className="gap-2 border-amber-200 text-amber-700 hover:bg-gradient-to-r hover:from-amber-50 hover:to-orange-50 hover:border-amber-300 transition-all duration-200"
                     >
-                      <Wand2 className="h-4 w-4" />
+                      <div className={`${loading.isGenerating ? 'animate-spin' : ''}`}>
+                        <Wand2 className="h-4 w-4" />
+                      </div>
+                      {loading.isGenerating ? "Generating..." : "AI Generate"}
                     </Button>
                   </div>
                   <Textarea
@@ -427,61 +518,88 @@ const CreatePost = () => {
                         description: e.target.value,
                       }))
                     }
-                    rows={6}
+                    rows={8}
                     required
-                    placeholder="Describe your post in detail..."
-                    className="resize-none"
+                    placeholder="Share your story... What makes this post special?"
+                    className="resize-none border-gray-200 focus:border-orange-500 focus:ring-orange-500 text-base rounded-xl"
                   />
                 </div>
 
+                {/* Submit Button */}
                 <Button
-                  type="submit"
-                  className="w-full h-11 mt-6 text-base"
+                  onClick={handleSubmit}
+                  className="w-full h-14 text-base font-semibold bg-gradient-to-r from-orange-500 via-red-500 to-orange-600 hover:from-orange-600 hover:via-red-600 hover:to-orange-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02]"
                   disabled={loading.isSubmitting || loading.isGenerating}
                 >
-                  {loading.isSubmitting ? "Creating..." : "Create Post"}
+                  {loading.isSubmitting ? (
+                    <div className="flex items-center gap-3">
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      Creating Post...
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-5 h-5" />
+                      Create Post
+                    </div>
+                  )}
                 </Button>
               </div>
             </div>
-          </form>
-        </CardContent>
-      </Card>
+          </div>
+        </div>
+      </div>
 
       {/* Edit Dialog */}
       <AlertDialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-2xl rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Edit Post</AlertDialogTitle>
+            <AlertDialogTitle className="text-xl font-semibold flex items-center gap-2">
+              <div className="p-2 bg-gradient-to-r from-orange-500 to-red-600 rounded-lg">
+                <Edit3 className="w-5 h-5 text-white" />
+              </div>
+              Edit Post
+            </AlertDialogTitle>
           </AlertDialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-title">Title</Label>
+          <div className="space-y-6 py-4">
+            <div className="space-y-3">
+              <Label htmlFor="edit-title" className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Title</Label>
               <Input
                 id="edit-title"
                 value={editData.title}
                 onChange={(e) => setEditData(prev => ({ ...prev, title: e.target.value }))}
                 placeholder="Enter post title"
+                className="h-11 rounded-xl border-gray-200 focus:border-black focus:ring-black"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-description">Description</Label>
+            <div className="space-y-3">
+              <Label htmlFor="edit-description" className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Description</Label>
               <Textarea
                 id="edit-description"
                 value={editData.description}
                 onChange={(e) => setEditData(prev => ({ ...prev, description: e.target.value }))}
                 placeholder="Enter post description"
-                rows={5}
-                className="resize-none"
+                rows={6}
+                className="resize-none rounded-xl border-gray-200 focus:border-black focus:ring-black"
               />
             </div>
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isEditing}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isEditing} className="rounded-xl border-gray-200">
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleEditPost}
               disabled={isEditing}
+              className="bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 rounded-xl"
             >
-              {isEditing ? "Saving..." : "Save Changes"}
+              {isEditing ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  Saving...
+                </div>
+              ) : (
+                "Save Changes"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -489,26 +607,40 @@ const CreatePost = () => {
 
       {/* Delete Confirmation */}
       <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete your post.
+            <AlertDialogTitle className="text-xl font-semibold flex items-center gap-2">
+              <div className="p-2 bg-gradient-to-r from-red-500 to-pink-500 rounded-lg">
+                <Trash2 className="w-5 h-5 text-white" />
+              </div>
+              Delete Post
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-base text-gray-600">
+              This action cannot be undone. This will permanently delete your post and remove it from our servers.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting} className="rounded-xl border-gray-200">
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeletePost}
               disabled={isDeleting}
-              className="bg-red-500 hover:bg-red-600"
+              className="bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 rounded-xl"
             >
-              {isDeleting ? "Deleting..." : "Delete"}
+              {isDeleting ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  Deleting...
+                </div>
+              ) : (
+                "Delete Post"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   );
 };
 
