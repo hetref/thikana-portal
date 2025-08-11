@@ -19,6 +19,7 @@ import { collection, addDoc, updateDoc, setDoc, doc } from "firebase/firestore";
 import { auth, db, storage } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import { Package, Sparkles, Upload, FileImage, IndianRupee, Hash } from "lucide-react";
 
 const AddProductPage = () => {
   const [formState, setFormState] = useState({
@@ -161,108 +162,220 @@ const AddProductPage = () => {
 
   if (authChecking) {
     return (
-      <div className="flex justify-center items-center h-screen">
+      <div className="min-h-screen bg-white flex justify-center items-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Checking authentication...</p>
+          <div className="relative">
+            <div className="w-16 h-16 border-4 border-orange-200 rounded-full animate-spin mx-auto"></div>
+            <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin absolute top-0 left-1/2 transform -translate-x-1/2"></div>
+          </div>
+          <p className="mt-6 text-gray-600 font-medium">Checking authentication...</p>
         </div>
       </div>
     );
-  }
+  };
 
   return (
-    <div className="container mx-auto py-10">
-      <Card className="max-w-2xl mx-auto">
-        <CardHeader>
-          <CardTitle className="text-2xl">Add New Product</CardTitle>
-          <CardDescription>
-            Fill in the details below to add a new product to your inventory.
-          </CardDescription>
-        </CardHeader>
-        <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Product Name</Label>
-              <Input
-                id="name"
-                name="name"
-                value={formState.name}
-                onChange={handleChange}
-                placeholder="Enter product name"
-                required
-              />
+    <div className="min-h-screen bg-white">
+      <div className="max-w-7xl mx-auto px-4 py-12">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center gap-3 mb-4">
+            <div className="p-3 bg-gradient-to-r from-orange-500 to-red-600 rounded-xl">
+              <Package className="w-6 h-6 text-white" />
             </div>
+            <h1 className="text-4xl font-bold text-gray-900">Add Product</h1>
+          </div>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Add new products to your inventory with detailed information and images
+          </p>
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                name="description"
-                value={formState.description}
-                onChange={handleChange}
-                placeholder="Enter product description"
-                rows={4}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="price">Price (₹)</Label>
-                <Input
-                  id="price"
-                  name="price"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formState.price}
-                  onChange={handleChange}
-                  placeholder="0.00"
-                  required
-                />
+        {/* Main Form */}
+        <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
+          {/* Form Fields Section - Left */}
+          <div className="xl:col-span-3">
+            <div className="bg-white border border-gray-200 rounded-2xl p-8 shadow-sm">
+              <div className="mb-6">
+                <h2 className="text-2xl font-semibold text-gray-900 mb-2">Product Details</h2>
+                <p className="text-gray-600">Fill in the information about your product</p>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="quantity">Quantity in Stock</Label>
-                <Input
-                  id="quantity"
-                  name="quantity"
-                  type="number"
-                  min="0"
-                  value={formState.quantity}
-                  onChange={handleChange}
-                  placeholder="0"
-                  required
-                />
+
+              <div className="space-y-6">
+                {/* Product Name */}
+                <div className="space-y-3">
+                  <Label htmlFor="name" className="text-sm font-semibold text-gray-900 uppercase tracking-wide flex items-center gap-2">
+                    <Package className="w-4 h-4 text-orange-500" />
+                    Product Name
+                  </Label>
+                  <Input
+                    id="name"
+                    name="name"
+                    value={formState.name}
+                    onChange={handleChange}
+                    placeholder="Enter product name..."
+                    required
+                    className="h-12 text-base border-gray-200 focus:border-orange-500 focus:ring-orange-500 rounded-xl"
+                  />
+                </div>
+
+                {/* Description */}
+                <div className="space-y-3">
+                  <Label htmlFor="description" className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+                    Description
+                  </Label>
+                  <Textarea
+                    id="description"
+                    name="description"
+                    value={formState.description}
+                    onChange={handleChange}
+                    placeholder="Describe your product in detail..."
+                    rows={4}
+                    className="resize-none border-gray-200 focus:border-orange-500 focus:ring-orange-500 text-base rounded-xl"
+                  />
+                </div>
+
+                {/* Price and Quantity */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <Label htmlFor="price" className="text-sm font-semibold text-gray-900 uppercase tracking-wide flex items-center gap-2">
+                      <IndianRupee className="w-4 h-4 text-green-500" />
+                      Price (₹)
+                    </Label>
+                    <Input
+                      id="price"
+                      name="price"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={formState.price}
+                      onChange={handleChange}
+                      placeholder="0.00"
+                      required
+                      className="h-12 text-base border-gray-200 focus:border-orange-500 focus:ring-orange-500 rounded-xl"
+                    />
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <Label htmlFor="quantity" className="text-sm font-semibold text-gray-900 uppercase tracking-wide flex items-center gap-2">
+                      <Hash className="w-4 h-4 text-blue-500" />
+                      Quantity in Stock
+                    </Label>
+                    <Input
+                      id="quantity"
+                      name="quantity"
+                      type="number"
+                      min="0"
+                      value={formState.quantity}
+                      onChange={handleChange}
+                      placeholder="0"
+                      required
+                      className="h-12 text-base border-gray-200 focus:border-orange-500 focus:ring-orange-500 rounded-xl"
+                    />
+                  </div>
+                </div>
+
+                {/* Category */}
+                <div className="space-y-3">
+                  <Label htmlFor="category" className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+                    Category
+                  </Label>
+                  <Input
+                    id="category"
+                    name="category"
+                    value={formState.category}
+                    onChange={handleChange}
+                    placeholder="e.g., Electronics, Clothing, Home & Garden..."
+                    className="h-12 text-base border-gray-200 focus:border-orange-500 focus:ring-orange-500 rounded-xl"
+                  />
+                </div>
+
+                {/* Submit Button */}
+                <div className="pt-4">
+                  <Button
+                    onClick={handleSubmit}
+                    className="w-full h-14 text-base font-semibold bg-gradient-to-r from-orange-500 via-red-500 to-orange-600 hover:from-orange-600 hover:via-red-600 hover:to-orange-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02]"
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <div className="flex items-center gap-3">
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        Adding Product...
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-5 h-5" />
+                        Add Product
+                      </div>
+                    )}
+                  </Button>
+                </div>
               </div>
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="category">Category</Label>
-              <Input
-                id="category"
-                name="category"
-                value={formState.category}
-                onChange={handleChange}
-                placeholder="Enter product category"
-              />
-            </div>
+          {/* Product Image Section - Right */}
+          <div className="xl:col-span-2">
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                  <div className="p-2 bg-gradient-to-r from-orange-500 to-red-500 rounded-lg">
+                    <FileImage className="w-4 h-4 text-white" />
+                  </div>
+                  Product Image
+                </h2>
+                <p className="text-gray-600">Upload a high-quality image of your product</p>
+              </div>
 
-            <div className="space-y-2">
-              <Label>Product Image</Label>
-              <ImageUpload
-                label=""
-                onImageChange={handleFileChange}
-                currentImage={file ? URL.createObjectURL(file) : null}
-                isSubmitting={loading}
-              />
+              <div className="sticky top-8">
+                {/* Image Upload Area */}
+                <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+                  <ImageUpload
+                    label=""
+                    onImageChange={handleFileChange}
+                    currentImage={file ? URL.createObjectURL(file) : null}
+                    isSubmitting={loading}
+                  />
+                </div>
+
+                {/* Large Image Preview */}
+                {file && (
+                  <div className="mt-6 bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Preview</h3>
+                    <div className="relative">
+                      <img
+                        src={URL.createObjectURL(file)}
+                        alt="Product preview"
+                        className="w-full h-80 object-cover rounded-xl border border-gray-200"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-xl"></div>
+                    </div>
+                    <p className="text-sm text-gray-600 mt-3 text-center">
+                      {file.name} • {(file.size / 1024 / 1024).toFixed(2)} MB
+                    </p>
+                  </div>
+                )}
+                
+                {!file && (
+                  <div className="mt-6 p-6 bg-gradient-to-br from-orange-50 to-red-50 rounded-2xl border border-orange-200">
+                    <div className="text-center">
+                      <Upload className="w-12 h-12 text-orange-500 mx-auto mb-4" />
+                      <div>
+                        <p className="text-lg font-medium text-orange-800 mb-2">Image Tips</p>
+                        <ul className="text-sm text-orange-700 space-y-1">
+                          <li>• Use clear, well-lit photos</li>
+                          <li>• Show multiple angles if possible</li>
+                          <li>• High resolution images work best</li>
+                          <li>• Remove distracting backgrounds</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          </CardContent>
-          <CardFooter>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Adding Product..." : "Add Product"}
-            </Button>
-          </CardFooter>
-        </form>
-      </Card>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

@@ -63,5 +63,5 @@ export default function DashboardLayout({ children }) {
     return null; // Will redirect in useEffect
   }
 
-  return <div className="min-h-screen bg-gray-50">{children}</div>;
+  return <div className="min-h-screen bg-white">{children}</div>;
 }

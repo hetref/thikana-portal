@@ -14,31 +14,36 @@ import { db } from "@/lib/firebase";
 
 const useLikePost = (post) => {
   const [isUpdating, setIsUpdating] = useState(false);
-  const [likes, setLikes] = useState(post.likes); // Assuming likes is a number in the post document
+  const [likes, setLikes] = useState(post?.likes || 0); // Add null check
   const [isLiked, setIsLiked] = useState(false);
 
   // Get the current user from Firebase Auth
   const auth = getAuth();
   const authUser = auth.currentUser;
 
+  // Get the correct post ID (handle both post.id and post.postId)
+  const postId = post?.id || post?.postId;
+
   // Initialize isLiked state based on the post's likes and current user
   useEffect(() => {
-    if (authUser) {
+    if (authUser && postId) {
       // Check if the user has already liked this post in their postlikes sub-collection
       const userPostLikesRef = doc(
         db,
         "users",
         authUser.uid,
         "postlikes",
-        post.id
+        postId
       );
       getDoc(userPostLikesRef).then((docSnapshot) => {
         if (docSnapshot.exists()) {
           setIsLiked(docSnapshot.data().liked); // Get the 'liked' field in the document
         }
+      }).catch(error => {
+        console.error("Error checking like status:", error);
       });
     }
-  }, [post.likes, authUser]);
+  }, [postId, authUser]);
   //comment
   const handleLikePost = async () => {
     if (isUpdating) return;
@@ -48,15 +53,43 @@ const useLikePost = (post) => {
       return;
     }
 
+    if (!postId) {
+      console.error("Post ID is missing:", post);
+      return;
+    }
+
     setIsUpdating(true);
 
     try {
-      const postRef = doc(db, "posts", post.id);
+      const postRef = doc(db, "posts", postId);
 
-      // Add or remove the like from the post's like count (likes is a number)
-      await updateDoc(postRef, {
-        likes: isLiked ? increment(-1) : increment(1), // Increment or decrement the like count
-      });
+      // Check if the post has the new 'likes' field or the old 'interactions.likeCount' field
+      const postDoc = await getDoc(postRef);
+      if (!postDoc.exists()) {
+        throw new Error("Post not found");
+      }
+
+      const postData = postDoc.data();
+      const hasNewLikesField = 'likes' in postData;
+      const hasOldLikeCountField = postData.interactions?.likeCount !== undefined;
+
+      // Update the appropriate field based on what exists
+      if (hasNewLikesField) {
+        // Use the new 'likes' field
+        await updateDoc(postRef, {
+          likes: isLiked ? increment(-1) : increment(1),
+        });
+      } else if (hasOldLikeCountField) {
+        // Use the old 'interactions.likeCount' field
+        await updateDoc(postRef, {
+          "interactions.likeCount": isLiked ? increment(-1) : increment(1),
+        });
+      } else {
+        // Create the new 'likes' field if neither exists
+        await updateDoc(postRef, {
+          likes: isLiked ? 0 : 1,
+        });
+      }
 
       // Update or remove the user's postlikes sub-collection
       const userPostLikesRef = doc(
@@ -64,7 +97,7 @@ const useLikePost = (post) => {
         "users",
         authUser.uid,
         "postlikes",
-        post.id
+        postId
       );
       if (isLiked) {
         // If the post was previously liked, we remove the like from the user's postlikes
@@ -73,7 +106,7 @@ const useLikePost = (post) => {
         // If the post was not liked, we add it to the user's postlikes sub-collection
         await setDoc(userPostLikesRef, {
           liked: true,
-          postId: post.id,
+          postId: postId,
         });
       }
 

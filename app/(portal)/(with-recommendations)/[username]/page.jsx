@@ -719,18 +719,14 @@ export default function UserProfile() {
 
           {/* Stats row */}
           <div className="mt-6 grid grid-cols-4 gap-4 divide-x divide-gray-200 rounded-lg border p-4 bg-gray-50">
-            <FollowingDialog
-              followingCount={followingCount}
-              userId={userId}
-              className="flex flex-col items-center"
-              viewOnly={true}
-            />
-            <FollowerDialog
-              followerCount={followersCount}
-              userId={userId}
-              className="flex flex-col items-center pl-4"
-              viewOnly={true}
-            />
+            <div className="flex flex-col items-center">
+              <div className="font-semibold text-gray-900">{followingCount}</div>
+              <div className="text-sm text-gray-600">Following</div>
+            </div>
+            <div className="flex flex-col items-center pl-4">
+              <div className="font-semibold text-gray-900">{followersCount}</div>
+              <div className="text-sm text-gray-600">Followers</div>
+            </div>
             <div className="flex flex-col items-center pl-4">
               <div className="font-semibold text-gray-900">{posts.length}</div>
               <div className="text-sm text-gray-600">Posts</div>
