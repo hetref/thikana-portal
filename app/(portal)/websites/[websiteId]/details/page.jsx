@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { Edit, ExternalLink, Calendar, Clock, Copy, Download, Image, FileText, Video, File } from "lucide-react";
+import { Edit, ExternalLink, Calendar, Clock, Copy, Download, Image, FileText, Video, File, Globe, Zap, RefreshCw, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 
 function getPublicBaseUrl() {
@@ -68,6 +68,9 @@ export default function WebsiteDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMedia, setLoadingMedia] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
+  const [deployingCloudFront, setDeployingCloudFront] = useState(false);
+  const [invalidatingCache, setInvalidatingCache] = useState(false);
+  const [refreshingStatus, setRefreshingStatus] = useState(false);
 
   useEffect(() => {
     const unsub = auth.onAuthStateChanged(async (user) => {
@@ -162,6 +165,111 @@ export default function WebsiteDetailsPage() {
     });
   };
 
+  const handleDeployToCloudFront = async () => {
+    if (!businessId || !websiteId || deployingCloudFront) return;
+    
+    try {
+      setDeployingCloudFront(true);
+      const idToken = await auth.currentUser.getIdToken();
+      
+      const response = await fetch('/api/websites/cloudfront', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          businessId,
+          websiteId,
+          websiteName: website?.name
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        toast.success(`CloudFront deployment started! Distribution: ${data.distribution.domainName}`);
+        
+        // Refresh website data to show new CloudFront info
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      } else {
+        const error = await response.json();
+        throw new Error(error.message || 'Deployment failed');
+      }
+    } catch (error) {
+      console.error('CloudFront deployment error:', error);
+      toast.error(`Deployment failed: ${error.message}`);
+    } finally {
+      setDeployingCloudFront(false);
+    }
+  };
+
+  const handleInvalidateCache = async () => {
+    if (!businessId || !websiteId || !website?.cloudfront?.distributionId || invalidatingCache) return;
+    
+    try {
+      setInvalidatingCache(true);
+      const idToken = await auth.currentUser.getIdToken();
+      
+      const response = await fetch('/api/websites/cloudfront/invalidate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          businessId,
+          websiteId,
+          distributionId: website.cloudfront.distributionId
+        }),
+      });
+
+      if (response.ok) {
+        toast.success('Cache invalidation started!');
+      } else {
+        const error = await response.json();
+        throw new Error(error.message || 'Cache invalidation failed');
+      }
+    } catch (error) {
+      console.error('Cache invalidation error:', error);
+      toast.error(`Cache invalidation failed: ${error.message}`);
+    } finally {
+      setInvalidatingCache(false);
+    }
+  };
+
+  const handleRefreshDistributionStatus = async () => {
+    if (!businessId || !websiteId || !website?.cloudfront?.distributionId || refreshingStatus) return;
+    
+    try {
+      setRefreshingStatus(true);
+      const idToken = await auth.currentUser.getIdToken();
+      
+      const response = await fetch(`/api/websites/cloudfront?businessId=${businessId}&websiteId=${websiteId}&distributionId=${website.cloudfront.distributionId}`, {
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+        },
+      });
+
+      if (response.ok) {
+        toast.success('Distribution status updated!');
+        // Refresh the page to show updated status
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      } else {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to refresh status');
+      }
+    } catch (error) {
+      console.error('Status refresh error:', error);
+      toast.error(`Failed to refresh status: ${error.message}`);
+    } finally {
+      setRefreshingStatus(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -191,8 +299,12 @@ export default function WebsiteDetailsPage() {
       </div>
 
       <Tabs defaultValue="details" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="details">Website Details</TabsTrigger>
+          <TabsTrigger value="cloudfront">
+            <Globe className="w-4 h-4 mr-2" />
+            CloudFront CDN
+          </TabsTrigger>
           <TabsTrigger value="media" onClick={() => !loadingMedia && mediaFiles.length === 0 && loadMediaFiles()}>
             Media Files
           </TabsTrigger>
@@ -303,6 +415,184 @@ export default function WebsiteDetailsPage() {
               </Card>
             )}
           </div>
+        </TabsContent>
+
+        <TabsContent value="cloudfront" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="w-5 h-5" />
+                CloudFront CDN Distribution
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {website?.cloudfront ? (
+                <div className="space-y-6">
+                  {/* Distribution Status */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <h3 className="font-semibold mb-3">Distribution Status</h3>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Status:</span>
+                          <Badge variant={website.cloudfront.status === 'Deployed' ? 'default' : 'secondary'}>
+                            {website.cloudfront.status}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Enabled:</span>
+                          <Badge variant={website.cloudfront.enabled ? 'default' : 'secondary'}>
+                            {website.cloudfront.enabled ? 'Yes' : 'No'}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Distribution ID:</span>
+                          <code className="text-xs bg-gray-100 px-2 py-1 rounded">
+                            {website.cloudfront.distributionId}
+                          </code>
+                        </div>
+                        {website.cloudfront.createdAt && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Created:</span>
+                            <span className="text-sm">
+                              {website.cloudfront.createdAt.toDate ? 
+                                website.cloudfront.createdAt.toDate().toLocaleString() : 
+                                new Date(website.cloudfront.createdAt).toLocaleString()
+                              }
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="font-semibold mb-3">CDN Domain</h3>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <code className="text-sm bg-gray-100 px-2 py-1 rounded flex-1 truncate">
+                            https://{website.cloudfront.domainName}
+                          </code>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => copyToClipboard(`https://${website.cloudfront.domainName}`, 'CDN URL')}
+                          >
+                            <Copy className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => window.open(`https://${website.cloudfront.domainName}`, '_blank')}
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div>
+                    <h3 className="font-semibold mb-3">Actions</h3>
+                    <div className="flex flex-wrap gap-2">
+                      <Button 
+                        onClick={handleInvalidateCache}
+                        disabled={invalidatingCache}
+                        variant="outline"
+                      >
+                        {invalidatingCache ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                            Clearing Cache...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="w-4 h-4 mr-2" />
+                            Clear Cache
+                          </>
+                        )}
+                      </Button>
+                      
+                      <Button 
+                        onClick={handleRefreshDistributionStatus}
+                        disabled={refreshingStatus}
+                        variant="outline"
+                      >
+                        {refreshingStatus ? (
+                          <>
+                            <Zap className="w-4 h-4 mr-2 animate-pulse" />
+                            Refreshing...
+                          </>
+                        ) : (
+                          <>
+                            <Zap className="w-4 h-4 mr-2" />
+                            Refresh Status
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Last Invalidation Info */}
+                  {website.cloudfront.lastInvalidation && (
+                    <div>
+                      <h3 className="font-semibold mb-3">Last Cache Invalidation</h3>
+                      <div className="bg-gray-50 p-3 rounded-md">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Invalidation ID:</span>
+                            <code className="ml-2 text-xs bg-white px-2 py-1 rounded">
+                              {website.cloudfront.lastInvalidation.id}
+                            </code>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Status:</span>
+                            <Badge variant="secondary" className="ml-2">
+                              {website.cloudfront.lastInvalidation.status}
+                            </Badge>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Created:</span>
+                            <span className="ml-2">
+                              {website.cloudfront.lastInvalidation.createdAt.toDate ? 
+                                website.cloudfront.lastInvalidation.createdAt.toDate().toLocaleString() : 
+                                new Date(website.cloudfront.lastInvalidation.createdAt).toLocaleString()
+                              }
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Paths:</span>
+                            <span className="ml-2">{website.cloudfront.lastInvalidation.paths?.join(', ') || '/*'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Globe className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No CloudFront Distribution</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Deploy your website to CloudFront CDN for faster global delivery and better performance.
+                  </p>
+                  <Button onClick={handleDeployToCloudFront} disabled={deployingCloudFront}>
+                    {deployingCloudFront ? (
+                      <>
+                        <Zap className="w-4 h-4 mr-2 animate-pulse" />
+                        Deploying to CloudFront...
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-4 h-4 mr-2" />
+                        Deploy to CloudFront
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="media" className="mt-6">

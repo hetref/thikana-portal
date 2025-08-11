@@ -7,7 +7,13 @@ import "@grapesjs/studio-sdk/style";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Layout, Palette, Rocket, Utensils, User, Dumbbell } from "lucide-react";
 import toast from "react-hot-toast";
+import { websiteTemplates, getTemplatesByCategory, getTemplateById } from "@/lib/website-templates";
 
 function getPublicBaseUrl() {
   const direct = process.env.NEXT_PUBLIC_AWS_S3_BUCKET_PUBLIC_BASE;
@@ -81,28 +87,161 @@ async function fetchWithCorsHandling(url, options = {}) {
   }
 }
 
+// Enhanced function to extract CSS from various HTML structures
+function extractAllStyles(htmlString) {
+  try {
+    let css = "";
+    
+    // Extract from <style> tags in head or anywhere
+    const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
+    let match;
+    while ((match = styleRegex.exec(htmlString)) !== null) {
+      css += match[1] + "\n";
+    }
+    
+    // Clean and normalize CSS
+    css = css.trim();
+    
+    // Remove any @import statements that might cause issues
+    css = css.replace(/@import[^;]*;/gi, '');
+    
+    // Log for debugging
+    console.log("Extracted CSS length:", css.length);
+    if (css.length > 100) {
+      console.log("CSS preview:", css.substring(0, 200) + "...");
+    } else if (css.length > 0) {
+      console.log("CSS content:", css);
+    }
+    
+    return css;
+  } catch (error) {
+    console.error("Error in extractAllStyles:", error);
+    return "";
+  }
+}
+
 // Extract CSS from <style> tags and return { html, css }
 function extractInlineStyles(htmlString) {
-  const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
-  let css = "";
-  let match;
-  while ((match = styleRegex.exec(htmlString)) !== null) {
-    css += match[1] + "\n";
+  try {
+    // Use enhanced CSS extraction
+    const css = extractAllStyles(htmlString);
+    
+    // Remove <style> tags from HTML
+    const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
+    let cleanHtml = htmlString.replace(styleRegex, "");
+    
+    // Extract content from body tag if present
+    const bodyMatch = cleanHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    if (bodyMatch) {
+      cleanHtml = bodyMatch[1];
+    } else {
+      // If no body tag, try to clean up HTML structure
+      cleanHtml = cleanHtml.replace(/<!DOCTYPE[^>]*>/i, "");
+      cleanHtml = cleanHtml.replace(/<\/?html[^>]*>/gi, "");
+      cleanHtml = cleanHtml.replace(/<head[\s\S]*?>[\s\S]*?<\/head>/gi, "");
+      cleanHtml = cleanHtml.replace(/<\/?body[^>]*>/gi, "");
+    }
+    
+    // Clean up any remaining whitespace and empty lines
+    cleanHtml = cleanHtml.trim();
+    
+    console.log("Final extracted content - HTML length:", cleanHtml.length, "CSS length:", css.length);
+    
+    return { html: cleanHtml, css: css };
+  } catch (error) {
+    console.error("Error extracting styles:", error);
+    // Return safe defaults on error
+    return { 
+      html: htmlString || '', 
+      css: '' 
+    };
   }
-  // Remove <style> tags from HTML and get body content
-  let cleanHtml = htmlString.replace(styleRegex, "");
-  // Try to extract just the body content
-  const bodyMatch = cleanHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-  if (bodyMatch) {
-    cleanHtml = bodyMatch[1];
-  } else {
-    // Remove DOCTYPE, html, head tags to get just content
-    cleanHtml = cleanHtml.replace(/<!DOCTYPE[^>]*>/i, "");
-    cleanHtml = cleanHtml.replace(/<\/?html[^>]*>/gi, "");
-    cleanHtml = cleanHtml.replace(/<head[^>]*>[\s\S]*?<\/head>/gi, "");
-    cleanHtml = cleanHtml.replace(/<\/?body[^>]*>/gi, "");
+}
+
+// Return HTML body content while preserving CSS by moving <style> tags from <head> into the body content
+function getBodyWithEmbeddedStyles(htmlString) {
+  try {
+    let headStyles = '';
+    // Collect <style> tags inside <head>
+    const headMatch = htmlString.match(/<head[\s\S]*?>[\s\S]*?<\/head>/i);
+    if (headMatch) {
+      const headHtml = headMatch[0];
+      const styleRegex = /<style[^>]*>[\s\S]*?<\/style>/gi;
+      const styles = headHtml.match(styleRegex) || [];
+      if (styles.length) {
+        headStyles = styles.join('\n');
+      }
+    }
+
+    // Extract body inner HTML; if missing, fallback to full string without doctype/html/head tags
+    let bodyInner = '';
+    const bodyMatch = htmlString.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    if (bodyMatch) {
+      bodyInner = bodyMatch[1];
+    } else {
+      bodyInner = htmlString
+        .replace(/<!DOCTYPE[^>]*>/i, '')
+        .replace(/<\/?html[^>]*>/gi, '')
+        .replace(/<head[\s\S]*?>[\s\S]*?<\/head>/gi, '')
+        .replace(/<\/?body[^>]*>/gi, '');
+    }
+
+    // Prepend collected head styles to body content (so styles live in canvas DOM)
+    const combined = `${headStyles}\n${bodyInner}`.trim();
+    return combined || bodyInner || '';
+  } catch (err) {
+    console.error('getBodyWithEmbeddedStyles error:', err);
+    return htmlString || '';
   }
-  return { html: cleanHtml.trim(), css: css.trim() };
+}
+
+// Improved function to properly set content in GrapesJS editor
+async function setEditorContent(editor, html, css) {
+  try {
+    console.log("Setting editor content - HTML length:", html?.length || 0, "CSS length:", css?.length || 0);
+    
+    // Clear existing content first
+    editor.setComponents('');
+    editor.setStyle('');
+    
+    // Set HTML content first
+    if (html && html.trim()) {
+      console.log("Setting HTML components...");
+      editor.setComponents(html);
+      console.log("HTML content set successfully");
+    }
+    
+    // Then set CSS styles
+    if (css && css.trim()) {
+      console.log("Setting CSS styles...");
+      editor.setStyle(css);
+      console.log("CSS styles set successfully");
+    }
+    
+    // Force a canvas refresh to ensure content is rendered
+    try {
+      const canvas = editor.Canvas;
+      if (canvas && typeof canvas.refresh === 'function') {
+        canvas.refresh();
+      }
+    } catch (refreshError) {
+      console.warn("Canvas refresh failed:", refreshError);
+    }
+    
+  } catch (error) {
+    console.error("Error setting editor content:", error);
+    throw error;
+  }
+}
+
+// Helper function to wait for editor to be fully ready
+function waitForEditorReady(editor) {
+  return new Promise((resolve) => {
+    // Simple timeout to ensure editor is ready
+    setTimeout(() => {
+      resolve();
+    }, 100);
+  });
 }
 
 export default function WebsiteBuilderPage() {
@@ -113,6 +252,8 @@ export default function WebsiteBuilderPage() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadAttempted, setLoadAttempted] = useState(false);
+  const [showTemplateDialog, setShowTemplateDialog] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('all');
   const editorReadyRef = useRef(false);
 
   useEffect(() => {
@@ -138,12 +279,67 @@ export default function WebsiteBuilderPage() {
     return () => unsub();
   }, []);
 
-  const loadInitialContent = async (ed, bizId) => {
-    if (!ed || !bizId || loadAttempted) return;
+  const loadInitialContent = async (ed, bizId, forceReload = false) => {
+    if (!ed || !bizId || (loadAttempted && !forceReload)) return;
     
     try {
-      console.log("Loading content for businessId:", bizId, "websiteId:", websiteId);
+      console.log("Loading content for businessId:", bizId, "websiteId:", websiteId, "forceReload:", forceReload);
       setLoadAttempted(true);
+      
+      // First, get a list of all HTML files for this website from S3
+      const idToken = await auth.currentUser.getIdToken();
+      const listResponse = await fetch(`/api/websites/list-files?businessId=${bizId}&websiteId=${websiteId}`, {
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+        },
+      });
+      
+      let htmlFiles = [];
+      if (listResponse.ok) {
+        const listData = await listResponse.json();
+        htmlFiles = (listData.files || [])
+          .filter(file => file.endsWith('.html'))
+          .sort((a, b) => {
+            // Sort so index.html comes first, then others alphabetically
+            if (a === 'index.html') return -1;
+            if (b === 'index.html') return 1;
+            return a.localeCompare(b);
+          });
+        console.log("Found HTML files:", htmlFiles);
+      }
+      
+      if (htmlFiles.length === 0) {
+        console.log("No HTML files found, creating blank page");
+        // No existing content, create blank page
+        const existingPages = ed.Pages.getAll();
+        existingPages.forEach((p) => ed.Pages.remove(p));
+        
+        const blankPage = ed.Pages.add({ name: "Index" });
+        ed.Pages.select(blankPage);
+        
+        // Directly set content using GrapesJS methods for blank page
+        ed.setComponents('<div class="container"><h1>New Website</h1><p>Start building your website...</p></div>');
+        ed.setStyle(`
+          .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+          }
+          h1 {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #1f2937;
+            margin-bottom: 1rem;
+          }
+          p {
+            color: #6b7280;
+          }
+        `);
+        
+        toast.info("New website created. Start building!");
+        setLoading(false);
+        return;
+      }
       
       const base = getPublicBaseUrl();
       console.log("Public base URL:", base);
@@ -154,114 +350,65 @@ export default function WebsiteBuilderPage() {
       }
       
       const baseUrl = `${base}/${bizId}/websites/${websiteId}`;
-      console.log("Attempting to load from:", `${baseUrl}/index.html`);
       
-      // Try to load index.html first
-      const indexRes = await fetchWithCorsHandling(`${baseUrl}/index.html`);
+      // Clear existing pages
+      const existingPages = ed.Pages.getAll();
+      existingPages.forEach((p) => ed.Pages.remove(p));
       
-      console.log("Index response status:", indexRes.status);
-      
-      if (indexRes.ok) {
-        const indexHtml = await indexRes.text();
-        console.log("Loaded HTML length:", indexHtml.length);
-        console.log("HTML preview:", indexHtml.substring(0, 200));
+      // Load each HTML file
+      for (let i = 0; i < htmlFiles.length; i++) {
+        const fileName = htmlFiles[i];
+        const fileUrl = `${baseUrl}/${fileName}${forceReload ? `?v=${Date.now()}` : ''}`;
         
-        const { html, css } = extractInlineStyles(indexHtml);
-        console.log("Extracted HTML length:", html.length, "CSS length:", css.length);
-        
-        // Clear existing pages and add the loaded content
-        const existingPages = ed.Pages.getAll();
-        existingPages.forEach((p) => ed.Pages.remove(p));
-        
-        const indexPage = ed.Pages.add({ name: "Index" });
-        ed.Pages.select(indexPage);
-        
-        if (html) {
-          ed.setComponents(html);
-        }
-        if (css) {
-          ed.setStyle(css);
-        }
-        
-        console.log("Successfully loaded index page");
-        
-        // Try to load additional pages with different naming patterns
-        let pageNumber = 2;
-        let foundAdditionalPages = false;
-        const pagePatterns = [
-          (num) => `page-${num}.html`,
-          (num) => `page${num}.html`,
-          (num) => `page_${num}.html`,
-        ];
-        
-        while (pageNumber <= 20) { // Increased limit
-          let pageFound = false;
+        try {
+          console.log(`Loading file ${i + 1}/${htmlFiles.length}: ${fileName}`);
+          const response = await fetchWithCorsHandling(fileUrl);
           
-          for (const pattern of pagePatterns) {
-            try {
-              const pageFileName = pattern(pageNumber);
-              const pageUrl = `${baseUrl}/${pageFileName}`;
-              console.log("Trying to load:", pageUrl);
-              
-              const pageRes = await fetchWithCorsHandling(pageUrl);
-              
-              if (pageRes.ok) {
-                const pageHtml = await pageRes.text();
-                console.log(`Found page ${pageNumber} as ${pageFileName}, length:`, pageHtml.length);
-                
-                const { html: pageContent, css: pageCss } = extractInlineStyles(pageHtml);
-                const newPage = ed.Pages.add({ name: `Page ${pageNumber}` });
-                ed.Pages.select(newPage);
-                
-                if (pageContent) {
-                  ed.setComponents(pageContent);
-                }
-                if (pageCss) {
-                  ed.setStyle(pageCss);
-                }
-                
-                foundAdditionalPages = true;
-                pageFound = true;
-                console.log(`Successfully loaded page ${pageNumber} from ${pageFileName}`);
-                break; // Found this page, move to next number
-              } else {
-                console.log(`No ${pageFileName} found (${pageRes.status})`);
-              }
-            } catch (e) {
-              console.log(`Error loading page ${pageNumber} with pattern:`, e.message);
+          if (response.ok) {
+            const htmlContent = await response.text();
+            console.log(`Loaded ${fileName}, length: ${htmlContent.length}`);
+            
+            // Determine page name based on filename
+            let pageName;
+            if (fileName === 'index.html') {
+              pageName = 'Index';
+            } else {
+              // Convert filename back to readable name
+              const nameWithoutExt = fileName.replace('.html', '');
+              pageName = nameWithoutExt
+                .split('-')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
             }
+            
+            const newPage = ed.Pages.add({ name: pageName });
+            ed.Pages.select(newPage);
+            
+            // Wait for editor to be ready before setting content
+            await waitForEditorReady(ed);
+            
+            // Keep CSS inside HTML: move head <style> into body content and set as components
+            const combinedHtml = getBodyWithEmbeddedStyles(htmlContent);
+            ed.setComponents(combinedHtml);
+            
+            console.log(`Successfully loaded page: ${pageName}`);
+          } else {
+            console.error(`Failed to load ${fileName}: ${response.status}`);
           }
-          
-          if (!pageFound) {
-            console.log(`No page ${pageNumber} found with any pattern, stopping search`);
-            break; // No more pages found
-          }
-          
-          pageNumber++;
+        } catch (error) {
+          console.error(`Error loading ${fileName}:`, error);
         }
-        
-        // Select the first page
-        const allPages = ed.Pages.getAll();
-        if (allPages.length > 0) {
-          ed.Pages.select(allPages[0]);
-        }
-        
-        console.log(`Loaded website with ${allPages.length} pages`);
-        toast.success(`Website loaded with ${allPages.length} page${allPages.length !== 1 ? 's' : ''}`);
-        
-      } else {
-        console.log("No existing content found, creating blank page");
-        // No existing content, create blank page
-        const existingPages = ed.Pages.getAll();
-        existingPages.forEach((p) => ed.Pages.remove(p));
-        
-        const blankPage = ed.Pages.add({ name: "Index" });
-        ed.Pages.select(blankPage);
-        ed.setComponents('<div class="container mx-auto p-8"><h1 class="text-3xl font-bold">New Website</h1><p class="text-gray-600">Start building your website...</p></div>');
-        ed.setStyle("");
-        
-        toast.info("New website created. Start building!");
       }
+      
+      // Select the first page (Index)
+      const allPages = ed.Pages.getAll();
+      if (allPages.length > 0) {
+        ed.Pages.select(allPages[0]);
+      }
+      
+      console.log(`Loaded website with ${allPages.length} pages`);
+      toast.success(`Website loaded with ${allPages.length} page${allPages.length !== 1 ? 's' : ''}`);
+      
     } catch (e) {
       console.error("Error loading from S3:", e);
       // Create blank page on error
@@ -270,8 +417,25 @@ export default function WebsiteBuilderPage() {
       
       const blankPage = ed.Pages.add({ name: "Index" });
       ed.Pages.select(blankPage);
-      ed.setComponents('<div class="container mx-auto p-8"><h1 class="text-3xl font-bold">New Website</h1><p class="text-gray-600">Start building your website...</p></div>');
-      ed.setStyle("");
+      
+      // Directly set content using GrapesJS methods for error case
+      ed.setComponents('<div class="container"><h1>New Website</h1><p>Start building your website...</p></div>');
+      ed.setStyle(`
+        .container {
+          max-width: 1200px;
+          margin: 0 auto;
+          padding: 2rem;
+        }
+        h1 {
+          font-size: 2rem;
+          font-weight: bold;
+          color: #1f2937;
+          margin-bottom: 1rem;
+        }
+        p {
+          color: #6b7280;
+        }
+      `);
       
       toast.error("Failed to load website. Starting with blank template.");
     } finally {
@@ -289,14 +453,22 @@ export default function WebsiteBuilderPage() {
       setupMediaUpload(ed, businessId, websiteId);
     }
     
-    // If we already have businessId, load content immediately
-    if (businessId && !loadAttempted) {
-      console.log("BusinessId available, loading content immediately");
-      await loadInitialContent(ed, businessId);
-    } else {
-      console.log("BusinessId not yet available, waiting...");
-      setLoading(false);
-    }
+    // Wait a moment for editor to fully initialize before loading content
+    setTimeout(async () => {
+      // If we already have businessId, load content
+      if (businessId && !loadAttempted) {
+        console.log("BusinessId available, loading content");
+        try {
+          await loadInitialContent(ed, businessId);
+        } catch (error) {
+          console.error("Error loading initial content:", error);
+          setLoading(false);
+        }
+      } else {
+        console.log("BusinessId not yet available, waiting...");
+        setLoading(false);
+      }
+    }, 200);
   };
 
   // Setup media upload functionality
@@ -504,6 +676,67 @@ export default function WebsiteBuilderPage() {
     }
   }, [businessId, editor, loadAttempted]);
 
+  // Apply selected template to current page
+  const applyTemplate = (templateId) => {
+    if (!editor) {
+      toast.error("Editor not ready");
+      return;
+    }
+
+    const template = getTemplateById(templateId);
+    if (!template) {
+      toast.error("Template not found");
+      return;
+    }
+
+    try {
+      // Get current page
+      const currentPage = editor.Pages.getSelected();
+      
+      // Apply template HTML and CSS
+      editor.setComponents(template.html);
+      editor.setStyle(template.css);
+      
+      // Update page name if it's still default
+      const currentPageName = currentPage.get('name');
+      if (currentPageName === 'Index' || currentPageName === 'Page 1') {
+        currentPage.set('name', template.name);
+      }
+
+      setShowTemplateDialog(false);
+      toast.success(`${template.name} template applied successfully!`);
+    } catch (error) {
+      console.error("Error applying template:", error);
+      toast.error("Failed to apply template");
+    }
+  };
+
+  // Get category icon
+  const getCategoryIcon = (category) => {
+    switch (category) {
+      case 'business':
+        return <Rocket className="w-4 h-4" />;
+      case 'food':
+        return <Utensils className="w-4 h-4" />;
+      case 'portfolio':
+        return <User className="w-4 h-4" />;
+      case 'tech':
+        return <Layout className="w-4 h-4" />;
+      case 'fitness':
+        return <Dumbbell className="w-4 h-4" />;
+      default:
+        return <Palette className="w-4 h-4" />;
+    }
+  };
+
+  // Get filtered templates
+  const getFilteredTemplates = () => {
+    if (selectedCategory === 'all') {
+      return websiteTemplates;
+    }
+    return getTemplatesByCategory(selectedCategory);
+  };
+
   const saveAllPagesToS3 = async () => {
     if (!editor || !businessId || !websiteId) {
       console.error('Save failed: missing editor, businessId, or websiteId');
@@ -561,7 +794,10 @@ export default function WebsiteBuilderPage() {
       
       toast.success(`Website saved successfully! ${payloadPages.length} page${payloadPages.length !== 1 ? 's' : ''} uploaded.`);
       
-      // Reset load attempted so it can be reloaded if needed
+      // Force reload content from S3 with cache busting so HTML (with embedded <style>) reflects latest save
+      await loadInitialContent(editor, businessId, true);
+      
+      // Reset flag so future non-forced loads can proceed
       setLoadAttempted(false);
       
     } catch (e) {
@@ -580,6 +816,66 @@ export default function WebsiteBuilderPage() {
           {loading && (
             <div className="text-sm text-gray-500">Loading...</div>
           )}
+          <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
+            <DialogTrigger asChild>
+              <Button variant="outline" disabled={!editor}>
+                <Layout className="w-4 h-4 mr-2" />
+                Templates
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Choose a Template</DialogTitle>
+              </DialogHeader>
+              
+              <Tabs value={selectedCategory} onValueChange={setSelectedCategory} className="w-full">
+                <TabsList className="grid w-full grid-cols-7">
+                  <TabsTrigger value="all">All</TabsTrigger>
+                  <TabsTrigger value="basic">Basic</TabsTrigger>
+                  <TabsTrigger value="business">Business</TabsTrigger>
+                  <TabsTrigger value="food">Food</TabsTrigger>
+                  <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
+                  <TabsTrigger value="tech">Tech</TabsTrigger>
+                  <TabsTrigger value="fitness">Fitness</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value={selectedCategory} className="mt-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {getFilteredTemplates().map((template) => (
+                      <Card key={template.id} className="cursor-pointer hover:shadow-lg transition-shadow">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-lg">{template.name}</CardTitle>
+                            <Badge variant="secondary" className="flex items-center gap-1">
+                              {getCategoryIcon(template.category)}
+                              {template.category}
+                            </Badge>
+                          </div>
+                          <CardDescription>{template.description}</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          {/* Template Preview */}
+                          <div className="bg-gray-100 rounded-lg h-32 mb-4 flex items-center justify-center overflow-hidden">
+                            <div 
+                              className="text-xs scale-[0.15] origin-top-left w-[800px] h-[600px] bg-white shadow-sm"
+                              dangerouslySetInnerHTML={{ __html: template.html.substring(0, 500) + '...' }}
+                            />
+                          </div>
+                          <Button 
+                            onClick={() => applyTemplate(template.id)}
+                            className="w-full"
+                            size="sm"
+                          >
+                            Use This Template
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </DialogContent>
+          </Dialog>
           <Button onClick={saveAllPagesToS3} disabled={saving || !editor || !businessId}>
             {saving ? "Saving..." : "Save All Pages"}
           </Button>
@@ -595,7 +891,7 @@ export default function WebsiteBuilderPage() {
                 pages: [
                   {
                     name: "Index",
-                    component: '<div class="container mx-auto p-8"><h1 class="text-3xl font-bold">Loading...</h1></div>',
+                    component: '<div class="container"><h1>New Website</h1><p>Start building your website...</p></div>',
                     styles: "",
                   },
                 ],
@@ -628,9 +924,7 @@ export default function WebsiteBuilderPage() {
               assets: []
             },
             canvas: {
-              styles: [
-                'https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css'
-              ]
+              styles: []
             }
           }}
         />

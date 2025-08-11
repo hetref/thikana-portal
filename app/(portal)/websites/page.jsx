@@ -19,7 +19,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { Trash2, Plus, Globe, Layout } from "lucide-react";
+import { Trash2, Plus, Globe, Layout, Rocket, RotateCcw } from "lucide-react";
 import toast from "react-hot-toast";
 
 export default function WebsitesPage() {
@@ -30,6 +30,8 @@ export default function WebsitesPage() {
   const [newWebsiteName, setNewWebsiteName] = useState("");
   const [newDomainName, setNewDomainName] = useState("");
   const [loading, setLoading] = useState(true);
+  const [deployingWebsites, setDeployingWebsites] = useState(new Set());
+  const [invalidatingWebsites, setInvalidatingWebsites] = useState(new Set());
 
   useEffect(() => {
     const unsub = auth.onAuthStateChanged(async (user) => {
@@ -124,6 +126,83 @@ export default function WebsitesPage() {
     }
   };
 
+  const handleDeployWebsite = async (website) => {
+    if (!businessId || !website.id || deployingWebsites.has(website.id)) return;
+    
+    try {
+      setDeployingWebsites(prev => new Set(prev).add(website.id));
+      const idToken = await auth.currentUser.getIdToken();
+      
+      const response = await fetch('/api/websites/cloudfront', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          businessId,
+          websiteId: website.id,
+          websiteName: website.name
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        toast.success(`Deployment started! Distribution: ${data.distribution.domainName}`);
+      } else {
+        const error = await response.json();
+        throw new Error(error.message || 'Deployment failed');
+      }
+    } catch (error) {
+      console.error('Deployment error:', error);
+      toast.error(`Deployment failed: ${error.message}`);
+    } finally {
+      setDeployingWebsites(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(website.id);
+        return newSet;
+      });
+    }
+  };
+
+  const handleInvalidateCache = async (website) => {
+    if (!businessId || !website.id || !website.cloudfront?.distributionId || invalidatingWebsites.has(website.id)) return;
+    
+    try {
+      setInvalidatingWebsites(prev => new Set(prev).add(website.id));
+      const idToken = await auth.currentUser.getIdToken();
+      
+      const response = await fetch('/api/websites/cloudfront/invalidate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          businessId,
+          websiteId: website.id,
+          distributionId: website.cloudfront.distributionId
+        }),
+      });
+
+      if (response.ok) {
+        toast.success('Cache invalidation started!');
+      } else {
+        const error = await response.json();
+        throw new Error(error.message || 'Cache invalidation failed');
+      }
+    } catch (error) {
+      console.error('Cache invalidation error:', error);
+      toast.error(`Cache invalidation failed: ${error.message}`);
+    } finally {
+      setInvalidatingWebsites(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(website.id);
+        return newSet;
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">Loading...</div>
@@ -192,6 +271,47 @@ export default function WebsitesPage() {
                             <Button variant="outline" size="sm" onClick={() => router.push(`/websites/${w.id}/details`)}>
                               Details
                             </Button>
+                            {w.cloudfront?.distributionId ? (
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => handleInvalidateCache(w)}
+                                disabled={invalidatingWebsites.has(w.id)}
+                                title="Clear CloudFront Cache"
+                              >
+                                {invalidatingWebsites.has(w.id) ? (
+                                  <>
+                                    <RotateCcw className="w-4 h-4 mr-1 animate-spin" />
+                                    Clearing...
+                                  </>
+                                ) : (
+                                  <>
+                                    <RotateCcw className="w-4 h-4 mr-1" />
+                                    Clear Cache
+                                  </>
+                                )}
+                              </Button>
+                            ) : (
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => handleDeployWebsite(w)}
+                                disabled={deployingWebsites.has(w.id)}
+                                title="Deploy to CloudFront CDN"
+                              >
+                                {deployingWebsites.has(w.id) ? (
+                                  <>
+                                    <Rocket className="w-4 h-4 mr-1 animate-pulse" />
+                                    Deploying...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Rocket className="w-4 h-4 mr-1" />
+                                    Deploy
+                                  </>
+                                )}
+                              </Button>
+                            )}
                             <Button variant="outline" size="icon" onClick={() => handleDeleteWebsite(w.id)}>
                               <Trash2 className="w-4 h-4" />
                             </Button>

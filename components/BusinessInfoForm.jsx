@@ -43,12 +43,12 @@ const businessInfoSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)"),
   operationalHours: z
     .array(
-      z.object({
-        day: z.string(),
+    z.object({
+      day: z.string(),
         enabled: z.boolean().default(false),
         openTime: z.string().optional().or(z.literal("")),
         closeTime: z.string().optional().or(z.literal("")),
-      })
+    })
     )
     .length(7),
   socialMediaLinks: z.array(
@@ -614,8 +614,8 @@ export default function BusinessInfoForm({
                                     );
                                   }
                                 }}
-                                disabled={isSubmitting}
-                              />
+                              disabled={isSubmitting}
+                            />
                               <Label className="text-sm">Open</Label>
                             </div>
                           </FormControl>
@@ -653,17 +653,17 @@ export default function BusinessInfoForm({
                           `operationalHours.${index}.enabled`
                         );
                         return (
-                          <FormItem>
-                            <FormControl>
-                              <Input
-                                type="time"
-                                {...field}
+                        <FormItem>
+                          <FormControl>
+                            <Input
+                              type="time"
+                              {...field}
                                 disabled={isSubmitting || !isEnabled}
-                                className="bg-white"
-                              />
-                            </FormControl>
+                              className="bg-white"
+                            />
+                          </FormControl>
                             <FormMessage />
-                          </FormItem>
+                        </FormItem>
                         );
                       }}
                     />
