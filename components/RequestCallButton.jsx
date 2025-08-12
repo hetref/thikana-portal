@@ -254,17 +254,14 @@ export default function RequestCallButton({ businessId, businessName }) {
 
       // Automatically trigger the call
       try {
-        const autoCallResponse = await fetch(
-          "/api/bland-ai/auto-call-handler",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              requestId: requestId,
-              businessId: businessId,
-            }),
-          }
-        );
+        const autoCallResponse = await fetch("/api/vapi/auto-call-handler", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            requestId: requestId,
+            businessId: businessId,
+          }),
+        });
 
         if (!autoCallResponse.ok) {
           console.warn(
