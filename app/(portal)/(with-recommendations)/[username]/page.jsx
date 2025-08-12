@@ -63,6 +63,7 @@ import { sendNotificationToUser } from "@/lib/notifications";
 import ShowBusinessProperties from "@/components/profile/ShowBusinessProperties";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useSidebar } from "@/lib/context/SidebarContext";
 
 // Add a style element to hide scrollbars
 const scrollbarHideStyles = `
@@ -79,6 +80,7 @@ export default function UserProfile() {
   const router = useRouter();
   const params = useParams();
   const userId = params.username; // Use username param directly as userId
+  const { setRightSidebarContent } = useSidebar();
   const [currentUser, setCurrentUser] = useState(null);
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
@@ -98,6 +100,160 @@ export default function UserProfile() {
   const [bookingLoading, setBookingLoading] = useState(false);
 
   const userData = useGetUser(userId);
+
+  // Set right sidebar content
+  useEffect(() => {
+    if (userData?.role === "business") {
+      const sidebarContent = (
+        <div className="space-y-6">
+          <Card className="p-6 bg-white/80 backdrop-blur-sm border-0 shadow-xl rounded-3xl">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">
+              Quick Actions
+            </h3>
+            <div className="space-y-3">
+              <Button
+                variant="outline"
+                onClick={() => setShowLocationIFrame(!showLocationIFrame)}
+                className="w-full justify-start gap-3 py-3 h-auto rounded-2xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+              >
+                <MapPinIcon className="w-4 h-4" />
+                {showLocationIFrame ? "Hide Location" : "Show Location"}
+              </Button>
+
+              <MoreInformationDialog
+                userData={userData}
+                buttonClassName="w-full justify-start gap-3 py-3 h-auto rounded-2xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+              />
+
+              <ShareBusinessDialog
+                userData={userData}
+                buttonText="Share Business"
+                buttonClassName="w-full justify-start gap-3 py-3 h-auto rounded-2xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+              />
+
+              {currentUser && currentUser.uid !== userId && (
+                <RequestCallButton
+                  businessId={userId}
+                  businessName={userData.businessName}
+                  variant="outline"
+                  className="w-full justify-start gap-3 py-3 h-auto rounded-2xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                />
+              )}
+
+              {userData?.website && (
+                <Button
+                  variant="outline"
+                  asChild
+                  className="w-full justify-start gap-3 py-3 h-auto rounded-2xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                >
+                  <Link
+                    href={userData.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Globe className="w-4 h-4" />
+                    Visit Website
+                  </Link>
+                </Button>
+              )}
+
+              {userData?.email && (
+                <Button
+                  variant="outline"
+                  asChild
+                  className="w-full justify-start gap-3 py-3 h-auto rounded-2xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                >
+                  <Link href={`mailto:${userData.email}`}>
+                    <Mail className="w-4 h-4" />
+                    Send Email
+                  </Link>
+                </Button>
+              )}
+            </div>
+          </Card>
+
+          <Card className="p-6 bg-white/80 backdrop-blur-sm border-0 shadow-xl rounded-3xl">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">
+              Business Info
+            </h3>
+            <div className="space-y-4">
+              {userData?.locations?.address && (
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-xl bg-blue-100 flex-shrink-0">
+                    <MapPinIcon className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">Address</p>
+                    <p className="text-sm text-gray-600">
+                      {userData.locations.address}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {userData?.phone && (
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-xl bg-green-100 flex-shrink-0">
+                    <Phone className="w-4 h-4 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">Phone</p>
+                    <p className="text-sm text-gray-600">
+                      {userData.phone}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {userData?.email && (
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-xl bg-purple-100 flex-shrink-0">
+                    <Mail className="w-4 h-4 text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">Email</p>
+                    <p className="text-sm text-gray-600 break-words">
+                      {userData.email}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {userData?.business_categories &&
+                userData.business_categories.length > 0 && (
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-xl bg-orange-100 flex-shrink-0">
+                      <Info className="w-4 h-4 text-orange-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">
+                        Categories
+                      </p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {userData.business_categories.map((category) => (
+                          <span
+                            key={category}
+                            className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full capitalize"
+                          >
+                            {category.replace("-", " ")}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+            </div>
+          </Card>
+        </div>
+      );
+      setRightSidebarContent(sidebarContent);
+    } else {
+      setRightSidebarContent(null);
+    }
+
+    // Cleanup when component unmounts
+    return () => setRightSidebarContent(null);
+  }, [userData, showLocationIFrame, setRightSidebarContent, currentUser, userId]);
 
   // Helpers for slot computation
   const parseTimeToMinutes = (hhmm) => {
@@ -141,7 +297,10 @@ export default function UserProfile() {
       setAvailableSlots([]);
       return;
     }
-    const slotMinutes = typeof userData.appointmentSlotMinutes === "number" ? userData.appointmentSlotMinutes : 30;
+    const slotMinutes =
+      typeof userData.appointmentSlotMinutes === "number"
+        ? userData.appointmentSlotMinutes
+        : 30;
     const openMins = parseTimeToMinutes(info.openTime);
     const closeMins = parseTimeToMinutes(info.closeTime);
     if (openMins == null || closeMins == null) {
@@ -163,12 +322,16 @@ export default function UserProfile() {
       setComputedEnd("");
       return;
     }
-    const slotMinutes = typeof userData.appointmentSlotMinutes === "number" ? userData.appointmentSlotMinutes : 30;
+    const slotMinutes =
+      typeof userData.appointmentSlotMinutes === "number"
+        ? userData.appointmentSlotMinutes
+        : 30;
     const ops = userData.operationalHours || [];
     const dayIdx = getDayIndexFromISO(selectedDate);
     const info = ops[dayIdx];
     const startMins = parseTimeToMinutes(selectedStart);
-    const endMins = startMins + slotMinutes * Math.max(1, Number(multiplier) || 1);
+    const endMins =
+      startMins + slotMinutes * Math.max(1, Number(multiplier) || 1);
     const closeMins = info && parseTimeToMinutes(info.closeTime);
     if (closeMins != null && endMins <= closeMins) {
       setComputedEnd(minutesToTime(endMins));
@@ -464,605 +627,768 @@ export default function UserProfile() {
 
   const formattedDate = userData?.createdAt
     ? new Date(userData.createdAt.toDate()).toLocaleDateString("en-US", {
-        month: "long",
-        year: "numeric",
-      })
+      month: "long",
+      year: "numeric",
+    })
     : "";
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-white">
       {/* Add style element for custom CSS */}
       <style jsx global>
         {scrollbarHideStyles}
       </style>
 
-      {/* Profile Card */}
-      <Card className="overflow-hidden bg-white border-0 shadow-sm">
-        {/* Cover Image */}
-        <div className="relative h-[180px] w-full">
-          <Dialog>
-            <DialogTrigger className="z-30 w-full h-full">
-              <Image
-                src={userData?.coverPic || "/coverimg.png"}
-                width={1200}
-                height={180}
-                alt="Cover Image"
-                className="z-30 object-cover w-full h-full transition-opacity hover:opacity-95 border border-black/40 rounded-t-xl"
-                priority
-              />
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-xl">
-              <DialogHeader>
-                <DialogTitle>Cover Image</DialogTitle>
-              </DialogHeader>
-              <div className="mt-2 rounded-md overflow-hidden">
-                <Image
-                  src={userData?.coverPic || "/coverimg.png"}
-                  width={1200}
-                  height={600}
-                  alt="Cover Image"
-                  className="w-full object-cover rounded-md"
-                />
+      <div className="w-full px-4 py-6">
+        <div className="space-y-8">
+          {loading ? (
+            <div className="flex justify-center items-center py-20">
+              <div className="p-4 rounded-full bg-blue-100">
+                <Loader2Icon className="w-8 h-8 animate-spin text-blue-600" />
               </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* Profile picture positioned over cover image */}
-          <Dialog>
-            <DialogTrigger className="absolute bottom-0 left-8 transform translate-y-1/2">
-              <Avatar className="z-50 w-24 h-24 border-4 border-white shadow-md hover:shadow-lg transition-all cursor-pointer">
-                <AvatarImage
-                  src={userData?.profilePic || "/avatar.png"}
-                  alt={userData?.name}
-                />
-                <AvatarFallback>
-                  {userData?.businessName?.charAt(0) || "B"}
-                </AvatarFallback>
-              </Avatar>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Profile Picture</DialogTitle>
-              </DialogHeader>
-              <div className="mt-2 rounded-md overflow-hidden">
-                <Image
-                  src={userData?.profilePic || "/avatar.png"}
-                  width={400}
-                  height={400}
-                  alt="Profile Image"
-                  className="w-full object-cover rounded-md"
-                />
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        {/* Profile info */}
-        <div className="pt-16 px-4 sm:px-6 pb-6">
-          <div className="flex flex-col md:items-start md:justify-between gap-4">
-            <div className="flex-1 space-y-2">
-              <h1 className="text-2xl font-bold text-gray-900">
-                {userData?.businessName || "Business Name"}
-              </h1>
-              <div className="flex items-center text-gray-600 gap-1">
-                <User className="w-4 h-4" />
-                <span>{userData?.name || "Owner Name"}</span>
-              </div>
-              {formattedDate && (
-                <div className="flex items-center text-gray-600 gap-1">
-                  <Calendar className="w-4 h-4" />
-                  <span className="text-sm">Joined {formattedDate}</span>
-                </div>
-              )}
-              <p className="text-gray-700 mt-2">
-                {userData?.bio || "Amazing Bio..."}
-              </p>
+              <span className="ml-4 text-lg text-gray-600">
+                Loading profile...
+              </span>
             </div>
+          ) : (
+            <>
+              {/* Profile Card - Enhanced with Fixed Spacing */}
+              <Card className="overflow-hidden bg-white/80 backdrop-blur-sm border-0 shadow-xl rounded-3xl">
+                {/* Cover Image with Gradient Overlay */}
+                <div className="relative h-48 sm:h-56 lg:h-64 w-full overflow-hidden">
+                  <Dialog>
+                    <DialogTrigger className="z-30 w-full h-full group">
+                      <div className="relative w-full h-full">
+                        <Image
+                          src={userData?.coverPic || "/coverimg.png"}
+                          width={1200}
+                          height={256}
+                          alt="Cover Image"
+                          className="object-cover w-full h-full transition-all duration-500 group-hover:scale-105"
+                          priority
+                        />
+                        {/* Gradient overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
+                      </div>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-2xl">
+                      <DialogHeader>
+                        <DialogTitle className="text-2xl font-bold">
+                          Cover Image
+                        </DialogTitle>
+                      </DialogHeader>
+                      <div className="mt-4 rounded-2xl overflow-hidden">
+                        <Image
+                          src={userData?.coverPic || "/coverimg.png"}
+                          width={1200}
+                          height={600}
+                          alt="Cover Image"
+                          className="w-full object-cover"
+                        />
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
 
-            {/* Action buttons */}
-            <div className="flex w-full gap-2 mt-3 md:mt-0">
-              {currentUser && (
-                <Button
-                  onClick={handleFollowToggle}
-                  variant={isFollowing ? "outline" : "default"}
-                  className={
-                    isFollowing ? "px-4" : "bg-black hover:bg-black/90 px-4"
-                  }
-                  disabled={followLoading}
-                >
-                  {followLoading ? (
-                    <>
-                      <Loader2Icon className="w-4 h-4 mr-2 animate-spin" />
-                      {isFollowing ? "Unfollowing..." : "Following..."}
-                    </>
-                  ) : isFollowing ? (
-                    <>
-                      <Minus className="w-4 h-4 mr-2" />
-                      Unfollow
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Follow
-                    </>
-                  )}
-                </Button>
-              )}
-
-              {userData?.role === "business" && (
-                <>
-                  {currentUser && userData && currentUser.uid !== userId && (
-                    <RequestCallButton
-                      businessId={userId}
-                      businessName={userData.businessName}
-                    />
-                  )}
-
-                  {/* Book Appointment Button */}
-                  {userData?.acceptAppointments && currentUser && currentUser.uid !== userId && (
-                    <Dialog open={bookOpen} onOpenChange={setBookOpen}>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" className="px-3">
-                          <Calendar className="w-4 h-4 mr-1" />
-                          Book Appointment
-                        </Button>
+                {/* Profile info with improved spacing */}
+                <div className="relative px-6 sm:px-8 pb-8 pt-4">
+                  {/* Profile picture positioned over cover image */}
+                  <div className="absolute -top-12 left-8 z-10">
+                    <Dialog>
+                      <DialogTrigger>
+                        <div className="relative group cursor-pointer">
+                          <Avatar className="w-24 h-24 sm:w-28 sm:h-28 border-4 border-white shadow-2xl ring-4 ring-white/50 transition-all duration-300 group-hover:scale-105 group-hover:shadow-3xl">
+                            <AvatarImage
+                              src={userData?.profilePic || "/avatar.png"}
+                              alt={userData?.name}
+                              className="object-cover"
+                            />
+                            <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-bold text-2xl">
+                              {userData?.businessName?.charAt(0) ||
+                                userData?.name?.charAt(0) ||
+                                "U"}
+                            </AvatarFallback>
+                          </Avatar>
+                          {/* Subtle hover ring */}
+                          <div className="absolute inset-0 rounded-full bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                        </div>
                       </DialogTrigger>
                       <DialogContent className="sm:max-w-md">
                         <DialogHeader>
-                          <DialogTitle>Book Appointment</DialogTitle>
-                          <DialogDescription>
-                            Select a date and time. Slots are in increments of {userData?.appointmentSlotMinutes || 30} minutes.
-                          </DialogDescription>
+                          <DialogTitle className="text-xl font-bold">
+                            Profile Picture
+                          </DialogTitle>
                         </DialogHeader>
-                        <div className="space-y-4">
-                          <div>
-                            <label className="block text-sm font-medium mb-1">Date</label>
-                            <Input
-                              type="date"
-                              value={selectedDate}
-                              onChange={(e) => setSelectedDate(e.target.value)}
-                            />
-                          </div>
-                          {selectedDate && (
-                            <>
-                              {availableSlots.length === 0 ? (
-                                <div className="text-sm text-muted-foreground">Closed on selected date</div>
-                              ) : (
-                                <>
-                                  <div>
-                                    <label className="block text-sm font-medium mb-1">Start Time</label>
-                                    <select
-                                      className="w-full border rounded-md px-3 py-2"
-                                      value={selectedStart}
-                                      onChange={(e) => setSelectedStart(e.target.value)}
-                                    >
-                                      {availableSlots.map((s) => (
-                                        <option key={s} value={s}>{s}</option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                  <div>
-                                    <label className="block text-sm font-medium mb-1">Duration (x slots)</label>
-                                    <Input
-                                      type="number"
-                                      min={1}
-                                      max={8}
-                                      value={multiplier}
-                                      onChange={(e) => setMultiplier(Number(e.target.value) || 1)}
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-sm font-medium mb-1">End Time</label>
-                                    <Input type="time" value={computedEnd || ""} readOnly />
-                                  </div>
-                                  <div>
-                                    <label className="block text-sm font-medium mb-1">Notes</label>
-                                    <Textarea
-                                      placeholder="Share any details for the business"
-                                      value={bookingDescription}
-                                      onChange={(e) => setBookingDescription(e.target.value)}
-                                    />
-                                  </div>
-                                </>
-                              )}
-                            </>
-                          )}
-                          <div className="flex justify-end gap-2">
-                            <Button variant="outline" onClick={() => setBookOpen(false)}>
-                              Cancel
-                            </Button>
-                            <Button onClick={submitBooking} disabled={bookingLoading || !computedEnd || availableSlots.length === 0}>
-                              {bookingLoading ? (
-                                <>
-                                  <Loader2Icon className="w-4 h-4 mr-2 animate-spin" />
-                                  Booking...
-                                </>
-                              ) : (
-                                "Confirm"
-                              )}
-                            </Button>
-                          </div>
+                        <div className="mt-4 rounded-2xl overflow-hidden">
+                          <Image
+                            src={userData?.profilePic || "/avatar.png"}
+                            width={400}
+                            height={400}
+                            alt="Profile Image"
+                            className="w-full object-cover"
+                          />
                         </div>
                       </DialogContent>
                     </Dialog>
-                  )}
-
-                  <Button
-                    variant="outline"
-                    className=""
-                    onClick={() => setShowLocationIFrame(!showLocationIFrame)}
-                  >
-                    <MapPinIcon className="w-4 h-4 mr-1" />
-                    Location
-                  </Button>
-
-                  {userData && <MoreInformationDialog userData={userData} />}
-
-                  {userData && <ShareBusinessDialog userData={userData} />}
-
-                  {userData?.website && (
-                    <Button variant="outline" asChild className="px-3">
-                      <Link
-                        href={userData.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <Globe className="w-4 h-4 mr-1" />
-                        Website
-                      </Link>
-                    </Button>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Stats row */}
-          <div className="mt-6 grid grid-cols-4 gap-4 divide-x divide-gray-200 rounded-lg border p-4 bg-gray-50">
-            <div className="flex flex-col items-center">
-              <div className="font-semibold text-gray-900">{followingCount}</div>
-              <div className="text-sm text-gray-600">Following</div>
-            </div>
-            <div className="flex flex-col items-center pl-4">
-              <div className="font-semibold text-gray-900">{followersCount}</div>
-              <div className="text-sm text-gray-600">Followers</div>
-            </div>
-            <div className="flex flex-col items-center pl-4">
-              <div className="font-semibold text-gray-900">{posts.length}</div>
-              <div className="text-sm text-gray-600">Posts</div>
-            </div>
-            <div className="flex flex-col items-center pl-4">
-              <div className="font-semibold text-gray-900">
-                {userPhotos.length || 0}
-              </div>
-              <div className="text-sm text-gray-600">Photos</div>
-            </div>
-          </div>
-
-          {/* Location map */}
-          {showLocationIFrame && userData?.role === "business" && (
-            <div className="mt-6 rounded-lg border overflow-hidden bg-white shadow-sm">
-              <div className="p-4 border-b">
-                <h3 className="font-medium flex items-center gap-2 text-gray-900">
-                  <MapPinIcon className="w-4 h-4" />
-                  Business Location
-                </h3>
-                {userData?.locations?.address ? (
-                  <div className="mt-1 text-sm text-gray-600">
-                    {userData.locations.address}
                   </div>
-                ) : null}
-              </div>
-              <iframe
-                src={
-                  userData?.locations?.mapUrl ||
-                  "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d7544.081477968485!2d73.08964204800337!3d19.017926421940366!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3be7e9d390c16fad%3A0x45a26096b6c171fd!2sKamothe%2C%20Panvel%2C%20Navi%20Mumbai%2C%20Maharashtra!5e0!3m2!1sen!2sin!4v1739571469059!5m2!1sen!2sin"
-                }
-                style={{ border: "0" }}
-                allowFullScreen=""
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-                className="w-full h-[300px]"
-              ></iframe>
-            </div>
-          )}
-        </div>
-      </Card>
 
-      {/* Content tabs */}
-      <Card className="border-0 shadow-sm overflow-hidden bg-white">
-        <Tabs defaultValue="posts" className="w-full">
-          <div className="border-b">
-            <TabsList className="justify-start h-auto p-0 bg-transparent overflow-x-auto scrollbar-hide whitespace-nowrap">
-              <TabsTrigger
-                value="posts"
-                className={cn(
-                  "rounded-none border-b-2 border-transparent",
-                  "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                  "px-6 py-3 font-medium text-sm transition-all duration-200"
-                )}
-              >
-                <FileTextIcon className="w-4 h-4 mr-2" />
-                Posts
-              </TabsTrigger>
-              <TabsTrigger
-                value="photos"
-                className={cn(
-                  "rounded-none border-b-2 border-transparent",
-                  "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                  "px-6 py-3 font-medium text-sm transition-all duration-200"
-                )}
-              >
-                <Images className="w-4 h-4 mr-2" />
-                Photos
-              </TabsTrigger>
+                  {/* Main content with proper spacing for profile picture */}
+                  <div className="pt-20 space-y-6">
+                    {/* Name, username and bio section */}
+                    <div className="space-y-4">
+                      {/* Name and badges */}
+                      <div className="space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                          <div className="space-y-3">
+                            <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 flex flex-wrap items-center gap-3">
+                              {userData?.businessName ||
+                                userData?.name ||
+                                "User"}
+                            </h1>
 
-              {/* Conditionally show Product tab based on business categories */}
-              {userData?.business_categories?.includes("product") && (
-                <TabsTrigger
-                  value="products"
-                  className={cn(
-                    "rounded-none border-b-2 border-transparent",
-                    "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                    "px-6 py-3 font-medium text-sm transition-all duration-200"
-                  )}
-                >
-                  <SquareChartGantt className="w-4 h-4 mr-2" />
-                  Products
-                </TabsTrigger>
-              )}
+                            <div className="flex items-center text-gray-600 gap-2 text-lg">
+                              <div className="p-2 rounded-full bg-gray-100">
+                                <User className="w-4 h-4" />
+                              </div>
+                              <span className="font-medium">
+                                {userData?.name || "Owner Name"}
+                              </span>
+                            </div>
 
-              {/* Conditionally show Service tab based on business categories */}
-              {userData?.business_categories?.includes("service") && (
-                <TabsTrigger
-                  value="services"
-                  className={cn(
-                    "rounded-none border-b-2 border-transparent",
-                    "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                    "px-6 py-3 font-medium text-sm transition-all duration-200"
-                  )}
-                >
-                  <Settings className="w-4 h-4 mr-2" />
-                  Services
-                </TabsTrigger>
-              )}
-              {userData?.business_categories?.includes("real-estate") && (
-                <TabsTrigger
-                  value="properties"
-                  className={cn(
-                    "rounded-none border-b-2 border-transparent",
-                    "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary",
-                    "px-6 py-3 font-medium text-sm transition-all duration-200"
-                  )}
-                >
-                  <Home className="w-4 h-4 mr-2" />
-                  Properties
-                </TabsTrigger>
-              )}
-            </TabsList>
-          </div>
-
-          <TabsContent
-            value="posts"
-            className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
-          >
-            {renderPosts()}
-          </TabsContent>
-
-          <TabsContent
-            value="photos"
-            className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
-          >
-            {loadingPhotos ? (
-              <div className="flex justify-center py-10">
-                <Loader2Icon className="w-8 h-8 animate-spin text-gray-400" />
-              </div>
-            ) : userPhotos.length > 0 ? (
-              <div className="w-full space-y-4">
-                {/* Photos Grid Header */}
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-medium">
-                    Photos ({userPhotos.length})
-                  </h3>
-                </div>
-
-                {/* Enhanced Photo Grid */}
-                <div className="grid grid-cols-2 gap-4">
-                  {userPhotos.map((photo, index) => (
-                    <Dialog key={photo.id}>
-                      <DialogTrigger asChild>
-                        <div
-                          className="relative group overflow-hidden rounded-xl shadow-md hover:shadow-lg transition-all duration-300 bg-black/5 border border-gray-200 hover:border-gray-300 cursor-pointer"
-                          style={{ height: "240px" }}
-                        >
-                          <div className="relative w-full h-full">
-                            <Image
-                              src={photo.photoUrl}
-                              alt={photo.caption || "Business photo"}
-                              fill
-                              sizes="(max-width: 768px) 50vw, 50vw"
-                              className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
-                              priority={index < 4} // Prioritize loading first 4 images
-                            />
-                          </div>
-
-                          {/* Overlay with date */}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3">
-                            {photo.caption && (
-                              <div className="bg-black/50 backdrop-blur-sm rounded-lg px-3 py-1.5 w-fit">
-                                <p className="text-white text-xs font-medium truncate">
-                                  {photo.caption}
-                                </p>
-                                <p className="text-white/70 text-xs">
-                                  {photo.timestamp
-                                    ? new Date(
-                                        photo.timestamp
-                                      ).toLocaleDateString("en-US", {
-                                        day: "numeric",
-                                        month: "short",
-                                        year: "numeric",
-                                      })
-                                    : ""}
-                                </p>
+                            {formattedDate && (
+                              <div className="flex items-center text-gray-600 gap-2 text-sm">
+                                <div className="p-1.5 rounded-full bg-gray-100">
+                                  <Calendar className="w-3 h-3" />
+                                </div>
+                                <span>Joined {formattedDate}</span>
                               </div>
                             )}
                           </div>
-                        </div>
-                      </DialogTrigger>
 
-                      {/* Enhanced Photo View Dialog */}
-                      <DialogContent className="sm:max-w-6xl max-h-[95vh] p-0 overflow-hidden bg-black border-border/20 shadow-2xl">
-                        <div className="relative w-full h-full flex flex-col">
-                          {/* Top controls bar */}
-                          <div className="absolute top-0 left-0 right-0 z-20 p-4 bg-gradient-to-b from-black/80 to-transparent">
-                            <div className="flex items-center justify-between">
-                              <div className="text-white/90">
-                                <p className="text-sm font-medium">
-                                  {index + 1} / {userPhotos.length}
-                                </p>
-                                <p className="text-xs text-white/70">
-                                  {photo.timestamp
-                                    ? new Date(
-                                        photo.timestamp
-                                      ).toLocaleDateString("en-US", {
-                                        day: "numeric",
-                                        month: "long",
-                                        year: "numeric",
-                                      })
-                                    : ""}
-                                </p>
-                              </div>
-                              <DialogClose asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="rounded-full bg-white/10 text-white hover:bg-white/20 h-9 w-9"
+                          {/* Action buttons */}
+                          <div className="flex flex-wrap gap-3 sm:flex-shrink-0">
+                            {currentUser && (
+                              <Button
+                                onClick={handleFollowToggle}
+                                disabled={followLoading}
+                                className={cn(
+                                  "w-full h-14 text-base font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02] px-6",
+                                  isFollowing
+                                    ? "bg-white border-2 border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50"
+                                    : "bg-gradient-to-r from-orange-500 via-red-500 to-orange-600 hover:from-orange-600 hover:via-red-600 hover:to-orange-700 text-white"
+                                )}
+                              >
+                                {followLoading ? (
+                                  <>
+                                    <Loader2Icon className="w-4 h-4 mr-2 animate-spin" />
+                                    {isFollowing
+                                      ? "Unfollowing..."
+                                      : "Following..."}
+                                  </>
+                                ) : isFollowing ? (
+                                  <>
+                                    <Minus className="w-4 h-4 mr-2" />
+                                    Unfollow
+                                  </>
+                                ) : (
+                                  <>
+                                    <Plus className="w-4 h-4 mr-2" />
+                                    Follow
+                                  </>
+                                )}
+                              </Button>
+                            )}
+
+
+
+                            {/* Book Appointment Button */}
+                            {userData?.acceptAppointments &&
+                              currentUser &&
+                              currentUser.uid !== userId && (
+                                <Dialog
+                                  open={bookOpen}
+                                  onOpenChange={setBookOpen}
                                 >
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              </DialogClose>
-                            </div>
-                          </div>
-
-                          {/* Navigation buttons when multiple photos */}
-                          {userPhotos.length > 1 && (
-                            <>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const prevIndex =
-                                    (index - 1 + userPhotos.length) %
-                                    userPhotos.length;
-                                  document
-                                    .querySelectorAll(
-                                      '[role="dialog"] [role="button"]'
-                                    )
-                                    [prevIndex].click();
-                                }}
-                                className="absolute left-4 top-1/2 -translate-y-1/2 z-20 rounded-full bg-black/30 text-white hover:bg-black/50 h-12 w-12"
-                              >
-                                <ChevronLeft className="h-8 w-8" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const nextIndex =
-                                    (index + 1) % userPhotos.length;
-                                  document
-                                    .querySelectorAll(
-                                      '[role="dialog"] [role="button"]'
-                                    )
-                                    [nextIndex].click();
-                                }}
-                                className="absolute right-4 top-1/2 -translate-y-1/2 z-20 rounded-full bg-black/30 text-white hover:bg-black/50 h-12 w-12"
-                              >
-                                <ChevronRight className="h-8 w-8" />
-                              </Button>
-                            </>
-                          )}
-
-                          {/* Image Container */}
-                          <div className="flex-1 flex items-center justify-center pt-16 pb-4 overflow-auto">
-                            <div className="relative flex items-center justify-center">
-                              <img
-                                src={photo.photoUrl}
-                                alt={photo.caption || "Business photo"}
-                                className="max-w-full max-h-[85vh] object-contain"
-                              />
-                            </div>
-                          </div>
-
-                          {/* Large Close Button at the bottom */}
-                          <div className="absolute bottom-6 left-0 right-0 flex justify-center z-20">
-                            <DialogClose asChild>
-                              <Button className="bg-white/10 hover:bg-white/20 backdrop-blur-md text-white px-6 py-2 rounded-full shadow-lg transition-all duration-300">
-                                <X className="h-4 w-4 mr-2" />
-                                Close
-                              </Button>
-                            </DialogClose>
+                                  <DialogTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      className="border-2 border-green-200 text-green-700 hover:bg-green-50 hover:border-green-300 rounded-2xl px-6 py-3 h-auto font-medium transition-all duration-200"
+                                    >
+                                      <Calendar className="w-4 h-4 mr-2" />
+                                      Book Appointment
+                                    </Button>
+                                  </DialogTrigger>
+                                  <DialogContent className="sm:max-w-md rounded-3xl border-0 shadow-2xl">
+                                    <DialogHeader>
+                                      <DialogTitle className="text-2xl font-bold text-gray-900">
+                                        Book Appointment
+                                      </DialogTitle>
+                                      <DialogDescription className="text-lg text-gray-600">
+                                        Select a date and time. Slots are in
+                                        increments of{" "}
+                                        {userData?.appointmentSlotMinutes ||
+                                          30}{" "}
+                                        minutes.
+                                      </DialogDescription>
+                                    </DialogHeader>
+                                    <div className="space-y-6 py-4">
+                                      <div>
+                                        <label className="block text-sm font-semibold mb-2 text-gray-900">
+                                          Date
+                                        </label>
+                                        <Input
+                                          type="date"
+                                          value={selectedDate}
+                                          onChange={(e) =>
+                                            setSelectedDate(e.target.value)
+                                          }
+                                          className="rounded-2xl border-2 border-gray-200 focus:border-blue-400 focus:ring-0"
+                                        />
+                                      </div>
+                                      {selectedDate && (
+                                        <>
+                                          {availableSlots.length === 0 ? (
+                                            <div className="text-center py-8 bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl border border-gray-200">
+                                              <div className="p-3 rounded-full bg-gray-200 w-fit mx-auto mb-3">
+                                                <Calendar className="w-6 h-6 text-gray-500" />
+                                              </div>
+                                              <p className="text-gray-600 font-medium">
+                                                Closed on selected date
+                                              </p>
+                                            </div>
+                                          ) : (
+                                            <>
+                                              <div>
+                                                <label className="block text-sm font-semibold mb-2 text-gray-900">
+                                                  Start Time
+                                                </label>
+                                                <select
+                                                  className="w-full border-2 border-gray-200 rounded-2xl px-4 py-3 focus:border-blue-400 focus:ring-0"
+                                                  value={selectedStart}
+                                                  onChange={(e) =>
+                                                    setSelectedStart(
+                                                      e.target.value
+                                                    )
+                                                  }
+                                                >
+                                                  {availableSlots.map((s) => (
+                                                    <option key={s} value={s}>
+                                                      {s}
+                                                    </option>
+                                                  ))}
+                                                </select>
+                                              </div>
+                                              <div>
+                                                <label className="block text-sm font-semibold mb-2 text-gray-900">
+                                                  Duration (x slots)
+                                                </label>
+                                                <Input
+                                                  type="number"
+                                                  min={1}
+                                                  max={8}
+                                                  value={multiplier}
+                                                  onChange={(e) =>
+                                                    setMultiplier(
+                                                      Number(
+                                                        e.target.value
+                                                      ) || 1
+                                                    )
+                                                  }
+                                                  className="rounded-2xl border-2 border-gray-200 focus:border-blue-400 focus:ring-0"
+                                                />
+                                              </div>
+                                              <div>
+                                                <label className="block text-sm font-semibold mb-2 text-gray-900">
+                                                  End Time
+                                                </label>
+                                                <Input
+                                                  type="time"
+                                                  value={computedEnd || ""}
+                                                  readOnly
+                                                  className="rounded-2xl border-2 border-gray-200 bg-gray-50"
+                                                />
+                                              </div>
+                                              <div>
+                                                <label className="block text-sm font-semibold mb-2 text-gray-900">
+                                                  Notes
+                                                </label>
+                                                <Textarea
+                                                  placeholder="Share any details for the business"
+                                                  value={bookingDescription}
+                                                  onChange={(e) =>
+                                                    setBookingDescription(
+                                                      e.target.value
+                                                    )
+                                                  }
+                                                  rows={3}
+                                                  className="rounded-2xl border-2 border-gray-200 focus:border-blue-400 focus:ring-0 resize-none"
+                                                />
+                                              </div>
+                                            </>
+                                          )}
+                                        </>
+                                      )}
+                                      <div className="flex justify-end gap-3 pt-2">
+                                        <Button
+                                          variant="outline"
+                                          onClick={() => setBookOpen(false)}
+                                          className="rounded-2xl px-6 py-3 h-auto"
+                                        >
+                                          Cancel
+                                        </Button>
+                                        <Button
+                                          onClick={submitBooking}
+                                          disabled={
+                                            bookingLoading ||
+                                            !computedEnd ||
+                                            availableSlots.length === 0
+                                          }
+                                          className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 rounded-2xl px-6 py-3 h-auto"
+                                        >
+                                          {bookingLoading ? (
+                                            <>
+                                              <Loader2Icon className="w-4 h-4 mr-2 animate-spin" />
+                                              Booking...
+                                            </>
+                                          ) : (
+                                            "Confirm"
+                                          )}
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </DialogContent>
+                                </Dialog>
+                              )}
                           </div>
                         </div>
-                      </DialogContent>
-                    </Dialog>
-                  ))}
+
+                        {/* Bio section */}
+                        {userData?.bio && (
+                          <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl p-4 border border-gray-200">
+                            <p className="text-gray-700 leading-relaxed">
+                              {userData.bio}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Stats row with enhanced design */}
+                    <div className="grid grid-cols-4 gap-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-3xl p-6 border border-gray-200">
+                      <FollowingDialog
+                        followingCount={followingCount}
+                        userId={userId}
+                        className="flex flex-col items-center"
+                      >
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-gray-900 mb-1">
+                            {followingCount}
+                          </div>
+                          <div className="text-sm text-gray-600 font-medium">
+                            Following
+                          </div>
+                        </div>
+                      </FollowingDialog>
+
+                      <FollowerDialog
+                        followerCount={followersCount}
+                        userId={userId}
+                        className="flex flex-col items-center pl-4 border-l border-gray-300"
+                      >
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-gray-900 mb-1">
+                            {followersCount}
+                          </div>
+                          <div className="text-sm text-gray-600 font-medium">
+                            Followers
+                          </div>
+                        </div>
+                      </FollowerDialog>
+
+                      <div className="flex flex-col items-center pl-4 border-l border-gray-300">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-gray-900 mb-1">
+                            {posts.length}
+                          </div>
+                          <div className="text-sm text-gray-600 font-medium">
+                            Posts
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col items-center pl-4 border-l border-gray-300">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-gray-900 mb-1">
+                            {userPhotos.length || 0}
+                          </div>
+                          <div className="text-sm text-gray-600 font-medium">
+                            Photos
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Location map with modern styling */}
+                    {showLocationIFrame && userData?.role === "business" && (
+                      <div className="rounded-3xl border border-gray-200 overflow-hidden bg-white shadow-lg">
+                        <div className="p-6 bg-gradient-to-r from-green-50 to-emerald-50 border-b border-gray-200">
+                          <h3 className="font-bold text-lg flex items-center gap-3 text-gray-900">
+                            <div className="p-2 rounded-xl bg-green-100">
+                              <MapPinIcon className="w-5 h-5 text-green-600" />
+                            </div>
+                            Business Location
+                          </h3>
+                          {userData?.locations?.address && (
+                            <div className="mt-2 text-gray-700 ml-11">
+                              {userData.locations.address}
+                            </div>
+                          )}
+                        </div>
+                        <div className="h-[350px] w-full relative">
+                          <iframe
+                            src={
+                              userData?.locations?.mapUrl ||
+                              "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d7544.081477968485!2d73.08964204800337!3d19.017926421940366!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3be7e9d390c16fad%3A0x45a26096b6c171fd!2sKamothe%2C%20Panvel%2C%20Navi%20Mumbai%2C%20Maharashtra!5e0!3m2!1sen!2sin!4v1739571469059!5m2!1sen!2sin"
+                            }
+                            style={{ border: "0" }}
+                            allowFullScreen=""
+                            loading="lazy"
+                            referrerPolicy="no-referrer-when-downgrade"
+                            className="w-full h-full"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <Images className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-                <p className="text-muted-foreground">No photos available</p>
-              </div>
-            )}
-          </TabsContent>
+              </Card>
 
-          {/* Products tab - only shown for businesses with product category */}
-          {userData?.business_categories?.includes("product") && (
-            <TabsContent
-              value="products"
-              className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
-            >
-              {userData && (
-                <ShowProductsTabContent
-                  userId={userId}
-                  userData={userData}
-                  isViewOnly={true}
-                  currentUserView={false}
-                />
-              )}
-            </TabsContent>
-          )}
+              {/* Content tabs with modern design */}
+              <Card className="border-0 shadow-xl overflow-hidden bg-white/80 backdrop-blur-sm rounded-3xl">
+                <Tabs defaultValue="posts" className="w-full">
+                  <div className="border-b border-gray-200 overflow-x-auto scrollbar-hide bg-gradient-to-r from-gray-50 to-gray-100">
+                    <TabsList className="justify-between h-auto p-2 bg-transparent w-full flex gap-1">
+                      <TabsTrigger
+                        value="posts"
+                        className={cn(
+                          "rounded-2xl flex-1 transition-all duration-300",
+                          "data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-lg",
+                          "px-4 py-4 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-white/50"
+                        )}
+                      >
+                        <div className="p-1.5 rounded-lg bg-blue-100">
+                          <FileTextIcon className="w-4 h-4 text-blue-600" />
+                        </div>
+                        <span className="hidden sm:block">Posts</span>
+                      </TabsTrigger>
 
-          {/* Services tab - only shown for businesses with service category */}
-          {userData?.business_categories?.includes("service") && (
-            <TabsContent
-              value="services"
-              className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
-            >
-              {userData && (
-                <ShowServicesTabContent
-                  userId={userId}
-                  userData={userData}
-                  isViewOnly={true}
-                  currentUserView={false}
-                />
-              )}
-            </TabsContent>
-          )}
+                      <TabsTrigger
+                        value="photos"
+                        className={cn(
+                          "rounded-2xl flex-1 transition-all duration-300",
+                          "data-[state=active]:bg-white data-[state=active]:text-green-600 data-[state=active]:shadow-lg",
+                          "px-4 py-4 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-white/50"
+                        )}
+                      >
+                        <div className="p-1.5 rounded-lg bg-green-100">
+                          <Images className="w-4 h-4 text-green-600" />
+                        </div>
+                        <span className="hidden sm:block">Photos</span>
+                      </TabsTrigger>
 
-          {userData?.business_categories?.includes("real-estate") && (
-            <TabsContent
-              value="properties"
-              className="p-6 focus-visible:outline-none focus:outline-none transition-all duration-200 animate-in fade-in-50"
-            >
-              {userData && <ShowBusinessProperties businessId={userId} />}
-            </TabsContent>
+                      {userData?.business_categories?.includes("product") && (
+                        <TabsTrigger
+                          value="products"
+                          className={cn(
+                            "rounded-2xl flex-1 transition-all duration-300",
+                            "data-[state=active]:bg-white data-[state=active]:text-orange-600 data-[state=active]:shadow-lg",
+                            "px-4 py-4 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-white/50"
+                          )}
+                        >
+                          <div className="p-1.5 rounded-lg bg-orange-100">
+                            <SquareChartGantt className="w-4 h-4 text-orange-600" />
+                          </div>
+                          <span className="hidden sm:block">Products</span>
+                        </TabsTrigger>
+                      )}
+
+                      {userData?.business_categories?.includes("service") && (
+                        <TabsTrigger
+                          value="services"
+                          className={cn(
+                            "rounded-2xl flex-1 transition-all duration-300",
+                            "data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-lg",
+                            "px-4 py-4 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-white/50"
+                          )}
+                        >
+                          <div className="p-1.5 rounded-lg bg-indigo-100">
+                            <Settings className="w-4 h-4 text-indigo-600" />
+                          </div>
+                          <span className="hidden sm:block">Services</span>
+                        </TabsTrigger>
+                      )}
+
+                      {userData?.business_categories?.includes(
+                        "real-estate"
+                      ) && (
+                          <TabsTrigger
+                            value="properties"
+                            className={cn(
+                              "rounded-2xl flex-1 transition-all duration-300",
+                              "data-[state=active]:bg-white data-[state=active]:text-teal-600 data-[state=active]:shadow-lg",
+                              "px-4 py-4 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-white/50"
+                            )}
+                          >
+                            <div className="p-1.5 rounded-lg bg-teal-100">
+                              <Home className="w-4 h-4 text-teal-600" />
+                            </div>
+                            <span className="hidden sm:block">Properties</span>
+                          </TabsTrigger>
+                        )}
+                    </TabsList>
+                  </div>
+
+                  {/* Tab Contents with modern styling */}
+                  <TabsContent
+                    value="posts"
+                    className="p-8 focus-visible:outline-none focus:outline-none transition-all duration-300 animate-in fade-in-50"
+                  >
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-2xl font-bold text-gray-900">
+                          Posts
+                        </h2>
+                        <div className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                          {posts.length} posts
+                        </div>
+                      </div>
+                      {renderPosts()}
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent
+                    value="photos"
+                    className="p-8 focus-visible:outline-none focus:outline-none transition-all duration-300 animate-in fade-in-50"
+                  >
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-2xl font-bold text-gray-900">
+                          Photos
+                        </h2>
+                        <div className="text-sm text-gray-500 bg-green-50 text-green-600 px-3 py-1 rounded-full border border-green-200">
+                          {userPhotos.length} photos
+                        </div>
+                      </div>
+                      {loadingPhotos ? (
+                        <div className="flex justify-center py-12">
+                          <div className="p-4 rounded-full bg-green-100">
+                            <Loader2Icon className="w-8 h-8 animate-spin text-green-600" />
+                          </div>
+                        </div>
+                      ) : userPhotos.length > 0 ? (
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                          {userPhotos.map((photo, index) => (
+                            <Dialog key={photo.id}>
+                              <DialogTrigger asChild>
+                                <div
+                                  className="relative group overflow-hidden rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-gray-100 to-gray-200 border border-gray-200 hover:border-gray-300 cursor-pointer hover:-translate-y-1"
+                                  style={{ height: "240px" }}
+                                >
+                                  <div className="relative w-full h-full">
+                                    <Image
+                                      src={photo.photoUrl}
+                                      alt={photo.caption || "Business photo"}
+                                      fill
+                                      sizes="(max-width: 768px) 50vw, 33vw"
+                                      className="object-cover transition-transform duration-500 ease-out group-hover:scale-110"
+                                      priority={index < 6}
+                                    />
+                                  </div>
+
+                                  {/* Enhanced overlay */}
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
+                                    {photo.caption && (
+                                      <div className="bg-black/50 backdrop-blur-sm rounded-xl px-3 py-2 w-fit">
+                                        <p className="text-white text-sm font-medium truncate">
+                                          {photo.caption}
+                                        </p>
+                                        <p className="text-white/70 text-xs">
+                                          {photo.timestamp
+                                            ? new Date(
+                                              photo.timestamp
+                                            ).toLocaleDateString("en-US", {
+                                              day: "numeric",
+                                              month: "short",
+                                              year: "numeric",
+                                            })
+                                            : ""}
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </DialogTrigger>
+
+                              {/* Enhanced Photo View Dialog */}
+                              <DialogContent className="sm:max-w-6xl max-h-[95vh] p-0 overflow-hidden bg-black border-0 shadow-2xl rounded-3xl">
+                                <div className="relative w-full h-full flex flex-col">
+                                  {/* Top controls bar */}
+                                  <div className="absolute top-0 left-0 right-0 z-20 p-6 bg-gradient-to-b from-black/80 to-transparent">
+                                    <div className="flex items-center justify-between">
+                                      <div className="text-white/90">
+                                        <p className="text-lg font-semibold">
+                                          {index + 1} / {userPhotos.length}
+                                        </p>
+                                        <p className="text-sm text-white/70">
+                                          {photo.timestamp
+                                            ? new Date(
+                                              photo.timestamp
+                                            ).toLocaleDateString("en-US", {
+                                              day: "numeric",
+                                              month: "long",
+                                              year: "numeric",
+                                            })
+                                            : ""}
+                                        </p>
+                                      </div>
+                                      <DialogClose asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="rounded-full bg-white/10 text-white hover:bg-white/20 h-12 w-12"
+                                        >
+                                          <X className="h-6 w-6" />
+                                        </Button>
+                                      </DialogClose>
+                                    </div>
+                                  </div>
+
+                                  {/* Image Container */}
+                                  <div className="flex-1 flex items-center justify-center pt-20 pb-6 overflow-auto">
+                                    <div className="relative flex items-center justify-center">
+                                      <img
+                                        src={photo.photoUrl}
+                                        alt={
+                                          photo.caption || "Business photo"
+                                        }
+                                        className="max-w-full max-h-[85vh] object-contain rounded-2xl"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {/* Caption if available */}
+                                  {photo.caption && (
+                                    <div className="absolute bottom-6 left-6 right-6 text-center">
+                                      <div className="bg-white/10 backdrop-blur-md text-white px-6 py-3 rounded-2xl shadow-lg">
+                                        <p className="font-medium">
+                                          {photo.caption}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-16 bg-gradient-to-br from-green-50 to-emerald-50 rounded-3xl border border-green-100">
+                          <div className="p-4 rounded-full bg-green-100 w-fit mx-auto mb-4">
+                            <Images className="w-12 h-12 text-green-600" />
+                          </div>
+                          <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                            No photos available
+                          </h3>
+                          <p className="text-gray-600">
+                            This business hasn't shared any photos yet.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+
+                  {/* Products tab - only shown for businesses with product category */}
+                  {userData?.business_categories?.includes("product") && (
+                    <TabsContent
+                      value="products"
+                      className="p-8 focus-visible:outline-none focus:outline-none transition-all duration-300 animate-in fade-in-50"
+                    >
+                      <div className="space-y-6">
+                        <div className="flex items-center justify-between">
+                          <h2 className="text-2xl font-bold text-gray-900">
+                            Products
+                          </h2>
+                          <div className="text-sm text-gray-500 bg-orange-50 text-orange-600 px-3 py-1 rounded-full border border-orange-200">
+                            Business Products
+                          </div>
+                        </div>
+                        {userData && (
+                          <ShowProductsTabContent
+                            userId={userId}
+                            userData={userData}
+                            isViewOnly={true}
+                            currentUserView={false}
+                          />
+                        )}
+                      </div>
+                    </TabsContent>
+                  )}
+
+                  {/* Services tab - only shown for businesses with service category */}
+                  {userData?.business_categories?.includes("service") && (
+                    <TabsContent
+                      value="services"
+                      className="p-8 focus-visible:outline-none focus:outline-none transition-all duration-300 animate-in fade-in-50"
+                    >
+                      <div className="space-y-6">
+                        <div className="flex items-center justify-between">
+                          <h2 className="text-2xl font-bold text-gray-900">
+                            Services
+                          </h2>
+                          <div className="text-sm text-gray-500 bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full border border-indigo-200">
+                            Business Services
+                          </div>
+                        </div>
+                        {userData && (
+                          <ShowServicesTabContent
+                            userId={userId}
+                            userData={userData}
+                            isViewOnly={true}
+                            currentUserView={false}
+                          />
+                        )}
+                      </div>
+                    </TabsContent>
+                  )}
+
+                  {/* Properties tab */}
+                  {userData?.business_categories?.includes("real-estate") && (
+                    <TabsContent
+                      value="properties"
+                      className="p-8 focus-visible:outline-none focus:outline-none transition-all duration-300 animate-in fade-in-50"
+                    >
+                      <div className="space-y-6">
+                        <div className="flex items-center justify-between">
+                          <h2 className="text-2xl font-bold text-gray-900">
+                            Properties
+                          </h2>
+                          <div className="text-sm text-gray-500 bg-teal-50 text-teal-600 px-3 py-1 rounded-full border border-teal-200">
+                            Real Estate
+                          </div>
+                        </div>
+                        {userData && (
+                          <ShowBusinessProperties businessId={userId} />
+                        )}
+                      </div>
+                    </TabsContent>
+                  )}
+                </Tabs>
+              </Card>
+            </>
           )}
-        </Tabs>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

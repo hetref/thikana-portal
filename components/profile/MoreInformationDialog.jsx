@@ -77,7 +77,7 @@ const getSocialMediaIcon = (platform) => {
   return Globe;
 };
 
-const MoreInformationDialog = ({ userData }) => {
+const MoreInformationDialog = ({ userData, buttonClassName }) => {
   if (!userData) return null;
 
   const joinedDate = userData?.createdAt
@@ -100,8 +100,11 @@ const MoreInformationDialog = ({ userData }) => {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="outline" className="">
-          <Info className="w-4 h-4 mr-1" />
+        <Button 
+          variant="outline" 
+          className={buttonClassName || ""}
+        >
+          <Info className="w-4 h-4 mr-2" />
           Info
         </Button>
       </DialogTrigger>

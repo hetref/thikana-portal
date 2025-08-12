@@ -299,7 +299,7 @@ export default function RequestCallButton({ businessId, businessName }) {
       <DialogTrigger asChild>
         <Button
           variant="outline"
-          className="flex items-center gap-1"
+          className="w-full justify-start gap-3 py-3 h-auto rounded-2xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
           disabled={onCooldown}
         >
           <Phone className="w-4 h-4" />

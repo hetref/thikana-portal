@@ -249,92 +249,65 @@ export default function WhoToFollow() {
   };
 
   const BusinessCard = ({ business }) => (
-    <div className="group relative overflow-hidden rounded-xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-4 shadow-sm transition-all duration-300 hover:shadow-lg hover:scale-[1.02]">
-      {/* Background Decoration */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-50/20 to-purple-50/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-      
-      <div className="relative flex items-start gap-3">
+    <div className="group relative bg-white border border-gray-100 rounded-2xl p-4 transition-all duration-200 hover:shadow-md hover:border-gray-200">
+      <div className="flex items-center gap-3">
         {/* Avatar */}
-        <Avatar className="h-12 w-12 border-2 border-white shadow-sm">
-          <AvatarImage src={business.profileImage} alt={business.businessName} />
-          <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-500 text-white font-semibold">
-            {business.businessName?.charAt(0) || "B"}
-          </AvatarFallback>
-        </Avatar>
+        <Link href={`/${business.id}`} className="flex-shrink-0">
+          <Avatar className="h-12 w-12 ring-2 ring-gray-100 transition-all duration-200 group-hover:ring-blue-200">
+            <AvatarImage src={business.profileImage} alt={business.businessName} />
+            <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-500 text-white font-semibold text-sm">
+              {business.businessName?.charAt(0) || "B"}
+            </AvatarFallback>
+          </Avatar>
+        </Link>
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          <Link href={`/${business.id}`} className="block group/link">
-            <div className="space-y-1">
-              <h3 className="font-semibold text-gray-900 group-hover/link:text-blue-600 transition-colors duration-200 truncate">
-                {business.businessName}
-              </h3>
-              <p className="text-sm text-gray-600 truncate">@{business.username}</p>
-              <p className="text-xs text-gray-500 capitalize">{business.businessType}</p>
-            </div>
+          <Link href={`/${business.id}`} className="block">
+            <h3 className="font-semibold text-gray-900 hover:text-blue-600 transition-colors duration-200 truncate text-sm">
+              {business.businessName}
+            </h3>
+            <p className="text-xs text-gray-500 truncate mt-0.5">
+              @{business.username}
+            </p>
           </Link>
 
-          {/* Badges */}
-          <div className="flex flex-wrap gap-1.5 mt-3">
-            {business.distance_km && (
-              <Badge 
-                variant="secondary" 
-                className={`text-xs px-2 py-1 ${getDistanceBadgeColor(business.distance_km)} border-0`}
-              >
+          {/* Single most relevant badge */}
+          <div className="mt-2">
+            {business.distance_km ? (
+              <Badge variant="secondary" className="text-xs px-2 py-1 bg-blue-50 text-blue-700 border-0 font-medium">
                 <MapPin className="w-3 h-3 mr-1" />
                 {business.distance_km}km away
               </Badge>
-            )}
-            
-            {business.business_plan && (
-              <Badge 
-                variant="secondary" 
-                className={`text-xs px-2 py-1 ${getPlanBadgeColor(business.business_plan)} border-0`}
-              >
-                {business.business_plan.charAt(0).toUpperCase() + business.business_plan.slice(1)}
+            ) : business.business_plan === "premium" ? (
+              <Badge variant="secondary" className="text-xs px-2 py-1 bg-amber-50 text-amber-700 border-0 font-medium">
+                Premium
               </Badge>
-            )}
-
-            {business.recommendation_type === "activity" && business.has_activity && (
-              <Badge variant="secondary" className="text-xs px-2 py-1 bg-gradient-to-r from-green-500 to-teal-500 text-white border-0">
+            ) : business.recommendation_type === "activity" && business.has_activity ? (
+              <Badge variant="secondary" className="text-xs px-2 py-1 bg-green-50 text-green-700 border-0 font-medium">
                 <Activity className="w-3 h-3 mr-1" />
                 Active
               </Badge>
-            )}
+            ) : null}
           </div>
-
-          {/* Follow Button */}
-          <Button
-            size="sm"
-            variant={following.has(business.id) ? "destructive" : "default"}
-            className={`mt-3 w-full text-xs h-8 font-medium transition-all duration-200 ${
-              following.has(business.id)
-                ? "bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 shadow-sm"
-                : "text-white shadow-sm"
-            }`}
-            style={!following.has(business.id) ? {
-              backgroundColor: '#000000',
-            } : {}}
-            onMouseEnter={(e) => {
-              if (!following.has(business.id)) {
-                e.target.style.backgroundColor = '#a03d1f';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!following.has(business.id)) {
-                e.target.style.backgroundColor = '#000000';
-              }
-            }}
-            onClick={() =>
-              following.has(business.id)
-                ? handleUnfollow(business.id)
-                : handleFollow(business.id)
-            }
-          >
-            <Users className="w-3 h-3 mr-1" />
-            {following.has(business.id) ? "Unfollow" : "Follow"}
-          </Button>
         </div>
+
+        {/* Follow Button */}
+        <Button
+          size="sm"
+          variant={following.has(business.id) ? "outline" : "default"}
+          className={`text-xs h-8 px-3 font-medium transition-all duration-200 transform flex-shrink-0 ${following.has(business.id)
+            ? "border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-400"
+            : "bg-gradient-to-r from-orange-500 via-red-500 to-orange-600 hover:from-orange-600 hover:via-red-600 hover:to-orange-700 text-white rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.02] border-0"
+            }`}
+          onClick={() =>
+            following.has(business.id)
+              ? handleUnfollow(business.id)
+              : handleFollow(business.id)
+          }
+        >
+          {following.has(business.id) ? "Following" : "Follow"}
+        </Button>
       </div>
     </div>
   );
@@ -345,17 +318,17 @@ export default function WhoToFollow() {
         {type === "no-recommendations" ? (
           <RefreshCw className="h-8 w-8 text-gray-400" />
         ) : type === "loading" ? (
-          <Loader/>
+          <Loader />
         ) : (
           <Users className="h-8 w-8 text-gray-400" />
         )}
       </div>
-      
+
       <div className="space-y-2">
         <h3 className="font-medium text-gray-900">
           {type === "loading" ? "Loading recommendations..." : "No recommendations found"}
         </h3>
-        
+
         {type !== "loading" && (
           <p className="text-sm text-gray-600 max-w-sm">
             {recommendationType === "location"
@@ -385,7 +358,7 @@ export default function WhoToFollow() {
       <div className="p-4 bg-amber-100 rounded-full">
         <Mail className="h-8 w-8 text-amber-600" />
       </div>
-      
+
       <div className="space-y-2">
         <h3 className="font-medium text-gray-900">Email Verification Required</h3>
         <p className="text-sm text-gray-600 max-w-sm">
@@ -422,7 +395,7 @@ export default function WhoToFollow() {
                 Who to Follow
               </CardTitle>
             </div>
-            
+
             <Select
               value={recommendationType}
               onValueChange={handleRecommendationTypeChange}
@@ -456,8 +429,8 @@ export default function WhoToFollow() {
           ) : loading && businesses.length === 0 ? (
             <EmptyState type="loading" />
           ) : businesses.length === 0 ? (
-            <EmptyState 
-              type="no-recommendations" 
+            <EmptyState
+              type="no-recommendations"
               onRefresh={() => fetchRecommendedBusinesses(0)}
             />
           ) : (
@@ -465,9 +438,9 @@ export default function WhoToFollow() {
               {/* Business Cards */}
               <div className="space-y-3">
                 {businesses.map((business) => (
-                  <BusinessCard 
-                    key={`${business.id}-${offset}`} 
-                    business={business} 
+                  <BusinessCard
+                    key={`${business.id}-${offset}`}
+                    business={business}
                   />
                 ))}
               </div>
@@ -483,7 +456,7 @@ export default function WhoToFollow() {
                 >
                   {loading ? (
                     <>
-                      <Loader/>
+                      <Loader />
                       <span className="ml-2">Loading more...</span>
                     </>
                   ) : (
