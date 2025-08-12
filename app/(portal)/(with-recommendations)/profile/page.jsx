@@ -2959,8 +2959,6 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* All the dialog components remain the same but with updated styling */}
-
       {/* Confirmation Dialog for Unsaving Posts */}
       <AlertDialog
         open={isUnsaveDialogOpen}
