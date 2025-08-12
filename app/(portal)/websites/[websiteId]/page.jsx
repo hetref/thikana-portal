@@ -11,9 +11,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Layout, Palette, Rocket, Utensils, User, Dumbbell } from "lucide-react";
+import { Layout, Palette, Rocket, Utensils, User, Dumbbell, ArrowLeft } from "lucide-react";
 import toast from "react-hot-toast";
 import { websiteTemplates, getTemplatesByCategory, getTemplateById } from "@/lib/website-templates";
+import Link from "next/link";
 
 function getPublicBaseUrl() {
   const direct = process.env.NEXT_PUBLIC_AWS_S3_BUCKET_PUBLIC_BASE;
@@ -811,7 +812,12 @@ export default function WebsiteBuilderPage() {
   return (
     <div className="flex flex-col h-[calc(100svh-70px)] w-full">
       <div className="px-4 py-2 border-b flex items-center gap-2">
-        <div className="font-semibold">Website Builder</div>
+        <div className="font-semibold">
+          <Link href={`/websites/${websiteId}/details`}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+          </Link>
+          <h1 className="text-2xl">Website Builder</h1>
+        </div>
         <div className="ml-auto flex items-center gap-2">
           {loading && (
             <div className="text-sm text-gray-500">Loading...</div>

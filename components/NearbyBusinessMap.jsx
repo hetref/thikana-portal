@@ -42,7 +42,11 @@ const userIcon = L.divIcon({
   iconAnchor: [12, 12],
 });
 
-export default function NearbyBusinessMap({ height = "400px", width = "100%", cardHeight = "auto" }) {
+export default function NearbyBusinessMap({
+  height = "400px",
+  width = "100%",
+  cardHeight = "auto",
+}) {
   const [userLocation, setUserLocation] = useState(null);
   const [businesses, setBusinesses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -64,58 +68,72 @@ export default function NearbyBusinessMap({ height = "400px", width = "100%", ca
   };
 
   useEffect(() => {
+    const getBrowserLocation = () =>
+      new Promise((resolve, reject) => {
+        if (!navigator?.geolocation) {
+          reject(new Error("Geolocation not supported"));
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            resolve({
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+            });
+          },
+          (err) => reject(err),
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+        );
+      });
+
     const fetchData = async () => {
-      if (!currentUserId) {
-        console.log("No current user ID");
-        return;
-      }
-
       try {
-        // Fetch user location
-        console.log("Fetching user location...");
-        const userDoc = await getDoc(doc(db, "users", currentUserId));
-        if (!userDoc.exists()) {
-          console.log("User document not found");
+        // 1) Try browser geolocation first
+        let userLoc = null;
+        try {
+          userLoc = await getBrowserLocation();
+          console.log("Browser geolocation:", userLoc);
+        } catch (geoErr) {
+          console.warn(
+            "Geolocation failed, falling back to Firestore user doc:",
+            geoErr?.message
+          );
+          // 2) Fallback to Firestore user location if logged in
+          if (currentUserId) {
+            const userDocSnap = await getDoc(doc(db, "users", currentUserId));
+            if (userDocSnap.exists()) {
+              const userData = userDocSnap.data();
+              if (userData?.location) {
+                userLoc = {
+                  lat: userData.location.latitude,
+                  lng: userData.location.longitude,
+                };
+              }
+            }
+          }
+        }
+
+        if (!userLoc) {
+          setLoading(false);
           return;
         }
 
-        const userData = userDoc.data();
-        console.log("User data:", userData);
-
-        if (!userData.location) {
-          console.log("No location data in user document");
-          return;
-        }
-
-        const userLoc = {
-          lat: userData.location.latitude,
-          lng: userData.location.longitude,
-        };
-        console.log("User location:", userLoc);
         setUserLocation(userLoc);
 
-        // Fetch all businesses
-        console.log("Fetching businesses...");
+        // 3) Fetch businesses and filter by distance to userLoc
         const businessesRef = collection(db, "businesses");
         const businessesSnapshot = await getDocs(businessesRef);
-        console.log("Total businesses found:", businessesSnapshot.size);
 
         const businessPromises = businessesSnapshot.docs.map(
           async (businessDoc) => {
             const businessData = businessDoc.data();
-            console.log("Business data for", businessDoc.id, ":", businessData);
+            if (!businessData?.location) return null;
 
             // Get business plan from users collection
             const userDocRef = doc(db, "users", businessDoc.id);
             const userDocSnap = await getDoc(userDocRef);
             const businessUserData = userDocSnap.data();
             const plan = businessUserData?.plan || "free";
-            console.log("Business plan for", businessDoc.id, ":", plan);
-
-            if (!businessData.location) {
-              console.log("No location data for business:", businessDoc.id);
-              return null;
-            }
 
             const distance = calculateDistance(
               userLoc.lat,
@@ -123,17 +141,9 @@ export default function NearbyBusinessMap({ height = "400px", width = "100%", ca
               businessData.location.latitude,
               businessData.location.longitude
             );
-            console.log("Distance for", businessDoc.id, ":", distance, "km");
 
-            // Check if business is within plan radius
-            const radiusLimits = {
-              free: 2,
-              standard: 4,
-              premium: 8,
-            };
-
+            const radiusLimits = { free: 2, standard: 4, premium: 8 };
             if (distance <= radiusLimits[plan]) {
-              console.log("Business", businessDoc.id, "is within radius limit");
               return {
                 id: businessDoc.id,
                 ...businessData,
@@ -145,7 +155,6 @@ export default function NearbyBusinessMap({ height = "400px", width = "100%", ca
                 },
               };
             }
-            console.log("Business", businessDoc.id, "is outside radius limit");
             return null;
           }
         );
@@ -154,10 +163,9 @@ export default function NearbyBusinessMap({ height = "400px", width = "100%", ca
         const validBusinesses = businessResults.filter(
           (business) => business !== null
         );
-        console.log("Valid businesses:", validBusinesses);
         setBusinesses(validBusinesses);
       } catch (error) {
-        console.error("Error fetching data:", error);
+        console.error("Error fetching nearby businesses:", error);
       } finally {
         setLoading(false);
       }
@@ -167,9 +175,7 @@ export default function NearbyBusinessMap({ height = "400px", width = "100%", ca
   }, [currentUserId]);
 
   const MapComponent = () => {
-    if (!userLocation || !businesses.length) {
-      console.log("MapComponent - userLocation:", userLocation);
-      console.log("MapComponent - businesses:", businesses);
+    if (!userLocation) {
       return null;
     }
 
@@ -182,7 +188,11 @@ export default function NearbyBusinessMap({ height = "400px", width = "100%", ca
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
         {/* User location marker */}
-        <Marker position={[userLocation.lat, userLocation.lng]} icon={userIcon}>
+        <Marker
+          position={[userLocation.lat, userLocation.lng]}
+          icon={userIcon}
+          zIndexOffset={1000}
+        >
           <Popup>Your Location</Popup>
         </Marker>
 
@@ -216,30 +226,27 @@ export default function NearbyBusinessMap({ height = "400px", width = "100%", ca
         />
 
         {/* Business markers */}
-        {businesses.map((business) => {
-          console.log("Rendering business marker:", business);
-          return (
-            <Marker
-              key={business.id}
-              position={[business.location.lat, business.location.lng]}
-              icon={businessIcons[business.business_plan || "free"]}
-            >
-              <Popup>
-                <div className="text-sm">
-                  <p className="font-semibold">{business.businessName}</p>
-                  <p className="text-gray-600">@{business.username}</p>
-                  <p className="text-gray-600">{business.businessType}</p>
-                  <p className="text-gray-600">
-                    {business.distance_km.toFixed(1)} km away
-                  </p>
-                  <p className="text-gray-600 capitalize">
-                    {business.business_plan} plan
-                  </p>
-                </div>
-              </Popup>
-            </Marker>
-          );
-        })}
+        {businesses.map((business) => (
+          <Marker
+            key={business.id}
+            position={[business.location.lat, business.location.lng]}
+            icon={businessIcons[business.business_plan || "free"]}
+          >
+            <Popup>
+              <div className="text-sm">
+                <p className="font-semibold">{business.businessName}</p>
+                <p className="text-gray-600">@{business.username}</p>
+                <p className="text-gray-600">{business.businessType}</p>
+                <p className="text-gray-600">
+                  {business.distance_km.toFixed(1)} km away
+                </p>
+                <p className="text-gray-600 capitalize">
+                  {business.business_plan} plan
+                </p>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
       </MapContainer>
     );
   };
@@ -251,15 +258,24 @@ export default function NearbyBusinessMap({ height = "400px", width = "100%", ca
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div style={{ height: height }} className="flex items-center justify-center">
+          <div
+            style={{ height: height }}
+            className="flex items-center justify-center"
+          >
             <p>Loading map...</p>
           </div>
         ) : !userLocation ? (
-          <div style={{ height: height }} className="flex items-center justify-center">
+          <div
+            style={{ height: height }}
+            className="flex items-center justify-center"
+          >
             <p>Location not available</p>
           </div>
         ) : !businesses.length ? (
-          <div style={{ height: height }} className="flex items-center justify-center">
+          <div
+            style={{ height: height }}
+            className="flex items-center justify-center"
+          >
             <p>No nearby businesses found</p>
           </div>
         ) : (
@@ -273,6 +289,11 @@ export default function NearbyBusinessMap({ height = "400px", width = "100%", ca
               </div>
             </div>
             <MapComponent />
+            {!businesses.length && (
+              <div className="mt-3 text-sm text-gray-600">
+                No nearby businesses found
+              </div>
+            )}
           </>
         )}
       </CardContent>

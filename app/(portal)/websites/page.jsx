@@ -19,8 +19,42 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { Trash2, Plus, Globe, Layout, Rocket, RotateCcw } from "lucide-react";
+import { Trash2, Plus, Globe, Layout } from "lucide-react";
 import toast from "react-hot-toast";
+
+function formatDateTime(date) {
+  try {
+    if (!date) return "-";
+    let d = null;
+    if (typeof date?.toDate === 'function') {
+      d = date.toDate();
+    } else if (date instanceof Date) {
+      d = date;
+    } else if (typeof date === 'object') {
+      if (date.type === 'firestore/timestamp/1.0' && date.seconds != null) {
+        const secs = Number(date.seconds);
+        const nanos = Number(date.nanoseconds || 0);
+        d = new Date(secs * 1000 + Math.floor(nanos / 1e6));
+      } else if (date.seconds != null) {
+        const secs = Number(date.seconds);
+        const nanos = Number(date.nanoseconds || 0);
+        d = new Date(secs * 1000 + Math.floor(nanos / 1e6));
+      } else if (date._seconds != null) {
+        const secs = Number(date._seconds);
+        const nanos = Number(date._nanoseconds || 0);
+        d = new Date(secs * 1000 + Math.floor(nanos / 1e6));
+      }
+    } else if (typeof date === 'number') {
+      d = new Date(date);
+    } else if (typeof date === 'string') {
+      d = new Date(date);
+    }
+    if (!d || isNaN(d.getTime())) return "-";
+    return d.toLocaleString();
+  } catch {
+    return "-";
+  }
+}
 
 export default function WebsitesPage() {
   const router = useRouter();
@@ -30,8 +64,8 @@ export default function WebsitesPage() {
   const [newWebsiteName, setNewWebsiteName] = useState("");
   const [newDomainName, setNewDomainName] = useState("");
   const [loading, setLoading] = useState(true);
-  const [deployingWebsites, setDeployingWebsites] = useState(new Set());
-  const [invalidatingWebsites, setInvalidatingWebsites] = useState(new Set());
+  const [disablingMap, setDisablingMap] = useState(new Set());
+  const [deletingMap, setDeletingMap] = useState(new Set());
 
   useEffect(() => {
     const unsub = auth.onAuthStateChanged(async (user) => {
@@ -50,7 +84,9 @@ export default function WebsitesPage() {
         const websitesRef = collection(db, "businesses", bizId, "websites");
         const domainsRef = collection(db, "businesses", bizId, "domains");
         const unsubWeb = onSnapshot(query(websitesRef, orderBy("createdAt", "desc")), (snap) => {
-          setWebsites(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+          const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          console.debug('[Websites] Snapshot rows:', rows.map(r => ({ id: r.id, createdAt: r.createdAt })));
+          setWebsites(rows);
         });
         const unsubDom = onSnapshot(query(domainsRef, orderBy("createdAt", "desc")), (snap) => {
           setDomains(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -74,10 +110,12 @@ export default function WebsitesPage() {
       const websitesRef = collection(db, "businesses", businessId, "websites");
       const docRef = await addDoc(websitesRef, {
         name: newWebsiteName.trim(),
+        // Ensure createdAt is always stored server-side
         createdAt: serverTimestamp(),
         publishedStatus: "pending",
         updatedAt: serverTimestamp(),
       });
+      console.debug('[Websites] Created website docId:', docRef.id);
       setNewWebsiteName("");
       toast.success("Website created");
       router.push(`/websites/${docRef.id}`);
@@ -87,15 +125,62 @@ export default function WebsitesPage() {
     }
   };
 
-  const handleDeleteWebsite = async (id) => {
-    if (!businessId || !id) return;
+  const disableDistribution = async (website) => {
+    if (!businessId || !website?.cloudfront?.distributionId) return;
     try {
-      await deleteDoc(doc(db, "businesses", businessId, "websites", id));
-      toast.success("Website deleted");
-      // Note: deleting S3 assets is not automatic here. Add a server route if you need that.
+      setDisablingMap((prev) => new Set(prev).add(website.id));
+      const idToken = await auth.currentUser.getIdToken();
+      const url = `/api/websites/cloudfront?businessId=${businessId}&websiteId=${website.id}&distributionId=${website.cloudfront.distributionId}`;
+      const res = await fetch(url, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.message || 'Failed to disable distribution');
+      toast.success('Distribution is being disabled. Please wait until status becomes Disabled.');
     } catch (e) {
       console.error(e);
-      toast.error("Failed to delete website");
+      toast.error(e.message);
+    } finally {
+      setDisablingMap((prev) => {
+        const n = new Set(prev);
+        n.delete(website.id);
+        return n;
+      });
+    }
+  };
+
+  const handleDeleteWebsite = async (id, website) => {
+    if (!businessId || !id) return;
+    try {
+      // If deployed, block deletion until disabled
+      if (website?.cloudfront?.distributionId && (website.cloudfront.enabled ?? true)) {
+        toast.error('Disable CloudFront distribution first');
+        return;
+      }
+
+      setDeletingMap((prev) => new Set(prev).add(id));
+      const idToken = await auth.currentUser.getIdToken();
+      const res = await fetch('/api/websites/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ businessId, websiteId: id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.message || 'Failed to delete website');
+      toast.success('Website deleted');
+    } catch (e) {
+      console.error(e);
+      toast.error(e.message || 'Failed to delete website');
+    } finally {
+      setDeletingMap((prev) => {
+        const n = new Set(prev);
+        n.delete(id);
+        return n;
+      });
     }
   };
 
@@ -123,83 +208,6 @@ export default function WebsitesPage() {
     } catch (e) {
       console.error(e);
       toast.error("Failed to delete domain");
-    }
-  };
-
-  const handleDeployWebsite = async (website) => {
-    if (!businessId || !website.id || deployingWebsites.has(website.id)) return;
-    
-    try {
-      setDeployingWebsites(prev => new Set(prev).add(website.id));
-      const idToken = await auth.currentUser.getIdToken();
-      
-      const response = await fetch('/api/websites/cloudfront', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({
-          businessId,
-          websiteId: website.id,
-          websiteName: website.name
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        toast.success(`Deployment started! Distribution: ${data.distribution.domainName}`);
-      } else {
-        const error = await response.json();
-        throw new Error(error.message || 'Deployment failed');
-      }
-    } catch (error) {
-      console.error('Deployment error:', error);
-      toast.error(`Deployment failed: ${error.message}`);
-    } finally {
-      setDeployingWebsites(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(website.id);
-        return newSet;
-      });
-    }
-  };
-
-  const handleInvalidateCache = async (website) => {
-    if (!businessId || !website.id || !website.cloudfront?.distributionId || invalidatingWebsites.has(website.id)) return;
-    
-    try {
-      setInvalidatingWebsites(prev => new Set(prev).add(website.id));
-      const idToken = await auth.currentUser.getIdToken();
-      
-      const response = await fetch('/api/websites/cloudfront/invalidate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({
-          businessId,
-          websiteId: website.id,
-          distributionId: website.cloudfront.distributionId
-        }),
-      });
-
-      if (response.ok) {
-        toast.success('Cache invalidation started!');
-      } else {
-        const error = await response.json();
-        throw new Error(error.message || 'Cache invalidation failed');
-      }
-    } catch (error) {
-      console.error('Cache invalidation error:', error);
-      toast.error(`Cache invalidation failed: ${error.message}`);
-    } finally {
-      setInvalidatingWebsites(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(website.id);
-        return newSet;
-      });
     }
   };
 
@@ -257,67 +265,47 @@ export default function WebsitesPage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      websites.map((w) => (
-                        <TableRow key={w.id}>
-                          <TableCell className="font-medium">{w.name || "Untitled"}</TableCell>
-                          <TableCell>{w.publishedStatus || "pending"}</TableCell>
-                          <TableCell>
-                            {w.createdAt?.toDate ? w.createdAt.toDate().toLocaleString() : "-"}
-                          </TableCell>
-                          <TableCell className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" onClick={() => router.push(`/websites/${w.id}`)}>
-                              Open
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => router.push(`/websites/${w.id}/details`)}>
-                              Details
-                            </Button>
-                            {w.cloudfront?.distributionId ? (
+                      websites.map((w) => {
+                        const isDeployed = !!w.cloudfront?.distributionId;
+                        const canDeleteDirect = !isDeployed || (isDeployed && w.cloudfront?.enabled === false);
+                        return (
+                          <TableRow key={w.id}>
+                            <TableCell className="font-medium">{w.name || "Untitled"}</TableCell>
+                            <TableCell>{isDeployed ? "Deployed" : "Not Deployed"}</TableCell>
+                            <TableCell>
+                              {formatDateTime(w.createdAt)}
+                            </TableCell>
+                            <TableCell className="flex items-center gap-2">
+                              <Button variant="outline" size="sm" onClick={() => router.push(`/websites/${w.id}`)}>
+                                Open
+                              </Button>
+                              <Button variant="outline" size="sm" onClick={() => router.push(`/websites/${w.id}/details`)}>
+                                Details
+                              </Button>
+                              {isDeployed && w.cloudfront?.enabled !== false && (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => disableDistribution(w)}
+                                  disabled={disablingMap.has(w.id)}
+                                  title="Disable CloudFront distribution before deleting"
+                                >
+                                  {disablingMap.has(w.id) ? 'Disabling…' : 'Disable CDN'}
+                                </Button>
+                              )}
                               <Button 
                                 variant="outline" 
-                                size="sm" 
-                                onClick={() => handleInvalidateCache(w)}
-                                disabled={invalidatingWebsites.has(w.id)}
-                                title="Clear CloudFront Cache"
+                                size="icon" 
+                                onClick={() => handleDeleteWebsite(w.id, w)}
+                                disabled={!canDeleteDirect || deletingMap.has(w.id)}
+                                title={canDeleteDirect ? 'Delete website' : 'Disable distribution first'}
                               >
-                                {invalidatingWebsites.has(w.id) ? (
-                                  <>
-                                    <RotateCcw className="w-4 h-4 mr-1 animate-spin" />
-                                    Clearing...
-                                  </>
-                                ) : (
-                                  <>
-                                    <RotateCcw className="w-4 h-4 mr-1" />
-                                    Clear Cache
-                                  </>
-                                )}
+                                <Trash2 className="w-4 h-4" />
                               </Button>
-                            ) : (
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={() => handleDeployWebsite(w)}
-                                disabled={deployingWebsites.has(w.id)}
-                                title="Deploy to CloudFront CDN"
-                              >
-                                {deployingWebsites.has(w.id) ? (
-                                  <>
-                                    <Rocket className="w-4 h-4 mr-1 animate-pulse" />
-                                    Deploying...
-                                  </>
-                                ) : (
-                                  <>
-                                    <Rocket className="w-4 h-4 mr-1" />
-                                    Deploy
-                                  </>
-                                )}
-                              </Button>
-                            )}
-                            <Button variant="outline" size="icon" onClick={() => handleDeleteWebsite(w.id)}>
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>

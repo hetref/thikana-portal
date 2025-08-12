@@ -8,7 +8,8 @@ import {
   CreateInvalidationCommand,
   ListDistributionsCommand,
   DeleteDistributionCommand,
-  UpdateDistributionCommand
+  UpdateDistributionCommand,
+  ListOriginAccessControlsCommand
 } from "@aws-sdk/client-cloudfront";
 import { S3Client, PutBucketPolicyCommand, GetBucketPolicyCommand } from "@aws-sdk/client-s3";
 
@@ -28,9 +29,32 @@ const s3Client = new S3Client({
   },
 });
 
-// Helper function to create OAC
+// Helper: find existing OAC by name
+async function findOacByName(name) {
+  try {
+    let Marker = undefined;
+    do {
+      const res = await cloudFrontClient.send(new ListOriginAccessControlsCommand({ Marker, MaxItems: 100 }));
+      const items = res.OriginAccessControlList?.Items || [];
+      const found = items.find(it => it.Name === name);
+      if (found) return found;
+      Marker = res.OriginAccessControlList?.NextMarker;
+    } while (Marker);
+  } catch (err) {
+    console.warn("ListOriginAccessControls failed:", err?.message || err);
+  }
+  return null;
+}
+
+// Helper function to create OAC (idempotent)
 async function createOriginAccessControl(businessId, websiteId) {
   const oacName = `oac-${businessId}-${websiteId}`.substring(0, 64);
+
+  // Reuse if already exists
+  const existing = await findOacByName(oacName);
+  if (existing) {
+    return existing;
+  }
   
   const command = new CreateOriginAccessControlCommand({
     OriginAccessControlConfig: {
@@ -42,8 +66,17 @@ async function createOriginAccessControl(businessId, websiteId) {
     }
   });
 
-  const response = await cloudFrontClient.send(command);
-  return response.OriginAccessControl;
+  try {
+    const response = await cloudFrontClient.send(command);
+    return response.OriginAccessControl;
+  } catch (err) {
+    // If already exists, fetch and return it
+    if (err?.name === 'OriginAccessControlAlreadyExists' || err?.Code === 'OriginAccessControlAlreadyExists' || err?.message?.includes('OriginAccessControlAlreadyExists')) {
+      const oac = await findOacByName(oacName);
+      if (oac) return oac;
+    }
+    throw err;
+  }
 }
 
 // Helper function to update S3 bucket policy for CloudFront access
@@ -127,9 +160,7 @@ export async function POST(request) {
     
     if (!isAuthorized) {
       try {
-        const { db } = await import('firebase-admin/firestore');
-        const firestore = db();
-        const userDoc = await firestore.collection('users').doc(requesterId).get();
+        const userDoc = await adminDb.collection('users').doc(requesterId).get();
         
         if (userDoc.exists) {
           const userData = userDoc.data();
@@ -233,7 +264,7 @@ export async function POST(request) {
         distributionDomainName: distribution.DomainName,
         distributionStatus: distribution.Status,
         distributionArn: distribution.ARN,
-        originAccessControlId: oac.OriginAccessControl.Id,
+        originAccessControlId: oac?.Id || null,
         createdAt: new Date(),
         updatedAt: new Date(),
         bucketName: bucket,
@@ -305,9 +336,7 @@ export async function GET(request) {
     
     if (!isAuthorized) {
       try {
-        const { db } = await import('firebase-admin/firestore');
-        const firestore = db();
-        const userDoc = await firestore.collection('users').doc(requesterId).get();
+        const userDoc = await adminDb.collection('users').doc(requesterId).get();
         
         if (userDoc.exists) {
           const userData = userDoc.data();
@@ -421,9 +450,7 @@ export async function DELETE(request) {
     
     if (!isAuthorized) {
       try {
-        const { db } = await import('firebase-admin/firestore');
-        const firestore = db();
-        const userDoc = await firestore.collection('users').doc(requesterId).get();
+        const userDoc = await adminDb.collection('users').doc(requesterId).get();
         
         if (userDoc.exists) {
           const userData = userDoc.data();
