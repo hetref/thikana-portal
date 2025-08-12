@@ -22,8 +22,9 @@ import {
 } from "lucide-react";
 import QRCode from "react-qr-code";
 import { toast } from "react-hot-toast";
+import { cn } from "@/lib/utils";
 
-const ShareBusinessDialog = ({ userData }) => {
+const ShareBusinessDialog = ({ userData, buttonClassName, buttonText = "Share" }) => {
   const [copied, setCopied] = useState(false);
   const qrRef = useRef(null);
   const profileUrl =
@@ -68,8 +69,12 @@ const ShareBusinessDialog = ({ userData }) => {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="outline" className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          className={cn("flex items-center gap-2", buttonClassName)}
+        >
           <Share2 className="h-4 w-4" />
+          <span>{buttonText}</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">

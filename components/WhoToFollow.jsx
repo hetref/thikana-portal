@@ -28,7 +28,7 @@ import Link from "next/link";
 import { userEmailStatus } from "@/utils/userStatus";
 import { sendEmailVerification } from "firebase/auth";
 import { toast } from "react-hot-toast";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, MapPin, Activity, Users, Mail } from "lucide-react";
 import Loader from "@/components/Loader";
 
 export default function WhoToFollow() {
@@ -49,7 +49,6 @@ export default function WhoToFollow() {
       // Get current location for location-based recommendations
       let locationParams = "";
       if (recommendationType === "location") {
-        // Try to get user's current location if not using saved location
         try {
           if (navigator.geolocation) {
             const position = await new Promise((resolve, reject) => {
@@ -167,8 +166,6 @@ export default function WhoToFollow() {
         ),
       ]);
 
-      toast.success("Followed successfully");
-
       // Remove the followed business from the list immediately
       setBusinesses((prevBusinesses) =>
         prevBusinesses.filter((business) => business.id !== businessId)
@@ -203,11 +200,9 @@ export default function WhoToFollow() {
         ),
       ]);
 
-      // Show unfollow toast message
       toast.success(`Business unfollowed successfully`);
     } catch (error) {
       console.error("Error unfollowing business:", error);
-      toast.error("Failed to unfollow business");
       toast.error("Failed to unfollow business");
     }
   };
@@ -225,7 +220,6 @@ export default function WhoToFollow() {
     setHasMore(true);
   };
 
-  // Get the recommendation type label
   const getRecommendationTypeLabel = (type) => {
     switch (type) {
       case "location":
@@ -237,201 +231,270 @@ export default function WhoToFollow() {
     }
   };
 
-  const getRecommendationBadge = (business) => {
-    if (business.recommendation_type === "location") {
-      return business.distance_km ? `${business.distance_km}km away` : "Nearby";
+  const getPlanBadgeColor = (plan) => {
+    switch (plan) {
+      case "premium":
+        return "bg-gradient-to-r from-amber-500 to-yellow-500 text-white";
+      case "standard":
+        return "bg-gradient-to-r from-blue-500 to-cyan-500 text-white";
+      default:
+        return "bg-gray-100 text-gray-700";
     }
-    return "Based on activity";
   };
+
+  const getDistanceBadgeColor = (distance) => {
+    if (distance <= 2) return "bg-gradient-to-r from-green-500 to-emerald-500 text-white";
+    if (distance <= 5) return "bg-gradient-to-r from-yellow-500 to-amber-500 text-white";
+    return "bg-gradient-to-r from-orange-500 to-red-500 text-white";
+  };
+
+  const BusinessCard = ({ business }) => (
+    <div className="group relative overflow-hidden rounded-xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-4 shadow-sm transition-all duration-300 hover:shadow-lg hover:scale-[1.02]">
+      {/* Background Decoration */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-50/20 to-purple-50/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      
+      <div className="relative flex items-start gap-3">
+        {/* Avatar */}
+        <Avatar className="h-12 w-12 border-2 border-white shadow-sm">
+          <AvatarImage src={business.profileImage} alt={business.businessName} />
+          <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-500 text-white font-semibold">
+            {business.businessName?.charAt(0) || "B"}
+          </AvatarFallback>
+        </Avatar>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <Link href={`/${business.id}`} className="block group/link">
+            <div className="space-y-1">
+              <h3 className="font-semibold text-gray-900 group-hover/link:text-blue-600 transition-colors duration-200 truncate">
+                {business.businessName}
+              </h3>
+              <p className="text-sm text-gray-600 truncate">@{business.username}</p>
+              <p className="text-xs text-gray-500 capitalize">{business.businessType}</p>
+            </div>
+          </Link>
+
+          {/* Badges */}
+          <div className="flex flex-wrap gap-1.5 mt-3">
+            {business.distance_km && (
+              <Badge 
+                variant="secondary" 
+                className={`text-xs px-2 py-1 ${getDistanceBadgeColor(business.distance_km)} border-0`}
+              >
+                <MapPin className="w-3 h-3 mr-1" />
+                {business.distance_km}km away
+              </Badge>
+            )}
+            
+            {business.business_plan && (
+              <Badge 
+                variant="secondary" 
+                className={`text-xs px-2 py-1 ${getPlanBadgeColor(business.business_plan)} border-0`}
+              >
+                {business.business_plan.charAt(0).toUpperCase() + business.business_plan.slice(1)}
+              </Badge>
+            )}
+
+            {business.recommendation_type === "activity" && business.has_activity && (
+              <Badge variant="secondary" className="text-xs px-2 py-1 bg-gradient-to-r from-green-500 to-teal-500 text-white border-0">
+                <Activity className="w-3 h-3 mr-1" />
+                Active
+              </Badge>
+            )}
+          </div>
+
+          {/* Follow Button */}
+          <Button
+            size="sm"
+            variant={following.has(business.id) ? "destructive" : "default"}
+            className={`mt-3 w-full text-xs h-8 font-medium transition-all duration-200 ${
+              following.has(business.id)
+                ? "bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 shadow-sm"
+                : "text-white shadow-sm"
+            }`}
+            style={!following.has(business.id) ? {
+              backgroundColor: '#000000',
+            } : {}}
+            onMouseEnter={(e) => {
+              if (!following.has(business.id)) {
+                e.target.style.backgroundColor = '#a03d1f';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!following.has(business.id)) {
+                e.target.style.backgroundColor = '#000000';
+              }
+            }}
+            onClick={() =>
+              following.has(business.id)
+                ? handleUnfollow(business.id)
+                : handleFollow(business.id)
+            }
+          >
+            <Users className="w-3 h-3 mr-1" />
+            {following.has(business.id) ? "Unfollow" : "Follow"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const EmptyState = ({ type, onRefresh }) => (
+    <div className="flex flex-col items-center justify-center py-12 px-4 text-center space-y-4">
+      <div className="p-4 bg-gray-100 rounded-full">
+        {type === "no-recommendations" ? (
+          <RefreshCw className="h-8 w-8 text-gray-400" />
+        ) : type === "loading" ? (
+          <Loader/>
+        ) : (
+          <Users className="h-8 w-8 text-gray-400" />
+        )}
+      </div>
+      
+      <div className="space-y-2">
+        <h3 className="font-medium text-gray-900">
+          {type === "loading" ? "Loading recommendations..." : "No recommendations found"}
+        </h3>
+        
+        {type !== "loading" && (
+          <p className="text-sm text-gray-600 max-w-sm">
+            {recommendationType === "location"
+              ? "No nearby businesses found. Try enabling location access or switch to Activity Based recommendations."
+              : "No businesses with recent activity found. Try switching to Location Based recommendations."
+            }
+          </p>
+        )}
+      </div>
+
+      {type === "no-recommendations" && onRefresh && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onRefresh}
+          className="mt-4 bg-white hover:bg-gray-50 border-gray-300"
+        >
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Try Again
+        </Button>
+      )}
+    </div>
+  );
+
+  const EmailVerificationPrompt = () => (
+    <div className="flex flex-col items-center justify-center py-12 px-4 text-center space-y-4">
+      <div className="p-4 bg-amber-100 rounded-full">
+        <Mail className="h-8 w-8 text-amber-600" />
+      </div>
+      
+      <div className="space-y-2">
+        <h3 className="font-medium text-gray-900">Email Verification Required</h3>
+        <p className="text-sm text-gray-600 max-w-sm">
+          Please verify your email address to see personalized business recommendations.
+        </p>
+      </div>
+
+      <Button
+        size="sm"
+        className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-sm"
+        onClick={() => {
+          sendEmailVerification(auth.currentUser)
+            .then(() => toast.success("Verification email sent"))
+            .catch(() => toast.error("Failed to send verification email"));
+        }}
+      >
+        <Mail className="w-4 h-4 mr-2" />
+        Send Verification Email
+      </Button>
+    </div>
+  );
 
   return (
     <div className="sticky top-20">
-      <Card className="overflow-hidden shadow-md border-none">
-        <CardHeader className="p-6 pb-3">
+      <Card className="overflow-hidden shadow-lg bg-white border-0 rounded-2xl">
+        {/* Header */}
+        <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 pb-4">
           <div className="flex items-center justify-between">
-            <CardTitle className="font-semibold text-lg">
-              Who to Follow
-            </CardTitle>
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-white rounded-lg shadow-sm">
+                <Users className="h-5 w-5 text-blue-600" />
+              </div>
+              <CardTitle className="font-bold text-xl text-gray-900">
+                Who to Follow
+              </CardTitle>
+            </div>
+            
             <Select
               value={recommendationType}
               onValueChange={handleRecommendationTypeChange}
             >
-              <SelectTrigger className="w-[140px] h-8 text-xs">
-                <SelectValue placeholder="Filter by" />
+              <SelectTrigger className="w-[160px] h-9 bg-white border-gray-200 shadow-sm hover:border-gray-300 focus:border-blue-500 transition-colors">
+                <div className="flex items-center gap-2">
+                  {recommendationType === "location" ? (
+                    <MapPin className="w-3 h-3 text-gray-500" />
+                  ) : (
+                    <Activity className="w-3 h-3 text-gray-500" />
+                  )}
+                  <SelectValue placeholder="Filter by" />
+                </div>
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="location">Location Based</SelectItem>
-                <SelectItem value="activity">Activity Based</SelectItem>
+              <SelectContent className="bg-white border-gray-200 shadow-lg rounded-lg">
+                <SelectItem value="location" className="focus:bg-blue-50 focus:text-blue-900">
+                  Location Based
+                </SelectItem>
+                <SelectItem value="activity" className="focus:bg-blue-50 focus:text-blue-900">
+                  Activity Based
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <Separator className="my-3" />
         </CardHeader>
 
-        <CardContent className="p-6 pt-0">
+        {/* Content */}
+        <CardContent className="p-6">
           {userEmailStatus() === false ? (
-            <div className="flex flex-col gap-4 items-center py-6 px-2 text-center">
-              <p className="text-sm text-muted-foreground">
-                Please verify your email to see recommendations.
-              </p>
-              <Button
-                size="sm"
-                className="text-xs bg-amber-600 hover:bg-amber-700"
-                onClick={() => {
-                  sendEmailVerification(auth.currentUser)
-                    .then(() => toast.success("Verification email sent"))
-                    .catch(() =>
-                      toast.error("Failed to send verification email")
-                    );
-                }}
-              >
-                Verify Email
-              </Button>
-            </div>
+            <EmailVerificationPrompt />
           ) : loading && businesses.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 space-y-3">
-              <Loader/>
-              <p className="text-sm text-muted-foreground">
-                Loading recommendations...
-              </p>
-            </div>
+            <EmptyState type="loading" />
           ) : businesses.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 space-y-2 text-center">
-              <RefreshCw className="h-8 w-8 text-muted-foreground/50" />
-              <p className="text-sm text-muted-foreground">
-                No recommendations found
-              </p>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => fetchRecommendedBusinesses(0)}
-                className="text-xs"
-              >
-                Refresh
-              </Button>
-            </div>
+            <EmptyState 
+              type="no-recommendations" 
+              onRefresh={() => fetchRecommendedBusinesses(0)}
+            />
           ) : (
-            <>
-              <div className="flex flex-col items-center gap-2">
-                {businesses.length === 0 && !loading ? (
-                  <div className="text-center p-4">
-                    {recommendationType === "location" ? (
-                      <p className="text-muted-foreground text-sm">
-                        No nearby businesses found. Try enabling location access
-                        or switch to Activity Based recommendations.
-                      </p>
-                    ) : (
-                      <p className="text-muted-foreground text-sm">
-                        No businesses with recent activity found. Try switching
-                        to Location Based recommendations.
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  businesses.map((business) => (
-                    <div
-                      className="flex items-center justify-between gap-4 border p-3 rounded-md w-full"
-                      key={`${business.id}-${offset}`}
-                    >
-                      <div className="flex flex-col justify-center w-full gap-2">
-                        <div className="flex items-center gap-2">
-                          <Link
-                            href={`/${business.id}`}
-                            className="grid gap-0.5 text-sm"
-                          >
-                            <span className="font-medium">
-                              {business.businessName}
-                            </span>
-                            <span className="text-muted-foreground">
-                              @{business.username}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {business.businessType}
-                              {business.distance_km && (
-                                <span
-                                  className={`${
-                                    business.distance_km > 4
-                                      ? "text-amber-600"
-                                      : "text-emerald-600"
-                                  }`}
-                                >
-                                  {` • ${business.distance_km}km away`}
-                                </span>
-                              )}
-                              {business.business_plan && (
-                                <span
-                                  className={`${
-                                    business.business_plan === "premium"
-                                      ? "text-amber-600"
-                                      : business.business_plan === "standard"
-                                        ? "text-blue-600"
-                                        : ""
-                                  }`}
-                                >
-                                  {` • ${
-                                    business.business_plan
-                                      .charAt(0)
-                                      .toUpperCase() +
-                                    business.business_plan.slice(1)
-                                  } plan`}
-                                </span>
-                              )}
-                            </span>
-                            {business.recommendation_type && (
-                              <span className="text-xs text-muted-foreground capitalize">
-                                {getRecommendationTypeLabel(
-                                  business.recommendation_type
-                                )}
-                                {recommendationType === "location"
-                                  ? " • Within range"
-                                  : business.has_activity
-                                    ? " • Active business"
-                                    : ""}
-                              </span>
-                            )}
-                          </Link>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className={`${
-                            following.has(business.id)
-                              ? "bg-red-500 text-primary-foreground hover:bg-red-400 hover:text-white"
-                              : ""
-                          }`}
-                          onClick={() =>
-                            following.has(business.id)
-                              ? handleUnfollow(business.id)
-                              : handleFollow(business.id)
-                          }
-                        >
-                          {following.has(business.id) ? "Unfollow" : "Follow"}
-                        </Button>
-                      </div>
-                    </div>
-                  ))
-                )}
+            <div className="space-y-4">
+              {/* Business Cards */}
+              <div className="space-y-3">
+                {businesses.map((business) => (
+                  <BusinessCard 
+                    key={`${business.id}-${offset}`} 
+                    business={business} 
+                  />
+                ))}
               </div>
 
+              {/* Load More Button */}
               {hasMore && (
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   onClick={handleLoadMore}
                   disabled={loading}
-                  className="w-full mt-4 text-xs h-8"
+                  className="w-full mt-6 h-10 bg-gradient-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 border-gray-200 text-gray-700 font-medium transition-all duration-200"
                 >
                   {loading ? (
                     <>
                       <Loader/>
-                      Loading...
+                      <span className="ml-2">Loading more...</span>
                     </>
                   ) : (
-                    "Load More"
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Load More Recommendations
+                    </>
                   )}
                 </Button>
               )}
-            </>
+            </div>
           )}
         </CardContent>
       </Card>

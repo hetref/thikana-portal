@@ -42,81 +42,81 @@ export default function StoreLocationPicker() {
 
   useEffect(() => {
     const init = async () => {
-      if (!isMapLoaded || !mapContainerRef.current || !inputRef.current) return;
+    if (!isMapLoaded || !mapContainerRef.current || !inputRef.current) return;
 
-      try {
+    try {
         // Ensure google.maps exists even if onLoad fired early
         await waitForGoogleMaps();
 
-        // Initialize the map
-        const defaultLocation = { lat: 19.076, lng: 72.877 }; // Default location (Mumbai)
+      // Initialize the map
+      const defaultLocation = { lat: 19.076, lng: 72.877 }; // Default location (Mumbai)
 
-        mapRef.current = new window.google.maps.Map(mapContainerRef.current, {
+      mapRef.current = new window.google.maps.Map(mapContainerRef.current, {
           center: existingLocation || defaultLocation,
-          zoom: 13,
-        });
+        zoom: 13,
+      });
 
-        // Create the autocomplete object and bind it to the input field
-        autocompleteRef.current = new window.google.maps.places.Autocomplete(
-          inputRef.current
-        );
-        autocompleteRef.current.bindTo("bounds", mapRef.current);
+      // Create the autocomplete object and bind it to the input field
+      autocompleteRef.current = new window.google.maps.places.Autocomplete(
+        inputRef.current
+      );
+      autocompleteRef.current.bindTo("bounds", mapRef.current);
 
-        // Set up the event listener for when the user selects a place
-        autocompleteRef.current.addListener("place_changed", () => {
-          const place = autocompleteRef.current.getPlace();
+      // Set up the event listener for when the user selects a place
+      autocompleteRef.current.addListener("place_changed", () => {
+        const place = autocompleteRef.current.getPlace();
 
           if (!place?.geometry) {
             console.log("No details available for the input");
-            return;
-          }
+          return;
+        }
 
-          if (place.geometry.viewport) {
-            mapRef.current.fitBounds(place.geometry.viewport);
-          } else {
-            mapRef.current.setCenter(place.geometry.location);
-            mapRef.current.setZoom(17);
-          }
+        if (place.geometry.viewport) {
+          mapRef.current.fitBounds(place.geometry.viewport);
+        } else {
+          mapRef.current.setCenter(place.geometry.location);
+          mapRef.current.setZoom(17);
+        }
 
-          // Update or create marker
-          const coordinates = {
-            lat: place.geometry.location.lat(),
-            lng: place.geometry.location.lng(),
-          };
+        // Update or create marker
+        const coordinates = {
+          lat: place.geometry.location.lat(),
+          lng: place.geometry.location.lng(),
+        };
 
-          updateMarker(coordinates);
+        updateMarker(coordinates);
 
-          // Set the selected location with place details
-          setSelectedLocation({
+        // Set the selected location with place details
+        setSelectedLocation({
             name: place.name || "Selected Location",
             address: place.formatted_address || "",
-            coordinates: coordinates,
-          });
-
-          console.log("Selected location coordinates:", coordinates);
+          coordinates: coordinates,
         });
 
-        // Add click event to the map to set location manually
-        mapRef.current.addListener("click", (event) => {
-          const clickedLocation = {
-            coordinates: {
-              lat: event.latLng.lat(),
-              lng: event.latLng.lng(),
-            },
-          };
+        console.log("Selected location coordinates:", coordinates);
+      });
 
-          // Update the marker
-          updateMarker(clickedLocation.coordinates);
+      // Add click event to the map to set location manually
+      mapRef.current.addListener("click", (event) => {
+        const clickedLocation = {
+          coordinates: {
+            lat: event.latLng.lat(),
+            lng: event.latLng.lng(),
+          },
+        };
 
-          // Do reverse geocoding to get address details
-          reverseGeocode(clickedLocation.coordinates);
-        });
+        // Update the marker
+        updateMarker(clickedLocation.coordinates);
 
-        console.log("Map initialized successfully");
-      } catch (err) {
-        console.error("Error initializing map:", err);
-        setError("Failed to initialize map. Please refresh the page.");
-      }
+        // Do reverse geocoding to get address details
+        reverseGeocode(clickedLocation.coordinates);
+      });
+
+      console.log("Map initialized successfully");
+    } catch (err) {
+      console.error("Error initializing map:", err);
+      setError("Failed to initialize map. Please refresh the page.");
+    }
     };
 
     init();
@@ -166,9 +166,9 @@ export default function StoreLocationPicker() {
             setExistingLocation(center);
 
             // If map is loaded and map exists, update the marker and center
-            if (isMapLoaded && mapRef.current) {
+          if (isMapLoaded && mapRef.current) {
               mapRef.current.setCenter(center);
-              mapRef.current.setZoom(17);
+            mapRef.current.setZoom(17);
               updateMarker(center);
               reverseGeocode(center);
             }

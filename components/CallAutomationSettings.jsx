@@ -39,6 +39,37 @@ import { Label } from "@/components/ui/label";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
+const foodstersMarketingScript = `Hello! My name is [AI Assistant], calling on behalf of Foodsters. I hope I'm not catching you at a busy time?
+
+[Wait for response]
+
+Great! I'm reaching out today because Foodsters has just launched an exciting new seasonal menu, and we wanted our valued customers to be the first to know. 
+
+Our chef has created five new signature dishes featuring locally-sourced ingredients. The star of our new menu is the Spiced Mango Curry with coconut rice - it's already become a customer favorite!
+
+[If customer shows interest]
+Would you like to hear about our limited-time promotion for these new dishes?
+
+[If yes]
+Wonderful! For the next two weeks, we're offering 20% off any of our new menu items when you dine in. And if you bring a friend who hasn't tried Foodsters before, you'll both receive a complimentary dessert from our artisan bakery selection.
+
+[If customer asks about other menu items]
+We still have all your favorites! Our classic butter chicken and hand-rolled samosas remain on the menu, along with our vegetarian and vegan options. Everything is made fresh daily with authentic spices and techniques.
+
+[If customer asks about hours/location]
+We're open Monday through Thursday from 11am to 9pm, and Friday through Sunday from 11am to 10pm. You can find us at 123 Main Street in the downtown area. We also offer online ordering through our website for takeout and delivery.
+
+[Closing]
+Would you like me to send you a text message with a link to view our new menu and the special promotion details?
+
+[If yes]
+Perfect! I'll send that to this number right away. The promotion code "NEWMENU" will be included in the message - just mention it to your server when you visit.
+
+[If no]
+No problem at all. You can always check out our menu and promotions at foodsters.com or follow us on social media @foodsters for the latest updates.
+
+Thank you so much for your time today! We hope to see you at Foodsters soon to try our exciting new dishes. Have a wonderful day!`;
+
 const callScriptSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   script: z.string().min(20, "Script must be at least 20 characters"),
@@ -222,33 +253,44 @@ export default function CallAutomationSettings() {
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold">Make a Call</h2>
-      <p className="text-muted-foreground">Manually place an AI call using your saved scripts.</p>
+      <p className="text-muted-foreground">
+        Manually place an AI call using your saved scripts.
+      </p>
 
       <Alert className="mb-4">
         <AlertCircle className="h-4 w-4" />
         <AlertTitle>API Key Required</AlertTitle>
         <AlertDescription>
           To make real calls, add your VAPI Private API key to the .env file as
-          VAPI_PRIVATE_API_KEY. Phone numbers should be in E.164 format (e.g., +14155552671).
+          VAPI_PRIVATE_API_KEY. Phone numbers should be in E.164 format (e.g.,
+          +14155552671).
         </AlertDescription>
       </Alert>
 
       <Card>
         <CardHeader>
           <CardTitle>Make an AI Call</CardTitle>
-          <CardDescription>Use your scripts to initiate calls to customers.</CardDescription>
+          <CardDescription>
+            Use your scripts to initiate calls to customers.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {scripts.length > 0 ? (
             <Form {...makeCallForm}>
-              <form onSubmit={makeCallForm.handleSubmit(handleMakeCall)} className="space-y-4">
+              <form
+                onSubmit={makeCallForm.handleSubmit(handleMakeCall)}
+                className="space-y-4"
+              >
                 <FormField
                   control={makeCallForm.control}
                   name="scriptId"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Select a Script</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Choose a script" />
@@ -288,7 +330,9 @@ export default function CallAutomationSettings() {
             </Form>
           ) : (
             <div className="text-center py-4">
-              <p className="text-muted-foreground mb-4">You need to create a call script before making calls.</p>
+              <p className="text-muted-foreground mb-4">
+                You need to create a call script before making calls.
+              </p>
               {/* In this view, scripts are managed in the Call Scripts tab on the Calls page */}
             </div>
           )}

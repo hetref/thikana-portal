@@ -158,10 +158,16 @@ const MainNav = () => {
           {/* Logo */}
           <div className="flex items-center">
             <Link href="/feed" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">T</span>
+              <div className="flex items-center gap-2">
+                <Image
+                  src="/logo/logo_text.png"
+                  alt="Thikana Logo"
+                  width={120}
+                  height={32}
+                  className="h-8 w-auto"
+                  priority
+                />
               </div>
-              <span className="font-bold text-xl hidden sm:block">Thikana</span>
             </Link>
           </div>
 

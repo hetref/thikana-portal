@@ -47,7 +47,7 @@ export default function WebsiteBuilderButton({ userId }) {
       variant="outline"
       className="text-primary border-primary hover:bg-primary/10 px-4 w-full md:w-auto"
     >
-      <Link href="/wb">
+      <Link href="/websites">
         <Globe className="w-4 h-4 mr-2" />
         {hasWebsite ? "Update Website" : "Build Your Website"}
       </Link>

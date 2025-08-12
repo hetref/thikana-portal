@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import GrapesJsStudio, {
   StudioCommands,
   ToastVariant,
@@ -85,25 +85,36 @@ export default function Home() {
   const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
   const [lastSaved, setLastSaved] = useState(null);
   const [customToasts, setCustomToasts] = useState([]);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const router = useRouter();
 
+  const isProd = process.env.NODE_ENV === 'production';
+  const saveDebounceRef = useRef(null);
+
+  // Warn before closing tab if there are unsaved changes
   useEffect(() => {
-    console.log('Setting up auth listener');
+    const handleBeforeUnload = (e) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  useEffect(() => {
+    if (!isProd) console.log('Setting up auth listener');
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      console.log('Auth state changed:', user);
+      if (!isProd) console.log('Auth state changed:', user);
       setUser(user);
-      
       if (user) {
-        // Load user pages when user logs in
         await loadUserPages(user.uid);
       } else {
-        // Clear pages when user logs out
         setUserPages([]);
       }
-      
       setIsLoading(false);
     });
-
     return () => unsubscribe();
   }, []);
 
@@ -132,21 +143,15 @@ export default function Home() {
   // Load pages belonging to the current user
   const loadUserPages = async (userId) => {
     try {
-      console.log('Loading pages for user:', userId);
+      if (!isProd) console.log('Loading pages for user:', userId);
       const pagesRef = collection(db, `users/${userId}/pages`);
       const q = query(pagesRef, orderBy('createdAt', 'desc'));
-
       const querySnapshot = await getDocs(q);
       const pages = [];
-      
       querySnapshot.forEach((doc) => {
-        pages.push({
-          id: doc.id,
-          ...doc.data()
+        pages.push({ id: doc.id, ...doc.data() });
         });
-      });
-      
-      console.log('Loaded pages:', pages);
+      if (!isProd) console.log('Loaded pages:', pages);
       setUserPages(pages);
       
       // If no pages exist, create a default home page
@@ -164,18 +169,10 @@ export default function Home() {
           css: '',
           createdAt: serverTimestamp()
         };
-        
-        // Add default page to Firestore
         const newPageRef = await addDoc(collection(db, `users/${userId}/pages`), defaultPage);
-        console.log('Created default page with ID:', newPageRef.id);
-        
-        // Add to local state
-        setUserPages([{
-          id: newPageRef.id,
-          ...defaultPage
-        }]);
+        if (!isProd) console.log('Created default page with ID:', newPageRef.id);
+        setUserPages([{ id: newPageRef.id, ...defaultPage }]);
       }
-      
       return pages;
     } catch (error) {
       console.error('Error loading pages:', error);
@@ -183,37 +180,68 @@ export default function Home() {
     }
   };
 
+  // Debounced save scheduler to reduce Firestore writes
+  const scheduleSave = (pageName, html, css, delayMs = 1500) => {
+    if (!autoSaveEnabled || !user) return;
+    setHasUnsavedChanges(true);
+    if (saveDebounceRef.current) clearTimeout(saveDebounceRef.current);
+    saveDebounceRef.current = setTimeout(async () => {
+      try {
+        const success = await savePageContent(pageName, html, css);
+        if (success) {
+          setLastSaved(new Date());
+          setHasUnsavedChanges(false);
+          if (!isProd) console.log(`Debounced save successful for page: ${pageName}`);
+        }
+      } catch (e) {
+        console.error('Debounced save error:', e);
+      }
+    }, delayMs);
+  };
+
   // Common function to save a page's content to Firebase
   const savePageContent = async (pageName, html, css, pageProjectData = null) => {
     if (!user || !pageName) return false;
     
     try {
+      if (!isProd) {
       console.log(`Saving page: ${pageName}`);
       console.log(`HTML length: ${html.length}, CSS length: ${css.length}`);
+      }
+      // Capture full project data safely
+      let projectDataString = null;
+      try {
+        if (editor) {
+          const pd = editor.getProjectData();
+          projectDataString = JSON.stringify(pd);
+        }
+      } catch {}
+      // Guard against Firestore 1MB limit: drop heavy project data if too big
+      const approxSize =
+        (pageName?.length || 0) + (html?.length || 0) + (css?.length || 0) + (projectDataString?.length || 0) + (pageProjectData?.length || 0);
+      if (approxSize > 700000) {
+        projectDataString = null;
+      }
       
       // Find existing page or create new data
-      const existingPageIndex = userPages.findIndex(p => p.name === pageName);
+      const existingPageIndex = userPages.find(p => p.name === pageName);
       const pageData = {
         name: pageName,
         component: html,
         css: css,
-        // Save both full project data and page-specific data
-        projectData: editor ? JSON.stringify(editor.getProjectData()) : null,
+        // Save both full project data and page-specific data (projectData may be null if large)
+        projectData: projectDataString,
         pageProjectData: pageProjectData || null,
         updatedAt: serverTimestamp()
       };
       
-      if (existingPageIndex >= 0) {
-        // Update existing page
+      if (existingPageIndex) {
         const pageId = userPages[existingPageIndex].id;
         await setDoc(doc(db, `users/${user.uid}/pages`, pageId), pageData, { merge: true });
-        
-        // Update local state
         const updatedPages = [...userPages];
         updatedPages[existingPageIndex] = { id: pageId, ...pageData };
         setUserPages(updatedPages);
-        
-        console.log(`Updated page ${pageName} in Firebase and local state`);
+        if (!isProd) console.log(`Updated page ${pageName} in Firebase and local state`);
         return true;
       } else {
         // Create new page
@@ -223,7 +251,7 @@ export default function Home() {
         // Update local state
         setUserPages([...userPages, { id: newPageRef.id, ...pageData }]);
         
-        console.log(`Created new page ${pageName} in Firebase and local state`);
+        if (!isProd) console.log(`Created new page ${pageName} in Firebase and local state`);
         return true;
       }
     } catch (error) {
@@ -235,27 +263,20 @@ export default function Home() {
   const getProjetData = () => {
     if (editor) {
       try {
-        // Get the current page
         const currentPage = editor.Pages.getSelected();
         if (!currentPage) {
           console.error('No page selected');
           showToast('log-project-data-error');
           return;
         }
-        
         const pageName = currentPage.get('name');
-        console.log(`Getting content for page: ${pageName}`);
-        
-        // Get the HTML and CSS of the current page
         const html = editor.getHtml();
         const css = editor.getCss();
-        
-        // Log to console for debugging
+        if (!isProd) {
         console.log(`HTML length: ${html.length}, CSS length: ${css.length}`);
         console.log('HTML Preview:', html.substring(0, 100) + '...');
         console.log('CSS Preview:', css.substring(0, 100) + '...');
-        
-        // Save the current page's HTML and CSS
+        }
         if (user) {
           (async () => {
             const success = await savePageContent(pageName, html, css);
@@ -267,7 +288,7 @@ export default function Home() {
             }
           })();
         } else {
-          console.log('User not authenticated, cannot save page');
+          if (!isProd) console.log('User not authenticated, cannot save page');
           showToast('log-project-data');
         }
       } catch (error) {
@@ -279,78 +300,32 @@ export default function Home() {
 
   const saveDesign = async () => {
     if (!user || !editor) return;
-
     try {
-      // Get all pages
       const pages = editor.Pages.getAll();
-      console.log(`Saving all ${pages.length} pages`);
-      
-      // Store the currently selected page
+      if (!isProd) console.log(`Saving all ${pages.length} pages`);
       const currentPage = editor.Pages.getSelected();
-      
-      // Get the full project data once
       const fullProjectData = editor.getProjectData();
-      console.log('Full project data:', fullProjectData);
-      
-      // Save each page separately
+      if (!isProd) console.log('Full project data captured');
       const savePromises = pages.map(async (page) => {
         try {
           const pageName = page.get('name');
           const pageId = page.get('id');
-          console.log(`Processing page: ${pageName}, ID: ${pageId}`);
-          
-          // Select the page to get its content
           editor.Pages.select(page);
-          
-          // Get the HTML and CSS of the selected page
           const html = editor.getHtml();
           const css = editor.getCss();
-          
-          console.log(`Page ${pageName} - HTML length: ${html.length}, CSS length: ${css.length}`);
-          
-          // Find this page in the full project data
-          const pageData = fullProjectData.pages.find(p => p.id === pageId);
-          
-          // Use our common save function with enhanced project data
-          const success = await savePageContent(
-            pageName, 
-            html, 
-            css, 
-            pageData ? JSON.stringify(pageData) : null
-          );
-          
-          if (success) {
-            console.log(`Saved page: ${pageName}`);
-            return true;
-          } else {
-            console.error(`Failed to save page: ${pageName}`);
-            return false;
-          }
+          const pageData = fullProjectData.pages?.find((p) => p.id === pageId);
+          const success = await savePageContent(pageName, html, css, pageData ? JSON.stringify(pageData) : null);
+          return !!success;
         } catch (error) {
           console.error(`Error saving page ${page.get('name')}:`, error);
           return false;
         }
       });
-      
-      // Wait for all save operations to complete
       const results = await Promise.all(savePromises);
       const successCount = results.filter(Boolean).length;
-      
-      // Restore the originally selected page
-      if (currentPage) {
-        editor.Pages.select(currentPage);
-      }
-      
-      // Update the last saved timestamp
+      if (currentPage) editor.Pages.select(currentPage);
       setLastSaved(new Date());
-      
-      if (successCount > 0) {
-        console.log(`Successfully saved ${successCount} of ${pages.length} pages`);
-        showToast('design-saved');
-      } else {
-        console.error('No pages were saved successfully');
-        showToast('design-save-error');
-      }
+      successCount > 0 ? showToast('design-saved') : showToast('design-save-error');
     } catch (error) {
       console.error('Error saving design:', error);
       showToast('design-save-error');
@@ -358,367 +333,146 @@ export default function Home() {
   };
 
   const onReady = async (editor) => {
-    console.log('Editor loaded', editor);
+    if (!isProd) console.log('Editor loaded', editor);
     setEditor(editor);
 
     try {
-    // Add custom blocks category
-    editor.Blocks.add('sections', {
-      label: 'Sections',
-      category: 'Sections',
-      content: '',
-      select: true,
-    });
-
-    // Add predefined sections as blocks
+      // Add custom blocks
+      editor.Blocks.add('sections', { label: 'Sections', category: 'Sections', content: '', select: true });
     Object.entries(predefinedSections).forEach(([name, content]) => {
-      editor.Blocks.add(`section-${name}`, {
-        label: name.charAt(0).toUpperCase() + name.slice(1),
-        category: 'Sections',
-        content,
-        select: true,
-      });
+        editor.Blocks.add(`section-${name}`, { label: name.charAt(0).toUpperCase() + name.slice(1), category: 'Sections', content, select: true });
     });
-
-      console.log('Blocks added successfully');
       
-      // Helper function to apply CSS directly to canvas
+      // Helper to apply CSS directly to canvas
       const applyStylesDirectly = (page, css) => {
         try {
-          if (!css || typeof css !== 'string' || !css.trim()) {
-            console.log('No CSS to apply for page:', page.get('name'));
-            return;
-          }
-          
-          console.log('Applying CSS directly to canvas for page:', page.get('name'));
-          
-          // Get the iframe document
+          if (!css || typeof css !== 'string' || !css.trim()) return;
           const frame = editor.Canvas.getFrameEl();
-          if (!frame) {
-            console.error('Canvas frame not found');
-            return;
-          }
-          
+          if (!frame) return;
           const doc = frame.contentDocument || frame.contentWindow.document;
-          
-          // Create a unique ID for this style element
           const styleId = `page-styles-${page.get('id')}`;
-          
-          // Remove any existing style element for this page
           const existingStyle = doc.getElementById(styleId);
-          if (existingStyle) {
-            existingStyle.remove();
-          }
-          
-          // Create a new style element
+          if (existingStyle) existingStyle.remove();
           const styleEl = doc.createElement('style');
           styleEl.id = styleId;
           styleEl.innerHTML = css;
-          
-          // Append to the head
           doc.head.appendChild(styleEl);
-          
-          console.log('CSS applied directly to canvas document');
         } catch (err) {
           console.error('Error applying styles directly:', err);
         }
       };
       
-      // Add page selection change handler to ensure CSS is applied
-      editor.on('page:select', (page) => {
-        if (!page) return;
-        
-        console.log('Page selected, reapplying CSS:', page.get('name'));
-        
-        // Find the page data in userPages
-        const pageData = userPages.find(p => p.name === page.get('name'));
-        if (!pageData) {
-          console.log('No saved data found for page:', page.get('name'));
-          return;
-        }
-        
-        // Clear existing CSS
-        editor.getCss({clear: true});
-        
-        // First try to get CSS from pageProjectData
-        let css = '';
-        if (pageData.pageProjectData) {
-          try {
-            const projectData = JSON.parse(pageData.pageProjectData);
-            if (projectData.styles) {
-              css = projectData.styles;
-            } else if (projectData.style) {
-              css = projectData.style;
-            }
-          } catch (err) {
-            console.error('Error parsing pageProjectData:', err);
-          }
-        }
-        
-        // If no CSS from pageProjectData, use the stored CSS
-        if (!css && pageData.css) {
-          css = pageData.css;
-        }
-        
-        if (css) {
-          // Apply CSS to the editor
-          editor.setStyle(css);
-          
-          // Also apply CSS directly to the canvas
-          applyStylesDirectly(page, css);
-          
-          console.log('Reapplied CSS for page:', page.get('name'));
+      // Ensure CSS is applied after frame loads
+      editor.on('canvas:frame:load', () => {
+        const currentPage = editor.Pages.getSelected();
+        if (currentPage) {
+          const css = editor.getCss();
+          if (css) applyStylesDirectly(currentPage, css);
         }
       });
-      
-      // If user has pages, load them into the editor
+
+      // Reapply CSS on page select
+      editor.on('page:select', (page) => {
+        if (!page) return;
+        const pageData = userPages.find((p) => p.name === page.get('name'));
+        editor.getCss({ clear: true });
+        let css = '';
+        if (pageData?.pageProjectData) {
+          try {
+            const projectData = JSON.parse(pageData.pageProjectData);
+            css = projectData.styles || projectData.style || '';
+          } catch {}
+        }
+        if (!css && pageData?.css) css = pageData.css;
+        if (css) {
+          editor.setStyle(css);
+          applyStylesDirectly(page, css);
+        }
+      });
+
+      // Mark unsaved and schedule save
+      const scheduleSaveFromEditor = () => {
+        if (!user || !autoSaveEnabled) return;
+        const currentPage = editor.Pages.getSelected();
+        if (!currentPage) return;
+        const pageName = currentPage.get('name');
+        const html = editor.getHtml();
+        const css = editor.getCss();
+        scheduleSave(pageName, html, css);
+      };
+
+      editor.on('component:update', scheduleSaveFromEditor);
+      editor.on('style:update', scheduleSaveFromEditor);
+      editor.on('component:add', scheduleSaveFromEditor);
+      editor.on('component:remove', scheduleSaveFromEditor);
+
+      // Load user pages into the editor
       if (user && userPages.length > 0) {
-        console.log('Loading user pages into editor, count:', userPages.length);
-        
-        // First, clear existing pages
         const existingPages = editor.Pages.getAll();
-        console.log('Existing pages in editor:', existingPages.length);
-        existingPages.forEach(p => editor.Pages.remove(p));
-        
-        // Process and add each user page
+        existingPages.forEach((p) => editor.Pages.remove(p));
         for (const page of userPages) {
           try {
-            console.log('Loading page:', page.name, 'HTML length:', page.component?.length || 0, 'CSS length:', page.css?.length || 0);
-            
-            // If we have page-specific project data, use that first
             if (page.pageProjectData) {
               try {
-                console.log('Found page-specific projectData, using that for targeted page restoration');
                 const pageData = JSON.parse(page.pageProjectData);
-                
-                // Create a new page
-                const newPage = editor.Pages.add({
-                  id: pageData.id || page.id,
-                  name: page.name || 'Untitled Page',
-                });
-                
-                // Select the page
+                const newPage = editor.Pages.add({ id: pageData.id || page.id, name: page.name || 'Untitled Page' });
                 editor.Pages.select(newPage);
-                
-                // Set components (HTML)
-                if (pageData.component) {
-                  editor.setComponents(pageData.component);
-                } else if (pageData.components) {
-                  editor.setComponents(pageData.components);
-                } else if (page.component) {
-                  editor.setComponents(page.component);
-                }
-                
-                // Set styles (CSS)
+                if (pageData.component) editor.setComponents(pageData.component);
+                else if (pageData.components) editor.setComponents(pageData.components);
+                else if (page.component) editor.setComponents(page.component);
                 if (pageData.styles) {
-                  // Clear existing styles first
-                  editor.getCss({clear: true});
+                  editor.getCss({ clear: true });
                   editor.setStyle(pageData.styles);
-                  
-                  // Apply CSS directly to the canvas
                   applyStylesDirectly(newPage, pageData.styles);
                 } else if (pageData.style) {
-                  // Clear existing styles first
-                  editor.getCss({clear: true});
+                  editor.getCss({ clear: true });
                   editor.setStyle(pageData.style);
-                  
-                  // Apply CSS directly to the canvas
                   applyStylesDirectly(newPage, pageData.style);
                 } else if (page.css) {
-                  // Clear existing styles first
-                  editor.getCss({clear: true});
+                  editor.getCss({ clear: true });
                   editor.setStyle(page.css);
-                  
-                  // Apply CSS directly to the canvas
                   applyStylesDirectly(newPage, page.css);
                 }
-                
-                console.log('Loaded page from page-specific projectData:', page.name);
-                continue; // Skip the rest of the loading logic for this page
-              } catch (err) {
-                console.error('Error loading from page-specific projectData:', err);
-                // Continue to try other loading methods
-              }
+                continue;
+              } catch {}
             }
-            
-            // Fallback to full project data
             if (page.projectData) {
               try {
-                console.log('Found full projectData, using that for complete page restoration');
                 const projectData = JSON.parse(page.projectData);
-                
-                // Create a new page
-                const newPage = editor.Pages.add({
-                  id: page.id,
-                  name: page.name || 'Untitled Page',
-                });
-                
-                // Select the page
+                const newPage = editor.Pages.add({ id: page.id, name: page.name || 'Untitled Page' });
                 editor.Pages.select(newPage);
-                
-                // Try to load the full project data for this page
                 if (projectData.pages) {
-                  // Find the matching page data from project
-                  const pageData = projectData.pages.find(p => p.name === page.name) || projectData.pages[0];
-                  
-                  // Set the components directly
-                  if (pageData.component) {
-                    editor.setComponents(pageData.component);
-                  } else if (pageData.components) {
-                    editor.setComponents(pageData.components);
-                  } else if (page.component) {
-                    editor.setComponents(page.component);
-                  }
-                  
-                  // Set the styles directly after clearing existing styles
-                  editor.getCss({clear: true});
-                  
+                  const pageData = projectData.pages.find((p) => p.name === page.name) || projectData.pages[0];
+                  if (pageData?.component) editor.setComponents(pageData.component);
+                  else if (pageData?.components) editor.setComponents(pageData.components);
+                  else if (page.component) editor.setComponents(page.component);
+                  editor.getCss({ clear: true });
                   let appliedCSS = '';
-                  if (pageData.styles) {
-                    editor.setStyle(pageData.styles);
-                    appliedCSS = pageData.styles;
-                    console.log('Applied styles from projectData.pages[].styles');
-                  } else if (pageData.style) {
-                    editor.setStyle(pageData.style);
-                    appliedCSS = pageData.style;
-                    console.log('Applied styles from projectData.pages[].style');
-                  } else if (page.css) {
-                    editor.setStyle(page.css);
-                    appliedCSS = page.css;
-                    console.log('Applied styles from page.css');
-                  }
-                  
-                  // Apply CSS directly to the canvas
+                  if (pageData?.styles) { editor.setStyle(pageData.styles); appliedCSS = pageData.styles; }
+                  else if (pageData?.style) { editor.setStyle(pageData.style); appliedCSS = pageData.style; }
+                  else if (page.css) { editor.setStyle(page.css); appliedCSS = page.css; }
                   applyStylesDirectly(newPage, appliedCSS);
-                  
-                  console.log('Loaded page from projectData:', page.name);
-                  continue; // Skip the rest of the loading logic for this page
+                  continue;
                 }
-              } catch (err) {
-                console.error('Error loading from projectData, falling back to component/css:', err);
-                // Continue with standard loading
-              }
+              } catch {}
             }
-            
-            // Standard loading without projectData
-            // Create page
-            const newPage = editor.Pages.add({
-              id: page.id,
-              name: page.name || 'Untitled Page',
-            });
-            
-            console.log('Created page in editor:', newPage.get('name'));
-            
-            // Select the page to work with it
+            const newPage = editor.Pages.add({ id: page.id, name: page.name || 'Untitled Page' });
             editor.Pages.select(newPage);
-            
-            // Set HTML content - explicitly log the content
-            if (page.component && typeof page.component === 'string') {
-              console.log('Setting HTML content for page:', page.name);
-              console.log('HTML content preview:', page.component.substring(0, 100));
-              editor.setComponents(page.component);
-              const loadedHTML = editor.getHtml();
-              console.log('HTML after load preview:', loadedHTML.substring(0, 100));
-              console.log('HTML load successful:', loadedHTML.length > 0);
-            }
-            
-            // Set CSS content - explicitly log the content
+            if (page.component && typeof page.component === 'string') editor.setComponents(page.component);
             if (page.css && typeof page.css === 'string') {
-              console.log('Setting CSS content for page:', page.name);
-              console.log('CSS content preview:', page.css.substring(0, 100));
-              
-              // Clear any existing styles first to avoid conflicts
-              editor.getCss({clear: true});
-              
-              // Apply the stored CSS
+              editor.getCss({ clear: true });
               editor.setStyle(page.css);
-              
-              // Apply CSS directly to the canvas iframe document
               applyStylesDirectly(newPage, page.css);
-              
-              const loadedCSS = editor.getCss();
-              console.log('CSS after load preview:', loadedCSS.substring(0, 100));
-              console.log('CSS load successful:', loadedCSS.length > 0);
             }
-            
-            console.log(`Loaded page: ${page.name} successfully`);
           } catch (err) {
             console.error(`Error loading page ${page.name}:`, err);
           }
         }
-        
-        // Select the first page by default
         if (editor.Pages.getAll().length > 0) {
           const firstPage = editor.Pages.getAll()[0];
           editor.Pages.select(firstPage);
-          console.log('Selected first page:', firstPage.get('name'));
         }
-        
-        console.log('Finished loading user pages');
-      } else {
-        console.log('No pages to load or user not authenticated');
       }
-      
-      // Set up change monitoring to detect manual edits
-      editor.on('component:update', () => {
-        console.log('Component updated, content modified');
-      });
-      
-      editor.on('style:update', () => {
-        console.log('Style updated, content modified');
-        
-        // Auto-save CSS changes if enabled
-        if (autoSaveEnabled && user) {
-          const currentPage = editor.Pages.getSelected();
-          if (currentPage) {
-            const pageName = currentPage.get('name');
-            const html = editor.getHtml();
-            const css = editor.getCss();
-            
-            // Apply CSS directly to the canvas iframe too
-            applyStylesDirectly(currentPage, css);
-            
-            console.log(`Auto-saving after style change for page: ${pageName}`);
-            (async () => {
-              try {
-                const success = await savePageContent(pageName, html, css);
-                if (success) {
-                  setLastSaved(new Date());
-                  console.log(`Style change auto-save successful for page: ${pageName}`);
-                }
-              } catch (error) {
-                console.error('Error during style change auto-save:', error);
-              }
-            })();
-          }
-        }
-      });
-      
-      // Fix for canvas reloading or store changes
-      editor.on('canvas:refresh', () => {
-        console.log('Canvas refreshed, reapplying styles');
-        const currentPage = editor.Pages.getSelected();
-        if (currentPage) {
-          const css = editor.getCss();
-          if (css) {
-            applyStylesDirectly(currentPage, css);
-          }
-        }
-      });
-      
-      // Also handle editor component add events to ensure styles are applied
-      editor.on('component:add', () => {
-        setTimeout(() => {
-          const currentPage = editor.Pages.getSelected();
-          if (currentPage) {
-            const css = editor.getCss();
-            if (css) {
-              applyStylesDirectly(currentPage, css);
-            }
-          }
-        }, 100); // Small delay to ensure component is fully added
-      });
-      
     } catch (error) {
       console.error('Error in onReady:', error);
     }
@@ -814,7 +568,7 @@ export default function Home() {
   useEffect(() => {
     if (!editor || !user || !autoSaveEnabled) return;
     
-    console.log('Setting up auto-save timer (60 seconds)');
+    if (!isProd) console.log('Setting up auto-save timer (60 seconds)');
     
     const autoSaveInterval = setInterval(() => {
       try {
@@ -825,14 +579,14 @@ export default function Home() {
         const html = editor.getHtml();
         const css = editor.getCss();
         
-        console.log(`Auto-saving page: ${pageName}`);
+        if (!isProd) console.log(`Auto-saving page: ${pageName}`);
         
         // Use the common save function
         (async () => {
           const success = await savePageContent(pageName, html, css);
           if (success) {
             setLastSaved(new Date());
-            console.log(`Auto-save successful for page: ${pageName}`);
+            if (!isProd) console.log(`Auto-save successful for page: ${pageName}`);
           } else {
             console.error(`Auto-save failed for page: ${pageName}`);
           }
@@ -843,7 +597,7 @@ export default function Home() {
     }, 60000); // Save every 60 seconds
     
     return () => {
-      console.log('Clearing auto-save timer');
+      if (!isProd) console.log('Clearing auto-save timer');
       clearInterval(autoSaveInterval);
     };
   }, [editor, user, userPages, autoSaveEnabled]);
@@ -994,12 +748,12 @@ export default function Home() {
   }
 
   return (
-    <div className="flex flex-col h-screen w-full">
+    <div className="flex flex-col h-[calc(100svh-70px)] w-full">
       {/* Add animation styles */}
       <style dangerouslySetInnerHTML={{ __html: toastAnimationStyles }} />
       
       {/* MainNav - fixed at top */}
-      <div className="fixed top-0 left-0 right-0 z-50 w-full">
+      <div className="fixed top-0 left-0 right-0 w-full">
         <MainNav />
       </div>
       
@@ -1033,7 +787,7 @@ export default function Home() {
       </div>
       
       {/* Main content - adjusted to account for the navbar */}
-      <div className="flex flex-col pt-16 h-screen w-full">
+      <div className="flex flex-col h-[calc(100svh-70px)] w-full">
         {/* Control bar */}
         <div className="px-6 py-3 flex gap-4 items-center border-b border-gray-700 bg-gradient-to-r from-gray-900 to-gray-800 shadow-md">
           <div className="font-bold text-white text-lg mr-2">Thikana Builder</div>
@@ -1157,7 +911,7 @@ export default function Home() {
       )}
 
         {/* Editor Container */}
-        <div className="flex-1 w-full overflow-hidden" style={{ height: 'calc(100vh - 120px)' }}>
+        <div className="flex-1 w-full overflow-hidden" style={{ height: '100svh' }}>
         {user ? (
           <GrapesJsStudio
             onReady={onReady}
