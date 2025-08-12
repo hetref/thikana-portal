@@ -1,6 +1,5 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import Sidebar from "@/components/Sidebar";
 import {
   Briefcase,
   MapPin,
@@ -9,11 +8,9 @@ import {
   Navigation,
   Clock,
 } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { toast } from "react-hot-toast";
-import { Loader } from "@googlemaps/js-api-loader";
 
 import { liteClient as algoliasearch } from "algoliasearch/lite";
 import {
@@ -32,47 +29,12 @@ const searchClient = algoliasearch(
   "816be13729d5b895aa6ce749d0fce451"
 );
 
-// Replace with your Google Maps API key
-const GOOGLE_MAPS_API_KEY = "AIzaSyDb-fh_vaeGMyzGKIbM5ki8PS7A4jTFQYs";
-
-const Hit = ({ hit, userLocation, googleMapsService }) => {
-  const [distance, setDistance] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const businessLocation = hit.location || null;
-
-  useEffect(() => {
-    const calculateGoogleDistance = async () => {
-      if (!userLocation || !businessLocation || !googleMapsService) return;
-
-      setLoading(true);
-      try {
-        const distanceService = new googleMapsService.DistanceMatrixService();
-        const response = await distanceService.getDistanceMatrix({
-          origins: [
-            { lat: userLocation.latitude, lng: userLocation.longitude },
-          ],
-          destinations: [
-            { lat: businessLocation.latitude, lng: businessLocation.longitude },
-          ],
-          travelMode: googleMapsService.TravelMode.DRIVING,
-          unitSystem: googleMapsService.UnitSystem.METRIC,
-        });
-
-        if (response.rows[0].elements[0].status === "OK") {
-          setDistance({
-            text: response.rows[0].elements[0].distance.text,
-            value: response.rows[0].elements[0].distance.value,
-          });
-        }
-      } catch (error) {
-        console.error("Error calculating Google Maps distance:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    calculateGoogleDistance();
-  }, [userLocation, businessLocation, googleMapsService]);
+const Hit = ({ hit, userLocation }) => {
+  // Distance in meters from Algolia ranking info when aroundLatLng is set
+  const meters =
+    hit?._rankingInfo?.matchedGeoLocation?.distance ?? hit?._geoDistance ?? null;
+  const distanceText =
+    typeof meters === "number" ? `${(meters / 1000).toFixed(1)} km` : null;
 
   return (
     <Link
@@ -110,17 +72,10 @@ const Hit = ({ hit, userLocation, googleMapsService }) => {
             </span>
           </div>
           
-          {loading && (
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-50 text-gray-500 rounded-lg border border-gray-100">
-              <div className="w-3 h-3 rounded-full bg-gray-400 animate-pulse"></div>
-              <span className="text-sm">Calculating distance...</span>
-            </div>
-          )}
-          
-          {distance && !loading && (
+          {userLocation && distanceText && (
             <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-green-50 to-emerald-25 text-green-700 rounded-lg border border-green-100">
               <Navigation className="w-3.5 h-3.5" />
-              <span className="text-sm font-medium">{distance.text}</span>
+              <span className="text-sm font-medium">{distanceText}</span>
             </div>
           )}
         </div>
@@ -212,32 +167,6 @@ const CustomSortBy = ({ ...props }) => (
 const SearchPage = () => {
   const [userLocation, setUserLocation] = useState(null);
   const [locationStatus, setLocationStatus] = useState("pending");
-  const [googleMapsService, setGoogleMapsService] = useState(null);
-  const [googleLoading, setGoogleLoading] = useState(true);
-
-  // Load Google Maps API
-  useEffect(() => {
-    const loadGoogleMapsAPI = async () => {
-      try {
-        setGoogleLoading(true);
-        const loader = new Loader({
-          apiKey: GOOGLE_MAPS_API_KEY,
-          version: "weekly",
-          libraries: ["places", "geometry"],
-        });
-
-        const google = await loader.load();
-        setGoogleMapsService(google.maps);
-        setGoogleLoading(false);
-      } catch (error) {
-        console.error("Error loading Google Maps API:", error);
-        toast.error("Could not load Google Maps. Distances may be inaccurate.");
-        setGoogleLoading(false);
-      }
-    };
-
-    loadGoogleMapsAPI();
-  }, []);
 
   const getLocation = () => {
     setLocationStatus("loading");
@@ -296,9 +225,23 @@ const SearchPage = () => {
     <Hit
       {...props}
       userLocation={userLocation}
-      googleMapsService={googleMapsService}
     />
   );
+
+  // Build Configure props based on available location
+  const configureProps = userLocation
+    ? {
+        aroundLatLngViaIP: false,
+        aroundLatLng: `${userLocation.latitude}, ${userLocation.longitude}`,
+        aroundRadius: 100000, // 100km search radius
+        getRankingInfo: true,
+        hitsPerPage: 10,
+      }
+    : {
+        aroundLatLngViaIP: true,
+        getRankingInfo: true,
+        hitsPerPage: 10,
+      };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
@@ -309,7 +252,7 @@ const SearchPage = () => {
             indexName="business"
             insights
           >
-            <Configure hitsPerPage={10} />
+            <Configure {...configureProps} />
 
             {/* Header Section */}
             <div className="mb-8">
@@ -344,11 +287,6 @@ const SearchPage = () => {
                     <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                     <Navigation className="w-4 h-4" />
                     <span className="font-medium">Location active</span>
-                    {googleLoading && (
-                      <span className="text-xs text-green-600 opacity-75">
-                        (Loading maps...)
-                      </span>
-                    )}
                   </div>
                 )}
               </div>
@@ -358,12 +296,12 @@ const SearchPage = () => {
 
             <div className="flex flex-col lg:flex-row gap-8">
               {/* Sidebar Filters */}
-              <div className="w-full lg:w-80 flex-shrink-0">
+              {/* <div className="w-full lg:w-80 flex-shrink-0">
                 <div className="sticky top-6 space-y-6">
                   <CustomRefinementList attribute="business_type" />
                   <CustomSortBy />
                 </div>
-              </div>
+              </div> */}
 
               {/* Main Content */}
               <div className="flex-1 min-w-0">
