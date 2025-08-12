@@ -72,6 +72,8 @@ export default function RequestCallsManager() {
   const user = auth.currentUser;
   const [debugOpen, setDebugOpen] = useState(false);
   const [savingBooking, setSavingBooking] = useState(false);
+  const [processingDetails, setProcessingDetails] = useState(false);
+  const [retryingFailedCalls, setRetryingFailedCalls] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -122,16 +124,29 @@ export default function RequestCallsManager() {
 
       const scriptData = scriptDoc.data();
 
-      // Make the call with Bland AI API
-      const response = await fetch("/api/bland-ai/initiate-call", {
+      // Make the call with VAPI API
+      const response = await fetch("/api/vapi/initiate-call", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           phone_number: request.userPhone,
           script: scriptData.script,
           request_id: request.id,
-          // Use Twilio number as caller_id if available
-          caller_id: user.twilioNumber || undefined,
+          language: scriptData.language || "en",
+          voiceConfig: {
+            provider: scriptData.voiceProvider || "11labs",
+            voiceId: scriptData.voiceId || "bIHbv24MWmeRgasZH58o",
+            model: scriptData.voiceModel || "eleven_turbo_v2_5",
+          },
+          transcriptionConfig: {
+            provider: "deepgram",
+            model: "nova-2",
+            language: scriptData.language === "hi" ? "hi" : "en",
+          },
+          assistantConfig: {
+            provider: "openai",
+            model: "gpt-4o-mini",
+          },
         }),
       });
 
@@ -146,6 +161,7 @@ export default function RequestCallsManager() {
         status: "initiated",
         callStartedAt: Timestamp.now(),
         callId: responseData.call_id,
+        assistantId: responseData.assistant_id,
       });
 
       toast.success("Call initiated successfully");
@@ -208,7 +224,7 @@ export default function RequestCallsManager() {
   const handleRetryCall = async (request) => {
     setProcessingCall(true);
     try {
-      const response = await fetch("/api/bland-ai/auto-call-handler", {
+      const response = await fetch("/api/vapi/auto-call-handler", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -237,13 +253,10 @@ export default function RequestCallsManager() {
 
     setLoadingSummary(true);
     try {
-      const response = await fetch(
-        `/api/bland-ai/call-details?call_id=${callId}`,
-        {
-          method: "GET",
-          headers: { "Content-Type": "application/json" },
-        }
-      );
+      const response = await fetch(`/api/vapi/call-details?call_id=${callId}`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
 
       if (!response.ok) {
         throw new Error("Failed to fetch call details");
@@ -266,9 +279,94 @@ export default function RequestCallsManager() {
     // Reset summary when opening a new call details
     setCallSummary(null);
 
-    // If call has been initiated, fetch the summary
-    if (request.callId && request.status === "initiated") {
-      fetchCallSummary(request.callId);
+    // If call has been initiated or completed, check for summary
+    if (
+      request.callId &&
+      (request.status === "initiated" || request.status === "completed")
+    ) {
+      // First check if we have summary in the database
+      if (request.callSummary) {
+        setCallSummary({
+          summary: request.callSummary,
+          transcript: request.transcript,
+          booking_info: request.bookingInfo,
+          duration: request.callDuration,
+          ended_reason: request.endedReason,
+        });
+      } else {
+        // If not in database, fetch from VAPI API
+        fetchCallSummary(request.callId);
+      }
+    }
+  };
+
+  const processCallDetails = async (callId, businessId) => {
+    if (!callId || !businessId) return;
+
+    setProcessingDetails(true);
+    try {
+      const response = await fetch(`/api/vapi/process-call-details`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          callId: callId,
+          businessId: businessId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to process call details");
+      }
+
+      const data = await response.json();
+
+      // Update the call summary with processed data
+      setCallSummary({
+        summary: data.data.summary,
+        transcript: data.data.transcript,
+        booking_info: data.data.bookingInfo,
+        duration: data.data.duration,
+        ended_reason: data.data.endedReason,
+      });
+
+      toast.success("Call details processed successfully");
+    } catch (error) {
+      console.error("Error processing call details:", error);
+      toast.error("Failed to process call details");
+    } finally {
+      setProcessingDetails(false);
+    }
+  };
+
+  const retryFailedCalls = async () => {
+    if (!user) return;
+
+    setRetryingFailedCalls(true);
+    try {
+      const response = await fetch(`/api/vapi/retry-failed-calls`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          businessId: user.uid,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to retry failed calls");
+      }
+
+      const data = await response.json();
+
+      toast.success(
+        `Processed ${data.processedCount} calls. ${data.successCount} successful, ${data.failCount} failed.`
+      );
+
+      console.log("Retry results:", data.results);
+    } catch (error) {
+      console.error("Error retrying failed calls:", error);
+      toast.error("Failed to retry failed calls");
+    } finally {
+      setRetryingFailedCalls(false);
     }
   };
 
@@ -315,10 +413,38 @@ export default function RequestCallsManager() {
           </Badge>
         );
         break;
+      case "completed":
+        badge = (
+          <Badge variant="outline" className={getBadgeClasses("green")}>
+            Completed
+          </Badge>
+        );
+        break;
       case "failed":
         badge = (
           <Badge variant="outline" className={getBadgeClasses("red")}>
             Failed
+          </Badge>
+        );
+        break;
+      case "ended":
+        badge = (
+          <Badge variant="outline" className={getBadgeClasses("green")}>
+            Ended
+          </Badge>
+        );
+        break;
+      case "in-progress":
+        badge = (
+          <Badge variant="outline" className={getBadgeClasses("blue")}>
+            In Progress
+          </Badge>
+        );
+        break;
+      case "ringing":
+        badge = (
+          <Badge variant="outline" className={getBadgeClasses("yellow")}>
+            Ringing
           </Badge>
         );
         break;
@@ -375,32 +501,52 @@ export default function RequestCallsManager() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-48">
-        <Loader/>
+        <Loader />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">Call Requests</h2>
-        <p className="text-muted-foreground">
-          Manage call requests from your customers
-        </p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h2 className="text-2xl font-bold">Call History</h2>
+          <p className="text-muted-foreground">
+            View and manage your call history
+          </p>
+        </div>
+
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={retryFailedCalls}
+            disabled={retryingFailedCalls}
+            className="shrink-0"
+          >
+            {retryingFailedCalls ? (
+              <>
+                <Loader />
+                Processing...
+              </>
+            ) : (
+              "Retry Failed Calls"
+            )}
+          </Button>
+        </div>
       </div>
 
       {callRequests.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="pt-6 pb-6 text-center">
-            <div className="text-muted-foreground">No call requests yet</div>
+            <div className="text-muted-foreground">No calls yet</div>
           </CardContent>
         </Card>
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle>Recent Requests</CardTitle>
+            <CardTitle>Recent Calls</CardTitle>
             <CardDescription>
-              You have {callRequests.length} call requests
+              You have {callRequests.length} calls
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -425,7 +571,10 @@ export default function RequestCallsManager() {
                     </TableCell>
                     <TableCell>{formatDate(request.requestedAt)}</TableCell>
                     <TableCell>
-                      {getStatusBadge(request.status, request.autoProcessing)}
+                      {getStatusBadge(
+                        request.callStatus || request.status,
+                        request.autoProcessing
+                      )}
                     </TableCell>
                     <TableCell>
                       <Button
@@ -449,7 +598,7 @@ export default function RequestCallsManager() {
         <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
           <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Call Request Details</DialogTitle>
+              <DialogTitle>Call Details</DialogTitle>
               <DialogDescription>
                 Request from {selectedRequest.userName}
               </DialogDescription>
@@ -461,7 +610,7 @@ export default function RequestCallsManager() {
                   <div className="text-sm text-muted-foreground">Status</div>
                   <div>
                     {getStatusBadge(
-                      selectedRequest.status,
+                      selectedRequest.callStatus || selectedRequest.status,
                       selectedRequest.autoProcessing
                     )}
                   </div>
@@ -525,15 +674,40 @@ export default function RequestCallsManager() {
 
               {/* Add Call Summary section */}
               {selectedRequest.callId &&
-                selectedRequest.status === "initiated" && (
+                (selectedRequest.status === "initiated" ||
+                  selectedRequest.status === "completed") && (
                   <>
                     <Separator />
 
                     <div>
-                      <h3 className="font-medium mb-2 flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        Call Summary
-                      </h3>
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-medium flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          Call Summary
+                        </h3>
+                        {!callSummary && !loadingSummary && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              processCallDetails(
+                                selectedRequest.callId,
+                                user.uid
+                              )
+                            }
+                            disabled={processingDetails}
+                          >
+                            {processingDetails ? (
+                              <>
+                                <Loader />
+                                Processing...
+                              </>
+                            ) : (
+                              "Load Summary"
+                            )}
+                          </Button>
+                        )}
+                      </div>
 
                       {loadingSummary ? (
                         <div className="space-y-2">
@@ -542,15 +716,118 @@ export default function RequestCallsManager() {
                           <Skeleton className="h-4 w-3/4" />
                         </div>
                       ) : callSummary ? (
-                        <div className="text-sm bg-secondary/30 p-3 rounded-md">
-                          {callSummary.summary || "No summary available yet."}
+                        <div className="space-y-3">
+                          <div className="text-sm bg-secondary/30 p-3 rounded-md">
+                            {callSummary.summary || "No summary available."}
+                          </div>
+
+                          {/* Key Points extraction from summary/transcript */}
+                          {callSummary && (
+                            <div className="border-t pt-3">
+                              <h4 className="text-sm font-medium mb-2">
+                                Key Points
+                              </h4>
+                              {(() => {
+                                const items = [];
+                                const raw = `${callSummary.summary || ""}\n${callSummary.transcript || ""}`;
+                                const text = raw.toLowerCase();
+                                // Extract order number like #1234 or Order 1234
+                                const orderMatch = raw.match(
+                                  /(#\d{3,}|order\s*#?\s*(\d{3,}))/i
+                                );
+                                const phoneMatch = raw.match(
+                                  /\+?[0-9][0-9\s\-()]{8,}/
+                                );
+                                const emailMatch = raw.match(
+                                  /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i
+                                );
+                                if (text.includes("refund"))
+                                  items.push({
+                                    label: "Refund",
+                                    value: "Requested",
+                                  });
+                                if (orderMatch)
+                                  items.push({
+                                    label: "Order",
+                                    value: orderMatch[0]
+                                      .replace(/order\s*/i, "")
+                                      .trim(),
+                                  });
+                                if (phoneMatch)
+                                  items.push({
+                                    label: "Phone",
+                                    value: phoneMatch[0],
+                                  });
+                                if (emailMatch)
+                                  items.push({
+                                    label: "Email",
+                                    value: emailMatch[0],
+                                  });
+                                if (text.includes("address"))
+                                  items.push({
+                                    label: "Address",
+                                    value: "Discussed",
+                                  });
+                                if (callSummary.ended_reason)
+                                  items.push({
+                                    label: "Ended Reason",
+                                    value: callSummary.ended_reason,
+                                  });
+                                if (items.length === 0)
+                                  items.push({
+                                    label: "Info",
+                                    value: "No specific key points detected",
+                                  });
+                                return (
+                                  <ul className="list-disc pl-5 text-sm space-y-1">
+                                    {items.map((kv, idx) => (
+                                      <li key={idx}>
+                                        <span className="font-medium">
+                                          {kv.label}:
+                                        </span>{" "}
+                                        {kv.value}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                );
+                              })()}
+                            </div>
+                          )}
+
+                          {/* Call Details */}
+                          {(callSummary.duration ||
+                            callSummary.ended_reason) && (
+                            <div className="text-xs text-muted-foreground space-y-1">
+                              {callSummary.duration && (
+                                <div>
+                                  Duration: {Math.round(callSummary.duration)}s
+                                </div>
+                              )}
+                              {callSummary.ended_reason && (
+                                <div>Ended: {callSummary.ended_reason}</div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Transcript Section */}
+                          {callSummary.transcript && (
+                            <div className="border-t pt-3">
+                              <h4 className="text-sm font-medium mb-2">
+                                Call Transcript
+                              </h4>
+                              <div className="text-xs bg-muted/50 p-3 rounded-md max-h-40 overflow-y-auto whitespace-pre-wrap">
+                                {callSummary.transcript}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
                           <AlertCircle className="h-4 w-4" />
                           <span>
-                            Call summary not available. The call may still be in
-                            progress or has not been processed yet.
+                            Call summary not available. Click "Load Summary" to
+                            fetch details from VAPI or wait for the call to
+                            complete.
                           </span>
                         </div>
                       )}
@@ -624,7 +901,7 @@ export default function RequestCallsManager() {
                         >
                           {savingBooking ? (
                             <>
-                              <Loader/>
+                              <Loader />
                               Saving...
                             </>
                           ) : (
@@ -668,6 +945,25 @@ export default function RequestCallsManager() {
                       <span className="font-mono text-xs">
                         {selectedRequest.callId}
                       </span>
+                    </div>
+                  )}
+                  {selectedRequest.recordingUrl && (
+                    <div className="mt-2">
+                      <h4 className="text-sm font-medium mb-1">Recording</h4>
+                      <audio
+                        controls
+                        src={selectedRequest.recordingUrl}
+                        className="w-full"
+                      />
+                      <div className="mt-1">
+                        <a
+                          href={selectedRequest.recordingUrl}
+                          download
+                          className="text-xs text-blue-600 hover:underline"
+                        >
+                          Download recording
+                        </a>
+                      </div>
                     </div>
                   )}
                   {selectedRequest.callStartedAt && (
@@ -739,7 +1035,7 @@ export default function RequestCallsManager() {
                   >
                     {processingCall ? (
                       <>
-                        <Loader/>
+                        <Loader />
                         Initiating...
                       </>
                     ) : (

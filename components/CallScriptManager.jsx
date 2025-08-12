@@ -41,10 +41,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {  Plus, Edit2, Trash2 } from "lucide-react";
+import { Plus, Edit2, Trash2, Sparkles } from "lucide-react";
 import toast from "react-hot-toast";
 import Loader from "@/components/Loader";
-
 
 export default function CallScriptManager() {
   const [scripts, setScripts] = useState([]);
@@ -56,10 +55,16 @@ export default function CallScriptManager() {
     name: "",
     callType: "",
     script: "",
+    language: "en",
+    voiceProvider: "11labs",
+    voiceId: "Hmz0MdhDqv9vPpSMfDkh", // Bobby from 11Labs
+    voiceModel: "eleven_turbo_v2_5",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [callTypes, setCallTypes] = useState([]);
   const [loadingCallTypes, setLoadingCallTypes] = useState(true);
+  const [isGeneratingScript, setIsGeneratingScript] = useState(false);
+  const [businessName, setBusinessName] = useState("");
 
   const user = auth.currentUser;
 
@@ -118,7 +123,7 @@ export default function CallScriptManager() {
 
   const handleAddScript = async () => {
     if (!formData.name || !formData.callType || !formData.script) {
-      toast.error("Please fill all fields");
+      toast.error("Please fill all required fields");
       return;
     }
 
@@ -139,6 +144,10 @@ export default function CallScriptManager() {
         callTypeName: selectedType.name,
         callType: selectedType.typeId,
         script: formData.script,
+        language: formData.language,
+        voiceProvider: formData.voiceProvider,
+        voiceId: formData.voiceId,
+        voiceModel: formData.voiceModel,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       };
@@ -158,7 +167,15 @@ export default function CallScriptManager() {
 
       setScripts(scriptsList);
       setIsAddDialogOpen(false);
-      setFormData({ name: "", callType: "", script: "" });
+      setFormData({
+        name: "",
+        callType: "",
+        script: "",
+        language: "en",
+        voiceProvider: "11labs",
+        voiceId: "bobby",
+        voiceModel: "eleven_turbo_v2_5",
+      });
       toast.success("Script added successfully");
     } catch (error) {
       console.error("Error adding script:", error);
@@ -191,6 +208,10 @@ export default function CallScriptManager() {
         callTypeName: selectedType.name,
         callType: selectedType.typeId,
         script: formData.script,
+        language: formData.language,
+        voiceProvider: formData.voiceProvider,
+        voiceId: formData.voiceId,
+        voiceModel: formData.voiceModel,
         updatedAt: Timestamp.now(),
       };
 
@@ -210,7 +231,15 @@ export default function CallScriptManager() {
       setScripts(scriptsList);
       setIsEditDialogOpen(false);
       setEditingScript(null);
-      setFormData({ name: "", callType: "", script: "" });
+      setFormData({
+        name: "",
+        callType: "",
+        script: "",
+        language: "en",
+        voiceProvider: "11labs",
+        voiceId: "bobby",
+        voiceModel: "eleven_turbo_v2_5",
+      });
       toast.success("Script updated successfully");
     } catch (error) {
       console.error("Error updating script:", error);
@@ -241,8 +270,163 @@ export default function CallScriptManager() {
       name: script.name,
       callType: script.callTypeId || "",
       script: script.script,
+      language: script.language || "en",
+      voiceProvider: script.voiceProvider || "11labs",
+      voiceId: script.voiceId || "bIHbv24MWmeRgasZH58o",
+      voiceModel: script.voiceModel || "eleven_turbo_v2_5",
     });
     setIsEditDialogOpen(true);
+  };
+
+  const generateScriptWithAI = async () => {
+    if (!businessName || !formData.callType) {
+      toast.error("Please enter business name and select call type first");
+      return;
+    }
+
+    // Find the selected call type
+    const selectedType = callTypes.find(
+      (type) => type.id === formData.callType
+    );
+    if (!selectedType) {
+      toast.error("Selected call type not found");
+      return;
+    }
+
+    setIsGeneratingScript(true);
+    try {
+      const response = await fetch("/api/generate-script", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          businessName: businessName,
+          callType: selectedType.name,
+          language: formData.language,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to generate script");
+      }
+
+      // Update form with generated script
+      setFormData({
+        ...formData,
+        name: `${businessName} - ${selectedType.name} Script`,
+        script: result.script,
+      });
+
+      toast.success("Script generated successfully with AI!");
+    } catch (error) {
+      console.error("Error generating script:", error);
+      toast.error(error.message || "Failed to generate script");
+    } finally {
+      setIsGeneratingScript(false);
+    }
+  };
+
+  const createFoodstersScript = async () => {
+    // Check if there are call types available
+    if (callTypes.length === 0) {
+      toast.error("Please create call types first before adding scripts");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Find or use the first available call type
+      const callType =
+        callTypes.find((type) => type.name.toLowerCase().includes("support")) ||
+        callTypes[0];
+
+      const foodstersScriptData = {
+        name: "Foodsters Customer Support",
+        callTypeId: callType.id,
+        callTypeName: callType.name,
+        callType: callType.typeId,
+        script: `Hello! Thank you for calling Foodsters. My name is [AI Assistant], and I'm here to help you with any questions or concerns you may have about your order or our services. Is this a good time to talk?
+
+[If not a good time]
+I understand. When would be a better time for me to call you back? I'll make sure to reach out at your preferred time.
+
+[If yes]
+Great! I'm here to assist you. What can I help you with today?
+
+[If customer has an order issue]
+I'm sorry to hear you're experiencing an issue with your order. Let me help you resolve this right away. Could you please provide me with your order number or the phone number you used to place the order?
+
+[After getting order details]
+Thank you for that information. I can see your order here. Could you please tell me specifically what issue you're experiencing? Is it related to:
+- Food quality
+- Delivery time
+- Missing items
+- Payment issues
+- Something else
+
+[If food quality issue]
+I sincerely apologize for the poor food quality. This is definitely not the Foodsters standard, and I want to make this right for you immediately. We can offer you a full refund or send you a fresh replacement meal right away. Which would you prefer?
+
+[If delivery issue]
+I apologize for the delay in your delivery. I understand how frustrating this can be when you're hungry and waiting for your meal. Let me check with our delivery team and provide you with an updated delivery time. Would you also like me to apply a discount to your current order for the inconvenience?
+
+[If missing items]
+I'm sorry that some items were missing from your order. This is definitely our mistake, and I want to fix this immediately. I can arrange for the missing items to be delivered to you right away at no extra charge, or I can process a partial refund for the missing items. What would work better for you?
+
+[If payment issue]
+I understand there's been an issue with your payment. Let me look into this for you. Could you please tell me what specific payment problem you're experiencing? I'll make sure we resolve this promptly.
+
+[For general inquiries]
+I'd be happy to help you with any questions about our menu, delivery areas, special offers, or anything else about Foodsters. What would you like to know?
+
+[If customer wants to place an order]
+Wonderful! I'd be delighted to help you place an order. You can place orders through our website, mobile app, or I can connect you directly with our order team. Which method would be most convenient for you?
+
+[If customer wants to modify an existing order]
+Let me check if we can still modify your order. Could you please provide your order number? If the order hasn't started being prepared, we should be able to make changes for you.
+
+[Resolution and follow-up]
+Is there anything else I can help you with regarding your Foodsters experience today?
+
+[If yes, address additional concerns]
+
+[If no]
+Thank you so much for choosing Foodsters and for giving us the opportunity to resolve this for you. We truly value your business and want to ensure you have a great experience with us. If you have any other questions or concerns, please don't hesitate to reach out to us anytime.
+
+[Closing]
+Have a wonderful day, and we look forward to serving you again soon!`,
+        language: "en",
+        voiceProvider: "11labs",
+        voiceId: "bobby",
+        voiceModel: "eleven_turbo_v2_5",
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      };
+
+      await addDoc(
+        collection(db, "users", user.uid, "callScripts"),
+        foodstersScriptData
+      );
+
+      // Refresh the scripts list
+      const scriptsRef = collection(db, "users", user.uid, "callScripts");
+      const querySnapshot = await getDocs(scriptsRef);
+      const scriptsList = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      setScripts(scriptsList);
+      toast.success("Foodsters script added");
+    } catch (error) {
+      console.error("Error adding Foodsters script:", error);
+      toast.error("Failed to add Foodsters script");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const createSampleScript = async () => {
@@ -300,6 +484,10 @@ Is there anything else I can help you with today?
 
 [If no]
 Thank you for taking the time to speak with me today. If you have any further questions, please don't hesitate to reach out. Have a wonderful day!`,
+        language: "en",
+        voiceProvider: "11labs",
+        voiceId: "bobby",
+        voiceModel: "eleven_turbo_v2_5",
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       };
@@ -330,7 +518,7 @@ Thank you for taking the time to speak with me today. If you have any further qu
   if (loading || loadingCallTypes) {
     return (
       <div className="flex justify-center items-center h-48">
-        <Loader/>
+        <Loader />
       </div>
     );
   }
@@ -351,7 +539,7 @@ Thank you for taking the time to speak with me today. If you have any further qu
               Add New Script
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[550px]">
+          <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Add New Call Script</DialogTitle>
               <DialogDescription>
@@ -360,6 +548,17 @@ Thank you for taking the time to speak with me today. If you have any further qu
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="businessName">
+                  Business Name (for AI generation)
+                </Label>
+                <Input
+                  id="businessName"
+                  placeholder="e.g., Foodsters"
+                  value={businessName}
+                  onChange={(e) => setBusinessName(e.target.value)}
+                />
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="name">Script Name</Label>
                 <Input
@@ -403,11 +602,122 @@ Thank you for taking the time to speak with me today. If you have any further qu
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="script">Script Content</Label>
+                <Label htmlFor="language">Language</Label>
+                <Select
+                  value={formData.language}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, language: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select language" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="en">English</SelectItem>
+                    <SelectItem value="hi">Hindi (हिंदी)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="voiceProvider">Voice Provider</Label>
+                  <Select
+                    value={formData.voiceProvider}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, voiceProvider: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select provider" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="11labs">11Labs</SelectItem>
+                      <SelectItem value="playht">PlayHT</SelectItem>
+                      <SelectItem value="azure">Azure</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="voiceModel">Voice Model</Label>
+                  <Select
+                    value={formData.voiceModel}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, voiceModel: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="eleven_turbo_v2_5">
+                        Eleven Turbo v2.5
+                      </SelectItem>
+                      <SelectItem value="eleven_turbo_v2">
+                        Eleven Turbo v2
+                      </SelectItem>
+                      <SelectItem value="eleven_multilingual_v2">
+                        Eleven Multilingual v2
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="voiceId">Voice</Label>
+                <Select
+                  value={formData.voiceId}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, voiceId: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select voice" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="bobby">
+                      Bobby (Indian Male) - 11Labs
+                    </SelectItem>
+                    <SelectItem value="pNInz6obpgDQGcFmaJgB">
+                      Adam (Male) - 11Labs
+                    </SelectItem>
+                    <SelectItem value="EXAVITQu4vr4xnSDxMaL">
+                      Bella (Female) - 11Labs
+                    </SelectItem>
+                    <SelectItem value="VR6AewLTigWG4xSOukaG">
+                      Arnold (Male) - 11Labs
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <Label htmlFor="script">Script Content</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={generateScriptWithAI}
+                    disabled={
+                      isGeneratingScript || !businessName || !formData.callType
+                    }
+                  >
+                    {isGeneratingScript ? (
+                      <>
+                        <Loader />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Generate with AI
+                      </>
+                    )}
+                  </Button>
+                </div>
                 <Textarea
                   id="script"
-                  placeholder="Write your call script here..."
-                  className="min-h-[200px]"
+                  placeholder="Write your call script here or use AI generation..."
+                  className="min-h-[200px] max-h-[50vh]"
                   value={formData.script}
                   onChange={(e) =>
                     setFormData({ ...formData, script: e.target.value })
@@ -429,7 +739,7 @@ Thank you for taking the time to speak with me today. If you have any further qu
               <Button onClick={handleAddScript} disabled={isSubmitting}>
                 {isSubmitting ? (
                   <>
-                    <Loader/>
+                    <Loader />
                     Saving...
                   </>
                 ) : (
@@ -454,12 +764,26 @@ Thank you for taking the time to speak with me today. If you have any further qu
               </Button>
               <Button
                 variant="outline"
+                onClick={createFoodstersScript}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader />
+                    Creating...
+                  </>
+                ) : (
+                  "Foodsters Script"
+                )}
+              </Button>
+              <Button
+                variant="outline"
                 onClick={createSampleScript}
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (
                   <>
-                    <Loader/>
+                    <Loader />
                     Creating...
                   </>
                 ) : (
@@ -510,7 +834,7 @@ Thank you for taking the time to speak with me today. If you have any further qu
 
       {/* Edit Script Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[550px]">
+        <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Call Script</DialogTitle>
             <DialogDescription>
@@ -556,6 +880,94 @@ Thank you for taking the time to speak with me today. If you have any further qu
               </Select>
             </div>
             <div className="space-y-2">
+              <Label htmlFor="edit-language">Language</Label>
+              <Select
+                value={formData.language}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, language: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select language" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en">English</SelectItem>
+                  <SelectItem value="hi">Hindi (हिंदी)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-voiceProvider">Voice Provider</Label>
+                <Select
+                  value={formData.voiceProvider}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, voiceProvider: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select provider" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="11labs">11Labs</SelectItem>
+                    <SelectItem value="playht">PlayHT</SelectItem>
+                    <SelectItem value="azure">Azure</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-voiceModel">Voice Model</Label>
+                <Select
+                  value={formData.voiceModel}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, voiceModel: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select model" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="eleven_turbo_v2_5">
+                      Eleven Turbo v2.5
+                    </SelectItem>
+                    <SelectItem value="eleven_turbo_v2">
+                      Eleven Turbo v2
+                    </SelectItem>
+                    <SelectItem value="eleven_multilingual_v2">
+                      Eleven Multilingual v2
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-voiceId">Voice</Label>
+              <Select
+                value={formData.voiceId}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, voiceId: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select voice" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bobby">
+                    Bobby (Indian Male) - 11Labs
+                  </SelectItem>
+                  <SelectItem value="pNInz6obpgDQGcFmaJgB">
+                    Adam (Male) - 11Labs
+                  </SelectItem>
+                  <SelectItem value="EXAVITQu4vr4xnSDxMaL">
+                    Bella (Female) - 11Labs
+                  </SelectItem>
+                  <SelectItem value="VR6AewLTigWG4xSOukaG">
+                    Arnold (Male) - 11Labs
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="edit-script">Script Content</Label>
               <Textarea
                 id="edit-script"
@@ -578,7 +990,7 @@ Thank you for taking the time to speak with me today. If you have any further qu
             <Button onClick={handleEditScript} disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
-                  <Loader/>
+                  <Loader />
                   Updating...
                 </>
               ) : (

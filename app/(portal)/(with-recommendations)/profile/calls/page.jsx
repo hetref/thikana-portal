@@ -9,15 +9,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 export default function CallsPage() {
   return (
     <div className="container mx-auto p-6">
-      <Tabs defaultValue="requests" className="space-y-6">
+      <Tabs defaultValue="history" className="space-y-6">
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="requests">Call Requests</TabsTrigger>
+          <TabsTrigger value="history">Call History</TabsTrigger>
           <TabsTrigger value="types">Call Types</TabsTrigger>
           <TabsTrigger value="scripts">Call Scripts</TabsTrigger>
-          <TabsTrigger value="automation">Call Automation</TabsTrigger>
+          <TabsTrigger value="make-call">Make a Call</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="requests">
+        <TabsContent value="history">
           <Card className="p-6">
             <RequestCallsManager />
           </Card>
@@ -35,7 +35,7 @@ export default function CallsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="automation">
+        <TabsContent value="make-call">
           <Card className="p-6">
             <CallAutomationSettings />
           </Card>
