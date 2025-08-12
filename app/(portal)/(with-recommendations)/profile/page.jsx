@@ -2896,7 +2896,7 @@ export default function Profile() {
                       variant="outline"
                       className="w-full justify-start gap-3 py-3 h-auto rounded-2xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
                     >
-                      <Link href={`/website-builder/${user?.uid}`}>
+                      <Link href="/websites">
                         <Globe className="w-4 h-4" />
                         Build Website
                       </Link>

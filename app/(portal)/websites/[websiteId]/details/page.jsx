@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { Edit, ExternalLink, Calendar, Clock, Copy, Download, Image, FileText, Video, File, Globe, Zap, RefreshCw, Trash2 } from "lucide-react";
+import { Edit, ExternalLink, Calendar, Clock, Copy, Download, Image, FileText, Video, File, Globe, Zap, Power } from "lucide-react";
 import toast from "react-hot-toast";
 
 function getPublicBaseUrl() {
@@ -45,6 +45,44 @@ function formatDate(date) {
   }
 }
 
+// Add robust date-time formatter that supports Firestore Timestamp, Date, and string
+function formatDateTime(input) {
+  try {
+    if (!input) return 'Unknown';
+    let d = null;
+    if (typeof input?.toDate === 'function') {
+      d = input.toDate();
+    } else if (input instanceof Date) {
+      d = input;
+    } else if (typeof input === 'object') {
+      // Support Firestore REST/serialized timestamp objects
+      if (input.type === 'firestore/timestamp/1.0' && input.seconds != null) {
+        console.debug('[formatDateTime] Parsing Firestore serialized timestamp', input);
+        const secs = Number(input.seconds);
+        const nanos = Number(input.nanoseconds || 0);
+        d = new Date(secs * 1000 + Math.floor(nanos / 1e6));
+      } else if (input.seconds != null) {
+        const secs = Number(input.seconds);
+        const nanos = Number(input.nanoseconds || 0);
+        d = new Date(secs * 1000 + Math.floor(nanos / 1e6));
+      } else if (input._seconds != null) {
+        const secs = Number(input._seconds);
+        const nanos = Number(input._nanoseconds || 0);
+        d = new Date(secs * 1000 + Math.floor(nanos / 1e6));
+      }
+    } else if (typeof input === 'number') {
+      d = new Date(input);
+    } else if (typeof input === 'string') {
+      d = new Date(input);
+    }
+    if (!d || isNaN(d.getTime())) return 'Unknown';
+    return d.toLocaleString();
+  } catch (error) {
+    console.error('DateTime formatting error:', error);
+    return 'Unknown';
+  }
+}
+
 function getFileIcon(type) {
   switch (type) {
     case 'image':
@@ -71,6 +109,8 @@ export default function WebsiteDetailsPage() {
   const [deployingCloudFront, setDeployingCloudFront] = useState(false);
   const [invalidatingCache, setInvalidatingCache] = useState(false);
   const [refreshingStatus, setRefreshingStatus] = useState(false);
+  const [activeTab, setActiveTab] = useState('details');
+  const [disablingDistribution, setDisablingDistribution] = useState(false);
 
   useEffect(() => {
     const unsub = auth.onAuthStateChanged(async (user) => {
@@ -81,16 +121,27 @@ export default function WebsiteDetailsPage() {
       try {
         const userDoc = await getDoc(doc(db, "users", user.uid));
         let bizId = user.uid;
+        console.log("BUSINESS", bizId, userDoc.data());
         if (userDoc.exists()) {
           const u = userDoc.data();
           if (u.role === "member" && u.businessId) bizId = u.businessId;
         }
         setBusinessId(bizId);
+
+        console.log("BUSINESS", bizId, websiteId);
         
         // Load website data
         const websiteDoc = await getDoc(doc(db, "businesses", bizId, "websites", websiteId));
-        if (websiteDoc.exists()) {
+        console.log("WEBSITE DATE", websiteDoc?.data())
+        if (websiteDoc.data()) {
           const websiteData = { id: websiteDoc.id, ...websiteDoc.data() };
+          console.debug('[Details] Loaded website doc:', websiteData);
+          console.debug('[Details] createdAt raw value:', websiteData?.createdAt);
+          // Fallback: if createdAt missing, try to use cloudfront.createdAt (not ideal, but better than Unknown)
+          if (!websiteData.createdAt && websiteData.cloudfront?.createdAt) {
+            websiteData.createdAt = websiteData.cloudfront.createdAt;
+          }
+          console.log("WEBSITE CREATED", websiteData.createdAt)
           setWebsite(websiteData);
           
           // Set preview URL
@@ -111,6 +162,16 @@ export default function WebsiteDetailsPage() {
     });
     return () => unsub();
   }, [websiteId, router]);
+
+  // Auto-load tab-specific data when a tab is opened
+  useEffect(() => {
+    if (activeTab === 'media' && !loadingMedia && mediaFiles.length === 0) {
+      loadMediaFiles();
+    }
+    if (activeTab === 'cloudfront' && website?.cloudfront && !refreshingStatus) {
+      handleRefreshDistributionStatus();
+    }
+  }, [activeTab]);
 
   const loadMediaFiles = async () => {
     if (!businessId) return;
@@ -188,11 +249,24 @@ export default function WebsiteDetailsPage() {
       if (response.ok) {
         const data = await response.json();
         toast.success(`CloudFront deployment started! Distribution: ${data.distribution.domainName}`);
-        
-        // Refresh website data to show new CloudFront info
+        // Normalize and optimistically update local state with returned distribution info
+        setWebsite(prev => ({
+          ...prev,
+          cloudfront: {
+            ...(prev?.cloudfront || {}),
+            distributionId: data.distribution.id || data.distribution.distributionId,
+            domainName: data.distribution.domainName || data.distribution.distributionDomainName,
+            status: data.distribution.status || data.distribution.distributionStatus,
+            enabled: typeof data.distribution.enabled === 'boolean' ? data.distribution.enabled : true,
+            arn: data.distribution.arn,
+            createdAt: data.distribution.createdAt || new Date(),
+            updatedAt: new Date(),
+          }
+        }));
+        // Optionally poll once to get latest status/enabled without full reload
         setTimeout(() => {
-          window.location.reload();
-        }, 2000);
+          handleRefreshDistributionStatus();
+        }, 1500);
       } else {
         const error = await response.json();
         throw new Error(error.message || 'Deployment failed');
@@ -253,11 +327,21 @@ export default function WebsiteDetailsPage() {
       });
 
       if (response.ok) {
+        const data = await response.json();
+        // Update local state with latest distribution info without full page reload
+        setWebsite(prev => ({
+          ...prev,
+          cloudfront: {
+            ...(prev?.cloudfront || {}),
+            ...data.distribution,
+            // normalize keys for UI
+            distributionId: data.distribution.distributionId || data.distribution.id || prev?.cloudfront?.distributionId,
+            domainName: data.distribution.domainName || data.distribution.distributionDomainName || prev?.cloudfront?.domainName,
+            status: data.distribution.status || data.distribution.distributionStatus || prev?.cloudfront?.status,
+            updatedAt: new Date(),
+          }
+        }));
         toast.success('Distribution status updated!');
-        // Refresh the page to show updated status
-        setTimeout(() => {
-          window.location.reload();
-        }, 1000);
       } else {
         const error = await response.json();
         throw new Error(error.message || 'Failed to refresh status');
@@ -267,6 +351,31 @@ export default function WebsiteDetailsPage() {
       toast.error(`Failed to refresh status: ${error.message}`);
     } finally {
       setRefreshingStatus(false);
+    }
+  };
+
+  const handleDisableDistribution = async () => {
+    if (!businessId || !websiteId || !website?.cloudfront?.distributionId || disablingDistribution) return;
+    const confirmDisable = window.confirm('Disable CloudFront distribution for this website? You can delete once disabled.');
+    if (!confirmDisable) return;
+    try {
+      setDisablingDistribution(true);
+      const idToken = await auth.currentUser.getIdToken();
+      const res = await fetch(`/api/websites/cloudfront?businessId=${businessId}&websiteId=${websiteId}&distributionId=${website.cloudfront.distributionId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+        },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.message || 'Failed to disable distribution');
+      toast.success(data?.message || 'Distribution disabling started');
+      setTimeout(() => handleRefreshDistributionStatus(), 1500);
+    } catch (error) {
+      console.error('Disable error:', error);
+      toast.error(error.message || 'Failed to disable distribution');
+    } finally {
+      setDisablingDistribution(false);
     }
   };
 
@@ -298,14 +407,14 @@ export default function WebsiteDetailsPage() {
         </Button>
       </div>
 
-      <Tabs defaultValue="details" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="details">Website Details</TabsTrigger>
           <TabsTrigger value="cloudfront">
             <Globe className="w-4 h-4 mr-2" />
             CloudFront CDN
           </TabsTrigger>
-          <TabsTrigger value="media" onClick={() => !loadingMedia && mediaFiles.length === 0 && loadMediaFiles()}>
+          <TabsTrigger value="media">
             Media Files
           </TabsTrigger>
         </TabsList>
@@ -333,13 +442,13 @@ export default function WebsiteDetailsPage() {
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Calendar className="w-4 h-4" />
-                      <span>Created: {website.createdAt?.toDate ? website.createdAt.toDate().toLocaleString() : "Unknown"}</span>
+                      <span>Created: {formatDateTime(website.createdAt)}</span>
                     </div>
                     
                     {website.updatedAt && (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Clock className="w-4 h-4" />
-                        <span>Last Updated: {website.updatedAt.toDate ? website.updatedAt.toDate().toLocaleString() : "Unknown"}</span>
+                        <span>Last Updated: {formatDateTime(website.updatedAt)}</span>
                       </div>
                     )}
 
@@ -391,6 +500,133 @@ export default function WebsiteDetailsPage() {
               </CardContent>
             </Card>
 
+            {/* CloudFront Overview in Details Tab */}
+            {website?.cloudfront && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Globe className="w-5 h-5" />
+                    CloudFront CDN
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Status:</span>
+                        <Badge variant={(website.cloudfront.status || website.cloudfront.distributionStatus) === 'Deployed' ? 'default' : 'secondary'}>
+                          {website.cloudfront.status || website.cloudfront.distributionStatus || 'Unknown'}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Enabled:</span>
+                        <Badge variant={website.cloudfront.enabled ? 'default' : 'secondary'}>
+                          {website.cloudfront.enabled ? 'Yes' : 'No'}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Distribution ID:</span>
+                        <code className="text-xs bg-gray-100 px-2 py-1 rounded">
+                          {website.cloudfront.distributionId}
+                        </code>
+                      </div>
+                      {website.cloudfront.createdAt && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Created:</span>
+                          <span className="text-sm">{formatDateTime(website.cloudfront.createdAt)}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="font-semibold mb-1">CDN Domain</h3>
+                      <div className="flex items-center gap-2">
+                        <code className="text-sm bg-gray-100 px-2 py-1 rounded flex-1 truncate">
+                          {`https://${website.cloudfront.domainName || website.cloudfront.distributionDomainName || ''}`}
+                        </code>
+                        {(website.cloudfront.domainName || website.cloudfront.distributionDomainName) && (
+                          <>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={() => copyToClipboard(`https://${website.cloudfront.domainName || website.cloudfront.distributionDomainName}`, 'CDN URL')}
+                            >
+                              <Copy className="w-3 h-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => window.open(`https://${website.cloudfront.domainName || website.cloudfront.distributionDomainName}`, '_blank')}
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                      <div className="pt-2">
+                        <Button 
+                          onClick={handleRefreshDistributionStatus}
+                          disabled={refreshingStatus}
+                          variant="outline"
+                        >
+                          {refreshingStatus ? (
+                            <>
+                              <Zap className="w-4 h-4 mr-2 animate-pulse" />
+                              Refreshing...
+                            </>
+                          ) : (
+                            <>
+                              <Zap className="w-4 h-4 mr-2" />
+                              Refresh Status
+                            </>
+                          )}
+                        </Button>
+                        {website.cloudfront?.enabled && (
+                          <Button
+                            onClick={handleDisableDistribution}
+                            disabled={disablingDistribution}
+                            variant="outline"
+                            className="text-red-600 border-red-600 hover:bg-red-50"
+                          >
+                            <Power className="w-4 h-4 mr-2" />
+                            Disable CDN
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {!website?.cloudfront && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Globe className="w-5 h-5" />
+                    CloudFront CDN
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center">
+                    <p className="text-muted-foreground mb-4">No CloudFront distribution. Deploy to enable CDN.</p>
+                    <Button onClick={handleDeployToCloudFront} disabled={deployingCloudFront}>
+                      {deployingCloudFront ? (
+                        <>
+                          <Zap className="w-4 h-4 mr-2 animate-pulse" />
+                          Deploying to CloudFront...
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-4 h-4 mr-2" />
+                          Deploy to CloudFront
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Website Preview */}
             {previewUrl && (
               <Card>
@@ -435,8 +671,8 @@ export default function WebsiteDetailsPage() {
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-muted-foreground">Status:</span>
-                          <Badge variant={website.cloudfront.status === 'Deployed' ? 'default' : 'secondary'}>
-                            {website.cloudfront.status}
+                          <Badge variant={(website.cloudfront.status || website.cloudfront.distributionStatus) === 'Deployed' ? 'default' : 'secondary'}>
+                            {website.cloudfront.status || website.cloudfront.distributionStatus || 'Unknown'}
                           </Badge>
                         </div>
                         <div className="flex items-center justify-between">
@@ -454,12 +690,7 @@ export default function WebsiteDetailsPage() {
                         {website.cloudfront.createdAt && (
                           <div className="flex items-center justify-between">
                             <span className="text-sm text-muted-foreground">Created:</span>
-                            <span className="text-sm">
-                              {website.cloudfront.createdAt.toDate ? 
-                                website.cloudfront.createdAt.toDate().toLocaleString() : 
-                                new Date(website.cloudfront.createdAt).toLocaleString()
-                              }
-                            </span>
+                            <span className="text-sm">{formatDateTime(website.cloudfront.createdAt)}</span>
                           </div>
                         )}
                       </div>
@@ -470,22 +701,26 @@ export default function WebsiteDetailsPage() {
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           <code className="text-sm bg-gray-100 px-2 py-1 rounded flex-1 truncate">
-                            https://{website.cloudfront.domainName}
+                            https://{website.cloudfront.domainName || website.cloudfront.distributionDomainName}
                           </code>
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            onClick={() => copyToClipboard(`https://${website.cloudfront.domainName}`, 'CDN URL')}
-                          >
-                            <Copy className="w-3 h-3" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => window.open(`https://${website.cloudfront.domainName}`, '_blank')}
-                          >
-                            <ExternalLink className="w-3 h-3" />
-                          </Button>
+                          {(website.cloudfront.domainName || website.cloudfront.distributionDomainName) && (
+                            <>
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                onClick={() => copyToClipboard(`https://${website.cloudfront.domainName || website.cloudfront.distributionDomainName}`, 'CDN URL')}
+                              >
+                                <Copy className="w-3 h-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => window.open(`https://${website.cloudfront.domainName || website.cloudfront.distributionDomainName}`, '_blank')}
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -495,24 +730,6 @@ export default function WebsiteDetailsPage() {
                   <div>
                     <h3 className="font-semibold mb-3">Actions</h3>
                     <div className="flex flex-wrap gap-2">
-                      <Button 
-                        onClick={handleInvalidateCache}
-                        disabled={invalidatingCache}
-                        variant="outline"
-                      >
-                        {invalidatingCache ? (
-                          <>
-                            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                            Clearing Cache...
-                          </>
-                        ) : (
-                          <>
-                            <RefreshCw className="w-4 h-4 mr-2" />
-                            Clear Cache
-                          </>
-                        )}
-                      </Button>
-                      
                       <Button 
                         onClick={handleRefreshDistributionStatus}
                         disabled={refreshingStatus}
@@ -527,6 +744,42 @@ export default function WebsiteDetailsPage() {
                           <>
                             <Zap className="w-4 h-4 mr-2" />
                             Refresh Status
+                          </>
+                        )}
+                      </Button>
+                      {website.cloudfront?.enabled && (
+                        <Button 
+                          onClick={handleDisableDistribution}
+                          disabled={disablingDistribution}
+                          variant="destructive"
+                        >
+                          {disablingDistribution ? (
+                            <>
+                              <Power className="w-4 h-4 mr-2 animate-pulse" />
+                              Disabling...
+                            </>
+                          ) : (
+                            <>
+                              <Power className="w-4 h-4 mr-2" />
+                              Disable CDN
+                            </>
+                          )}
+                        </Button>
+                      )}
+                      <Button 
+                        onClick={handleInvalidateCache}
+                        disabled={invalidatingCache}
+                        variant="outline"
+                      >
+                        {invalidatingCache ? (
+                          <>
+                            <Zap className="w-4 h-4 mr-2 animate-pulse" />
+                            Invalidating Cache...
+                          </>
+                        ) : (
+                          <>
+                            <Zap className="w-4 h-4 mr-2" />
+                            Invalidate Cache
                           </>
                         )}
                       </Button>
@@ -553,12 +806,7 @@ export default function WebsiteDetailsPage() {
                           </div>
                           <div>
                             <span className="text-muted-foreground">Created:</span>
-                            <span className="ml-2">
-                              {website.cloudfront.lastInvalidation.createdAt.toDate ? 
-                                website.cloudfront.lastInvalidation.createdAt.toDate().toLocaleString() : 
-                                new Date(website.cloudfront.lastInvalidation.createdAt).toLocaleString()
-                              }
-                            </span>
+                            <span className="ml-2">{formatDateTime(website.cloudfront.lastInvalidation.createdAt)}</span>
                           </div>
                           <div>
                             <span className="text-muted-foreground">Paths:</span>
