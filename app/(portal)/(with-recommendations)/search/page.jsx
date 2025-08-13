@@ -38,7 +38,7 @@ const Hit = ({ hit, userLocation }) => {
 
   return (
     <Link
-      href={`/${hit.username || "business"}?user=${hit.objectID || hit.id}`}
+      href={`/${hit.objectID || hit.id}`}
       className="block group"
     >
       <div className="bg-white rounded-2xl shadow-sm hover:shadow-lg transition-all duration-300 p-6 border border-gray-100 hover:border-gray-200 group-hover:scale-[1.01]">
