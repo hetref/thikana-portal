@@ -858,7 +858,10 @@ export default function Profile() {
             className="cursor-pointer hover:shadow-md transition-shadow border border-gray-100"
           >
             <CardContent className="pt-6">
-              <PostCard post={post} onView={() => router.push(`/feed/${post.id || post.postId}`)} />
+              <PostCard
+                post={post}
+                onView={() => router.push(`/feed/${post.id || post.postId}`)}
+              />
             </CardContent>
           </Card>
         ))}
@@ -906,9 +909,15 @@ export default function Profile() {
 
   const renderSavedPostCard = useCallback(
     (post) => (
-      <Card key={post.id} className="cursor-pointer hover:shadow-md transition-shadow border border-gray-100">
+      <Card
+        key={post.id}
+        className="cursor-pointer hover:shadow-md transition-shadow border border-gray-100"
+      >
         <CardContent className="pt-6">
-          <PostCard post={post} onView={() => router.push(`/feed/${post.id || post.postId}`)} />
+          <PostCard
+            post={post}
+            onView={() => router.push(`/feed/${post.id || post.postId}`)}
+          />
         </CardContent>
       </Card>
     ),
@@ -1196,10 +1205,11 @@ export default function Profile() {
               disabled={!isSelectable}
             >
               <Star
-                className={`h-6 w-6 ${star <= currentRating
+                className={`h-6 w-6 ${
+                  star <= currentRating
                     ? "fill-yellow-400 text-yellow-400"
                     : "text-gray-300"
-                  } ${isSelectable && star <= currentRating ? "text-yellow-400" : ""}`}
+                } ${isSelectable && star <= currentRating ? "text-yellow-400" : ""}`}
               />
             </button>
           ))}
@@ -1289,10 +1299,11 @@ export default function Profile() {
                   <div className="relative px-6 sm:px-8 pb-8 pt-4">
                     {/* Profile picture positioned over cover image */}
                     <div
-                      className={`${isBusinessUser
+                      className={`${
+                        isBusinessUser
                           ? "absolute -top-12 left-8 z-10"
                           : "flex justify-center -mt-12 mb-6"
-                        }`}
+                      }`}
                     >
                       <Dialog>
                         <DialogTrigger>
@@ -1334,8 +1345,9 @@ export default function Profile() {
 
                     {/* Main content with proper spacing for profile picture */}
                     <div
-                      className={`${isBusinessUser ? "pt-20" : "pt-0"
-                        } space-y-6`}
+                      className={`${
+                        isBusinessUser ? "pt-20" : "pt-0"
+                      } space-y-6`}
                     >
                       {/* Name, username and bio section */}
                       <div className="space-y-4">
@@ -1348,7 +1360,7 @@ export default function Profile() {
                                   ? userData?.businessName || userData?.name
                                   : userData?.name}
                                 {isBusinessUser &&
-                                  userData?.role === "member" ? (
+                                userData?.role === "member" ? (
                                   <Badge
                                     variant="outline"
                                     className="bg-gradient-to-r from-violet-50 to-violet-100 text-violet-700 border-violet-200 px-3 py-1 text-sm font-medium rounded-full"
@@ -1397,7 +1409,9 @@ export default function Profile() {
                                     }
                                   >
                                     <EditIcon className="w-4 h-4 mr-2" />
-                                    <span className="font-medium">Edit Profile</span>
+                                    <span className="font-medium">
+                                      Edit Profile
+                                    </span>
                                   </Link>
                                 </Button>
                               )}
@@ -1429,19 +1443,23 @@ export default function Profile() {
                                               ? "Loading..."
                                               : selectedFranchiseId
                                                 ? franchises.find(
-                                                  (f) =>
-                                                    f.id === selectedFranchiseId
-                                                )?.businessName || "Franchise"
+                                                    (f) =>
+                                                      f.id ===
+                                                      selectedFranchiseId
+                                                  )?.businessName || "Franchise"
                                                 : "Headquarters"}
                                           </span>
                                           <Badge
                                             variant="outline"
-                                            className={`text-xs px-2 py-0.5 ${selectedFranchiseId
+                                            className={`text-xs px-2 py-0.5 ${
+                                              selectedFranchiseId
                                                 ? "bg-blue-50 text-blue-600 border-blue-200"
                                                 : "bg-amber-50 text-amber-600 border-amber-200"
-                                              }`}
+                                            }`}
                                           >
-                                            {selectedFranchiseId ? "Franchise" : "HQ"}
+                                            {selectedFranchiseId
+                                              ? "Franchise"
+                                              : "HQ"}
                                           </Badge>
                                         </div>
                                         <ChevronDown className="h-4 w-4 ml-2" />
@@ -1490,10 +1508,12 @@ export default function Profile() {
                                           </div>
                                           <div className="flex-1">
                                             <span className="font-medium">
-                                              {franchise.businessName || "Franchise"}
+                                              {franchise.businessName ||
+                                                "Franchise"}
                                             </span>
                                           </div>
-                                          {selectedFranchiseId === franchise.id && (
+                                          {selectedFranchiseId ===
+                                            franchise.id && (
                                             <Badge className="bg-blue-100 text-blue-700 border-blue-200">
                                               Current
                                             </Badge>
@@ -1528,8 +1548,6 @@ export default function Profile() {
                           )}
                         </div>
                       </div>
-
-
 
                       {/* Stats row with enhanced design */}
                       <div className="grid grid-cols-4 gap-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-3xl p-6 border border-gray-200">
@@ -1627,7 +1645,7 @@ export default function Profile() {
                           </div>
                           <div className="h-[350px] w-full relative">
                             {userData?.location?.latitude &&
-                              userData?.location?.longitude ? (
+                            userData?.location?.longitude ? (
                               <MapComponent
                                 location={{
                                   lat: userData.location.latitude,
@@ -1763,65 +1781,65 @@ export default function Profile() {
                             {userData?.business_categories?.includes(
                               "product"
                             ) && (
-                                <TabsTrigger
-                                  title="Products"
-                                  value="products"
-                                  className={cn(
-                                    "rounded-2xl flex-1 transition-all duration-300",
-                                    "data-[state=active]:bg-white data-[state=active]:text-orange-600 data-[state=active]:shadow-lg",
-                                    "px-4 py-4 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-white/50"
-                                  )}
-                                >
-                                  <div className="p-1.5 rounded-lg bg-orange-100">
-                                    <SquareChartGantt className="w-4 h-4 text-orange-600" />
-                                  </div>
-                                  <span className="hidden sm:block">
-                                    Products
-                                  </span>
-                                </TabsTrigger>
-                              )}
+                              <TabsTrigger
+                                title="Products"
+                                value="products"
+                                className={cn(
+                                  "rounded-2xl flex-1 transition-all duration-300",
+                                  "data-[state=active]:bg-white data-[state=active]:text-orange-600 data-[state=active]:shadow-lg",
+                                  "px-4 py-4 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-white/50"
+                                )}
+                              >
+                                <div className="p-1.5 rounded-lg bg-orange-100">
+                                  <SquareChartGantt className="w-4 h-4 text-orange-600" />
+                                </div>
+                                <span className="hidden sm:block">
+                                  Products
+                                </span>
+                              </TabsTrigger>
+                            )}
 
                             {userData?.business_categories?.includes(
                               "service"
                             ) && (
-                                <TabsTrigger
-                                  value="services"
-                                  title="Services"
-                                  className={cn(
-                                    "rounded-2xl flex-1 transition-all duration-300",
-                                    "data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-lg",
-                                    "px-4 py-4 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-white/50"
-                                  )}
-                                >
-                                  <div className="p-1.5 rounded-lg bg-indigo-100">
-                                    <Settings className="w-4 h-4 text-indigo-600" />
-                                  </div>
-                                  <span className="hidden sm:block">
-                                    Services
-                                  </span>
-                                </TabsTrigger>
-                              )}
+                              <TabsTrigger
+                                value="services"
+                                title="Services"
+                                className={cn(
+                                  "rounded-2xl flex-1 transition-all duration-300",
+                                  "data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-lg",
+                                  "px-4 py-4 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-white/50"
+                                )}
+                              >
+                                <div className="p-1.5 rounded-lg bg-indigo-100">
+                                  <Settings className="w-4 h-4 text-indigo-600" />
+                                </div>
+                                <span className="hidden sm:block">
+                                  Services
+                                </span>
+                              </TabsTrigger>
+                            )}
 
                             {userData?.business_categories?.includes(
                               "real-estate"
                             ) && (
-                                <TabsTrigger
-                                  value="properties"
-                                  title="Properties"
-                                  className={cn(
-                                    "rounded-2xl flex-1 transition-all duration-300",
-                                    "data-[state=active]:bg-white data-[state=active]:text-teal-600 data-[state=active]:shadow-lg",
-                                    "px-4 py-4 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-white/50"
-                                  )}
-                                >
-                                  <div className="p-1.5 rounded-lg bg-teal-100">
-                                    <Home className="w-4 h-4 text-teal-600" />
-                                  </div>
-                                  <span className="hidden sm:block">
-                                    Properties
-                                  </span>
-                                </TabsTrigger>
-                              )}
+                              <TabsTrigger
+                                value="properties"
+                                title="Properties"
+                                className={cn(
+                                  "rounded-2xl flex-1 transition-all duration-300",
+                                  "data-[state=active]:bg-white data-[state=active]:text-teal-600 data-[state=active]:shadow-lg",
+                                  "px-4 py-4 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-white/50"
+                                )}
+                              >
+                                <div className="p-1.5 rounded-lg bg-teal-100">
+                                  <Home className="w-4 h-4 text-teal-600" />
+                                </div>
+                                <span className="hidden sm:block">
+                                  Properties
+                                </span>
+                              </TabsTrigger>
+                            )}
 
                             <TabsTrigger
                               value="saved"
@@ -2000,11 +2018,11 @@ export default function Profile() {
                                             <p className="font-semibold text-gray-900">
                                               {franchise.createdAt?.toDate
                                                 ? format(
-                                                  new Date(
-                                                    franchise.createdAt?.toDate()
-                                                  ),
-                                                  "MMM d, yyyy"
-                                                )
+                                                    new Date(
+                                                      franchise.createdAt?.toDate()
+                                                    ),
+                                                    "MMM d, yyyy"
+                                                  )
                                                 : "N/A"}
                                             </p>
                                           </div>
@@ -2109,7 +2127,14 @@ export default function Profile() {
                                     className="cursor-pointer hover:shadow-2xl transition-all duration-300 border-0 bg-white/80 backdrop-blur-sm shadow-lg rounded-3xl hover:-translate-y-1"
                                   >
                                     <CardContent className="p-6">
-                                      <PostCard post={post} onView={() => router.push(`/feed/${post.id || post.postId}`)} />
+                                      <PostCard
+                                        post={post}
+                                        onView={() =>
+                                          router.push(
+                                            `/feed/${post.id || post.postId}`
+                                          )
+                                        }
+                                      />
                                     </CardContent>
                                   </Card>
                                 ))
@@ -2151,7 +2176,7 @@ export default function Profile() {
                                     <PhotosGrid
                                       photos={userPhotos}
                                       userId={userData.uid}
-                                      onPhotoDeleted={() => { }}
+                                      onPhotoDeleted={() => {}}
                                       onAddPhoto={openAddPhotoModal}
                                     />
                                     {auth.currentUser && (
@@ -2223,23 +2248,23 @@ export default function Profile() {
                         {userData?.business_categories?.includes(
                           "real-estate"
                         ) && (
-                            <TabsContent
-                              value="properties"
-                              className="p-8 focus-visible:outline-none focus:outline-none transition-all duration-300 animate-in fade-in-50"
-                            >
-                              <div className="space-y-6">
-                                <div className="flex items-center justify-between">
-                                  <h2 className="text-2xl font-bold text-gray-900">
-                                    Properties
-                                  </h2>
-                                  <div className="text-sm text-gray-500 bg-teal-50 text-teal-600 px-3 py-1 rounded-full border border-teal-200">
-                                    Real Estate
-                                  </div>
+                          <TabsContent
+                            value="properties"
+                            className="p-8 focus-visible:outline-none focus:outline-none transition-all duration-300 animate-in fade-in-50"
+                          >
+                            <div className="space-y-6">
+                              <div className="flex items-center justify-between">
+                                <h2 className="text-2xl font-bold text-gray-900">
+                                  Properties
+                                </h2>
+                                <div className="text-sm text-gray-500 bg-teal-50 text-teal-600 px-3 py-1 rounded-full border border-teal-200">
+                                  Real Estate
                                 </div>
-                                {userData && user && <ShowPropertiesTabContent />}
                               </div>
-                            </TabsContent>
-                          )}
+                              {userData && user && <ShowPropertiesTabContent />}
+                            </div>
+                          </TabsContent>
+                        )}
 
                         {/* Saved Posts tab */}
                         <TabsContent
@@ -2331,10 +2356,11 @@ export default function Profile() {
                                                   ? "success"
                                                   : "outline"
                                               }
-                                              className={`px-3 py-1 rounded-full font-semibold ${order.status === "completed"
+                                              className={`px-3 py-1 rounded-full font-semibold ${
+                                                order.status === "completed"
                                                   ? "bg-green-100 text-green-700 border-green-200"
                                                   : "bg-gray-100 text-gray-700 border-gray-200"
-                                                }`}
+                                              }`}
                                             >
                                               {order.status === "completed"
                                                 ? "Completed"
@@ -2627,7 +2653,14 @@ export default function Profile() {
                                     className="cursor-pointer hover:shadow-2xl transition-all duration-300 border-0 bg-white/80 backdrop-blur-sm shadow-lg rounded-3xl hover:-translate-y-1"
                                   >
                                     <CardContent className="p-6">
-                                      <PostCard post={post} onView={() => router.push(`/feed/${post.id || post.postId}`)} />
+                                      <PostCard
+                                        post={post}
+                                        onView={() =>
+                                          router.push(
+                                            `/feed/${post.id || post.postId}`
+                                          )
+                                        }
+                                      />
                                     </CardContent>
                                   </Card>
                                 ))
@@ -2689,10 +2722,11 @@ export default function Profile() {
                                                   ? "success"
                                                   : "outline"
                                               }
-                                              className={`px-3 py-1 rounded-full font-semibold ${order.status === "completed"
+                                              className={`px-3 py-1 rounded-full font-semibold ${
+                                                order.status === "completed"
                                                   ? "bg-green-100 text-green-700 border-green-200"
                                                   : "bg-gray-100 text-gray-700 border-gray-200"
-                                                }`}
+                                              }`}
                                             >
                                               {order.status === "completed"
                                                 ? "Completed"
@@ -2869,7 +2903,9 @@ export default function Profile() {
           {/* Right sidebar - Quick Actions */}
           <aside className="hidden xl:block w-80 space-y-6">
             <Card className="p-6 bg-white/80 backdrop-blur-sm border-0 shadow-xl rounded-3xl">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">Quick Actions</h3>
+              <h3 className="text-lg font-bold text-gray-900 mb-4">
+                Quick Actions
+              </h3>
               <div className="space-y-3">
                 {isCurrentUser && isBusinessUser && (
                   <>
@@ -2918,23 +2954,25 @@ export default function Profile() {
 
                     <Button
                       variant="outline"
-                      onClick={() => router.push('/profile/calls')}
+                      onClick={() => router.push("/profile/calls")}
                       className="w-full justify-start gap-3 py-3 h-auto rounded-2xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
                     >
                       <PhoneCall className="w-4 h-4" />
                       Manage AI Calls
                     </Button>
 
-                    {userData && !selectedFranchiseId && !userData?.franchiseOwner && (
-                      <Button
-                        variant="outline"
-                        onClick={() => setIsFranchiseModalOpen(true)}
-                        className="w-full justify-start gap-3 py-3 h-auto rounded-2xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                      >
-                        <Globe className="w-4 h-4" />
-                        Add Franchise
-                      </Button>
-                    )}
+                    {userData &&
+                      !selectedFranchiseId &&
+                      !userData?.franchiseOwner && (
+                        <Button
+                          variant="outline"
+                          onClick={() => setIsFranchiseModalOpen(true)}
+                          className="w-full justify-start gap-3 py-3 h-auto rounded-2xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                        >
+                          <Globe className="w-4 h-4" />
+                          Add Franchise
+                        </Button>
+                      )}
 
                     {selectedFranchiseId && (
                       <Button
@@ -2943,7 +2981,7 @@ export default function Profile() {
                         className="w-full justify-start gap-3 py-3 h-auto rounded-2xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
                       >
                         <ArrowLeftIcon className="w-4 h-4" />
-                        Return to {userData?.franchiseOwner ? 'Business' : 'HQ'}
+                        Return to {userData?.franchiseOwner ? "Business" : "HQ"}
                       </Button>
                     )}
                   </>

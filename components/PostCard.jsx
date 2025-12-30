@@ -55,6 +55,8 @@ import { Textarea } from "./ui/textarea";
 import useLikePost from "@/hooks/useLikePosts";
 
 function PostCard({ post, onView, showDistance, distanceText }) {
+    // Debug: Log the post prop to see what data is coming in
+    console.log('PostCard received post:', post);
   const [isLikeProcessing, setIsLikeProcessing] = useState(false);
   const [showCommentBox, setShowCommentBox] = useState(false);
   const [comment, setComment] = useState("");
@@ -72,11 +74,12 @@ function PostCard({ post, onView, showDistance, distanceText }) {
     ...post,
     id: post?.postId || post?.id, // Ensure post has 'id' field
     likes: post?.likes || 0,
-    isLiked: post?.isLiked || false
+    isLiked: post?.isLiked || false,
   };
 
   // Use the like hook with normalized post
-  const { isLiked, likes, handleLikePost, isUpdating } = useLikePost(normalizedPost);
+  const { isLiked, likes, handleLikePost, isUpdating } =
+    useLikePost(normalizedPost);
 
   // Edit and delete states
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -169,7 +172,7 @@ function PostCard({ post, onView, showDistance, distanceText }) {
     try {
       const commentsRef = collection(db, "posts", postId, "comments");
       const commentsSnapshot = await getDocs(commentsRef);
-      
+
       const allComments = [];
       commentsSnapshot.forEach((doc) => {
         const data = doc.data();
@@ -195,7 +198,7 @@ function PostCard({ post, onView, showDistance, distanceText }) {
 
   const formatTimeAgo = (timestamp) => {
     if (!timestamp) return "now";
-    
+
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
     const now = new Date();
     const diffInSeconds = Math.floor((now - date) / 1000);
@@ -275,7 +278,7 @@ function PostCard({ post, onView, showDistance, distanceText }) {
     e.preventDefault();
     const newShowState = !showCommentBox;
     setShowCommentBox(newShowState);
-    
+
     if (newShowState) {
       loadComments();
     }
@@ -337,7 +340,7 @@ function PostCard({ post, onView, showDistance, distanceText }) {
       });
 
       // Add the new comment to the local state
-      setComments(prev => [commentData, ...prev]);
+      setComments((prev) => [commentData, ...prev]);
       setComment("");
       toast.success("Comment added successfully");
     } catch (error) {
@@ -419,6 +422,56 @@ function PostCard({ post, onView, showDistance, distanceText }) {
     setShowDeleteAlert(true);
   };
 
+  // console.log(post);
+  {
+    isPostOwner && console.log("Post owned by current user" + post);
+  }
+
+  // Determine author display fields
+  let displayName = post?.authorName;
+  let displayUsername = post?.authorUsername;
+  let displayProfileImage = post?.authorProfileImage;
+
+  // Debug: Log what will be used for author fields
+  console.log('PostCard author fields:', {
+    post,
+    isPostOwner,
+    currentUserProfile,
+    displayNameBefore: displayName,
+    displayUsernameBefore: displayUsername,
+    displayProfileImageBefore: displayProfileImage,
+  });
+
+  // If post is owned by current user and author fields are missing, use currentUserProfile
+  if (
+    isPostOwner &&
+    (!displayName || !displayUsername || !displayProfileImage) &&
+    currentUserProfile
+  ) {
+    displayName =
+      displayName ||
+      currentUserProfile.name ||
+      currentUserProfile.username ||
+      "User";
+    displayUsername = displayUsername || currentUserProfile.username || "user";
+    displayProfileImage =
+      displayProfileImage ||
+      currentUserProfile.profilePic ||
+      currentUserProfile.profileImage ||
+      "/default-avatar.png";
+  } else {
+    displayName = displayName || "Anonymous";
+    displayUsername = displayUsername || "user";
+    displayProfileImage = displayProfileImage || "/default-avatar.png";
+  }
+
+  // Debug: Log what will actually be displayed
+  console.log('PostCard display fields:', {
+    displayName,
+    displayUsername,
+    displayProfileImage,
+  });
+
   return (
     <>
       <Card
@@ -431,23 +484,21 @@ function PostCard({ post, onView, showDistance, distanceText }) {
             <div className="flex gap-4">
               <div className="relative">
                 <Avatar className="h-14 w-14 ring-2 ring-blue-100 transition-all duration-300 hover:ring-blue-300">
-                <AvatarImage
-                  src={post?.authorProfileImage || "/default-avatar.png"}
-                  alt={post?.authorName || "User"}
+                  <AvatarImage
+                    src={displayProfileImage}
+                    alt={displayName}
                     className="transition-transform duration-300 hover:scale-105"
-                />
+                  />
                   <AvatarFallback className="text-lg font-semibold bg-gradient-to-br from-blue-400 to-purple-500 text-white">
-                  {(post?.authorName || "U").substring(0, 2).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
+                    {(displayName || "U").substring(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
                 <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-400 border-2 border-white rounded-full animate-pulse"></div>
               </div>
               <div>
-                <p className="font-bold text-lg text-gray-800">
-                  {post?.authorName || "Anonymous"}
-                </p>
+                <p className="font-bold text-lg text-gray-800">{displayName}</p>
                 <p className="text-sm text-gray-600 font-medium">
-                  Product Designer, slothUI
+                  {displayUsername ? `@${displayUsername}` : "@user"}
                 </p>
                 {isPostOwner && (
                   <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full font-semibold">
@@ -461,13 +512,14 @@ function PostCard({ post, onView, showDistance, distanceText }) {
               <div className="text-sm text-gray-600 font-medium px-3 py-1 bg-gray-100 rounded-full">
                 {post?.createdAt
                   ? new Date(
-                      typeof post.createdAt === "object" && post.createdAt.toDate
+                      typeof post.createdAt === "object" &&
+                      post.createdAt.toDate
                         ? post.createdAt.toDate()
                         : post.createdAt
                     ).toLocaleDateString()
                   : ""}
               </div>
-              
+
               {showDistance && distanceText && (
                 <div className="flex items-center text-sm text-blue-600 bg-blue-50 px-3 py-1 rounded-full font-medium">
                   <MapPin className="h-4 w-4 mr-1" />
@@ -490,7 +542,10 @@ function PostCard({ post, onView, showDistance, distanceText }) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuItem onClick={openEditDialog} className="text-base py-3">
+                    <DropdownMenuItem
+                      onClick={openEditDialog}
+                      className="text-base py-3"
+                    >
                       Edit Post
                     </DropdownMenuItem>
                     <DropdownMenuItem
@@ -522,7 +577,11 @@ function PostCard({ post, onView, showDistance, distanceText }) {
               const [showFull, setShowFull] = React.useState(false);
 
               if (!isLong) {
-                return <p className="text-base text-gray-700 leading-relaxed">{text}</p>;
+                return (
+                  <p className="text-base text-gray-700 leading-relaxed">
+                    {text}
+                  </p>
+                );
               }
 
               return (
@@ -571,27 +630,29 @@ function PostCard({ post, onView, showDistance, distanceText }) {
 
           {/* Post Stats */}
           <div className="flex items-center justify-between mt-8 text-base">
-              <Button
-                variant="ghost"
+            <Button
+              variant="ghost"
               size="lg"
               className="group hover:bg-red-50 transition-all duration-300 rounded-2xl px-6 py-3"
-                onClick={handleLike}
-                disabled={isUpdating}
-              >
+              onClick={handleLike}
+              disabled={isUpdating}
+            >
               <div className="flex items-center gap-3">
-                <Heart 
+                <Heart
                   className={`w-6 h-6 transition-all duration-300 group-hover:scale-110 ${
-                    isLiked 
-                      ? "fill-current text-red-500" 
+                    isLiked
+                      ? "fill-current text-red-500"
                       : "text-gray-600 group-hover:text-red-500"
-                  }`} 
+                  }`}
                 />
-                <span className={`font-semibold ${isLiked ? "text-red-500" : "text-gray-700 group-hover:text-red-500"}`}>
+                <span
+                  className={`font-semibold ${isLiked ? "text-red-500" : "text-gray-700 group-hover:text-red-500"}`}
+                >
                   {likes || 0} Likes
                 </span>
-                </div>
-              </Button>
-            
+              </div>
+            </Button>
+
             <Button
               variant="ghost"
               size="lg"
@@ -605,7 +666,7 @@ function PostCard({ post, onView, showDistance, distanceText }) {
                 </span>
               </div>
             </Button>
-            
+
             <Button
               variant="ghost"
               size="lg"
@@ -614,11 +675,11 @@ function PostCard({ post, onView, showDistance, distanceText }) {
               <div className="flex items-center gap-3">
                 <Share2 className="w-6 h-6 text-gray-600 group-hover:text-green-500 transition-all duration-300 group-hover:scale-110" />
                 <span className="font-semibold text-gray-700 group-hover:text-green-500">
-                  187 Share
+                  2 Share
                 </span>
-            </div>
+              </div>
             </Button>
-            
+
             <Button
               variant="ghost"
               size="lg"
@@ -627,14 +688,16 @@ function PostCard({ post, onView, showDistance, distanceText }) {
               disabled={isSaveProcessing}
             >
               <div className="flex items-center gap-3">
-                <Bookmark 
+                <Bookmark
                   className={`w-6 h-6 transition-all duration-300 group-hover:scale-110 ${
-                    isSaved 
-                      ? "fill-current text-yellow-500" 
+                    isSaved
+                      ? "fill-current text-yellow-500"
                       : "text-gray-600 group-hover:text-yellow-500"
-                  }`} 
+                  }`}
                 />
-                <span className={`font-semibold ${isSaved ? "text-yellow-500" : "text-gray-700 group-hover:text-yellow-500"}`}>
+                <span
+                  className={`font-semibold ${isSaved ? "text-yellow-500" : "text-gray-700 group-hover:text-yellow-500"}`}
+                >
                   {isSaved ? "Saved" : "Save"}
                 </span>
               </div>
@@ -644,12 +707,27 @@ function PostCard({ post, onView, showDistance, distanceText }) {
           {/* Comment Input */}
           <div className="flex items-center gap-4 mt-8 pt-6 border-t-2 border-gray-100">
             <Avatar className="w-12 h-12 ring-2 ring-gray-200">
-              <AvatarImage 
-                src={currentUserProfile?.profilePic || currentUserProfile?.profileImage || auth.currentUser?.photoURL || "/default-avatar.png"} 
-                alt={currentUserProfile?.name || currentUserProfile?.username || "User"}
+              <AvatarImage
+                src={
+                  currentUserProfile?.profilePic ||
+                  currentUserProfile?.profileImage ||
+                  auth.currentUser?.photoURL ||
+                  "/default-avatar.png"
+                }
+                alt={
+                  currentUserProfile?.name ||
+                  currentUserProfile?.username ||
+                  "User"
+                }
               />
               <AvatarFallback className="bg-gradient-to-br from-gray-400 to-gray-600 text-white font-semibold">
-                {(currentUserProfile?.name || currentUserProfile?.username || "U").substring(0, 2).toUpperCase()}
+                {(
+                  currentUserProfile?.name ||
+                  currentUserProfile?.username ||
+                  "U"
+                )
+                  .substring(0, 2)
+                  .toUpperCase()}
               </AvatarFallback>
             </Avatar>
             <form onSubmit={handleSubmitComment} className="flex gap-3 flex-1">
@@ -659,19 +737,19 @@ function PostCard({ post, onView, showDistance, distanceText }) {
                 placeholder="Write your comment..."
                 className="flex-1 rounded-2xl px-6 py-4 border-2 border-gray-200 focus:border-blue-400 text-base transition-all duration-300 bg-gray-50 focus:bg-white"
               />
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="w-12 h-12 hover:bg-gray-100 rounded-2xl transition-all duration-300 hover:scale-105" 
+              <Button
+                variant="ghost"
+                size="icon"
+                className="w-12 h-12 hover:bg-gray-100 rounded-2xl transition-all duration-300 hover:scale-105"
                 type="button"
               >
                 <Paperclip className="w-6 h-6 text-gray-500 hover:text-gray-700" />
                 <span className="sr-only">Attach file</span>
               </Button>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="w-12 h-12 hover:bg-yellow-100 rounded-2xl transition-all duration-300 hover:scale-105" 
+              <Button
+                variant="ghost"
+                size="icon"
+                className="w-12 h-12 hover:bg-yellow-100 rounded-2xl transition-all duration-300 hover:scale-105"
                 type="button"
               >
                 <Smile className="w-6 h-6 text-gray-500 hover:text-yellow-500" />
@@ -684,7 +762,9 @@ function PostCard({ post, onView, showDistance, distanceText }) {
                 className="w-12 h-12 hover:bg-blue-100 rounded-2xl transition-all duration-300 hover:scale-105 disabled:opacity-50"
                 disabled={!comment.trim() || isSubmitting}
               >
-                <Send className={`w-6 h-6 transition-colors duration-300 ${comment.trim() ? "text-blue-500" : "text-gray-400"}`} />
+                <Send
+                  className={`w-6 h-6 transition-colors duration-300 ${comment.trim() ? "text-blue-500" : "text-gray-400"}`}
+                />
                 <span className="sr-only">Send comment</span>
               </Button>
             </form>
@@ -698,29 +778,50 @@ function PostCard({ post, onView, showDistance, distanceText }) {
                 {comments.length > 0 && (
                   <div className="max-h-[300px] overflow-y-auto pr-2 space-y-4">
                     {comments.map((comment, index) => (
-                      <div key={`${comment.uid}-${index}`} className="flex items-start gap-3 py-3 hover:bg-gray-50 rounded-2xl px-3 transition-colors duration-200">
+                      <div
+                        key={`${comment.uid}-${index}`}
+                        className="flex items-start gap-3 py-3 hover:bg-gray-50 rounded-2xl px-3 transition-colors duration-200"
+                      >
                         <Avatar className="w-10 h-10 ring-2 ring-gray-200">
-                          <AvatarImage src={comment.profilePic || "/default-avatar.png"} />
+                          <AvatarImage
+                            src={comment.profilePic || "/default-avatar.png"}
+                          />
                           <AvatarFallback className="bg-gradient-to-br from-purple-400 to-pink-500 text-white text-sm font-semibold">
-                            {(comment.name || comment.username || "U").substring(0, 2).toUpperCase()}
+                            {(comment.name || comment.username || "U")
+                              .substring(0, 2)
+                              .toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                         <div className="grid gap-2 text-sm flex-1">
                           <div className="flex items-center gap-3">
-                            <span className="font-bold text-gray-800">{comment.name || comment.username}</span>
+                            <span className="font-bold text-gray-800">
+                              {comment.name || comment.username}
+                            </span>
                             <span className="text-gray-500 text-xs bg-gray-200 px-2 py-1 rounded-full">
                               {formatTimeAgo(comment.timestamp)}
                             </span>
                           </div>
-                          <p className="text-gray-700 leading-relaxed">{comment.comment}</p>
+                          <p className="text-gray-700 leading-relaxed">
+                            {comment.comment}
+                          </p>
                           <div className="flex items-center gap-4 text-xs text-gray-500">
-                            <span className="bg-gray-100 px-2 py-1 rounded-full">0 like</span>
-                            <Button variant="ghost" size="sm" className="h-auto px-2 py-1 text-xs hover:bg-blue-100 rounded-full transition-colors duration-200">
+                            <span className="bg-gray-100 px-2 py-1 rounded-full">
+                              0 like
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-auto px-2 py-1 text-xs hover:bg-blue-100 rounded-full transition-colors duration-200"
+                            >
                               reply
                             </Button>
                           </div>
                         </div>
-                        <Button variant="ghost" size="icon" className="w-8 h-8 hover:bg-red-100 rounded-2xl transition-all duration-300 hover:scale-110">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="w-8 h-8 hover:bg-red-100 rounded-2xl transition-all duration-300 hover:scale-110"
+                        >
                           <Heart className="w-5 h-5 text-gray-400 hover:text-red-500" />
                           <span className="sr-only">Like comment</span>
                         </Button>
@@ -751,11 +852,15 @@ function PostCard({ post, onView, showDistance, distanceText }) {
       <AlertDialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <AlertDialogContent className="max-w-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-2xl font-bold">Edit Post</AlertDialogTitle>
+            <AlertDialogTitle className="text-2xl font-bold">
+              Edit Post
+            </AlertDialogTitle>
           </AlertDialogHeader>
           <div className="space-y-6 py-6">
             <div className="space-y-3">
-              <Label htmlFor="edit-title" className="text-base font-semibold">Title</Label>
+              <Label htmlFor="edit-title" className="text-base font-semibold">
+                Title
+              </Label>
               <Input
                 id="edit-title"
                 value={editData.title}
@@ -767,7 +872,12 @@ function PostCard({ post, onView, showDistance, distanceText }) {
               />
             </div>
             <div className="space-y-3">
-              <Label htmlFor="edit-description" className="text-base font-semibold">Description</Label>
+              <Label
+                htmlFor="edit-description"
+                className="text-base font-semibold"
+              >
+                Description
+              </Label>
               <Textarea
                 id="edit-description"
                 value={editData.description}
@@ -784,14 +894,14 @@ function PostCard({ post, onView, showDistance, distanceText }) {
             </div>
           </div>
           <AlertDialogFooter className="gap-3">
-            <AlertDialogCancel 
+            <AlertDialogCancel
               disabled={isEditing}
               className="px-6 py-3 rounded-xl text-base font-semibold"
             >
               Cancel
             </AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleEditPost} 
+            <AlertDialogAction
+              onClick={handleEditPost}
               disabled={isEditing}
               className="px-6 py-3 rounded-xl text-base font-semibold bg-blue-500 hover:bg-blue-600"
             >
@@ -805,14 +915,16 @@ function PostCard({ post, onView, showDistance, distanceText }) {
       <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-2xl font-bold text-red-600">Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle className="text-2xl font-bold text-red-600">
+              Are you sure?
+            </AlertDialogTitle>
             <AlertDialogDescription className="text-base text-gray-600 leading-relaxed">
               This action cannot be undone. This will permanently delete your
               post and all its comments.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-3">
-            <AlertDialogCancel 
+            <AlertDialogCancel
               disabled={isDeleting}
               className="px-6 py-3 rounded-xl text-base font-semibold"
             >
