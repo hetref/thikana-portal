@@ -328,7 +328,6 @@ export default function StoreLocationPicker() {
         { merge: true }
       );
 
-      // Update the global alert state
       setShowLocationAlert(false);
 
       alert(

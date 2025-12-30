@@ -1,4 +1,4 @@
-# Project Name
+# Thikana
 
 A brief description of your project, its purpose, and what it aims to achieve.
 
