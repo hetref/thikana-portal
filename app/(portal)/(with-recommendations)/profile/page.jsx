@@ -533,64 +533,14 @@ export default function Profile() {
             return;
           }
 
-          // Always fetch latest post data for up-to-date likes
           const postDocs = await Promise.all(
             postIds.map((id) => getDoc(doc(db, "posts", id)).catch(() => null))
           );
 
-          // Attach author info and normalize each liked post
-          const postsWithAuthor = await Promise.all(
-            postDocs
-              .filter((doc) => doc && doc.exists())
-              .map(async (doc) => {
-                const raw = doc.data();
-                const postData = {
-                  ...raw,
-                  id: doc.id,
-                  postId: doc.id,
-                  likes: raw.likes || 0,
-                  isLiked: true, // All are liked by current user
-                };
-                // Always fetch author info from users/{uid}
-                const authorId = postData.uid;
-                if (!authorId) {
-                  console.warn("Post missing uid:", postData);
-                  return {
-                    ...postData,
-                    authorName: "Anonymous",
-                    authorUsername: "user",
-                    authorProfileImage: "/default-avatar.png",
-                  };
-                }
-                try {
-                  const authorDoc = await getDoc(doc(db, "users", authorId));
-                  const authorData = authorDoc.exists() ? authorDoc.data() : {};
-                  return {
-                    ...postData,
-                    authorName:
-                      authorData.name || authorData.username || "Anonymous",
-                    authorUsername: authorData.username || "user",
-                    authorProfileImage:
-                      authorData.profilePic ||
-                      authorData.profileImage ||
-                      "/default-avatar.png",
-                  };
-                } catch (err) {
-                  console.warn(
-                    "Error fetching author for post:",
-                    postData,
-                    err
-                  );
-                  return {
-                    ...postData,
-                    authorName: "Anonymous",
-                    authorUsername: "user",
-                    authorProfileImage: "/default-avatar.png",
-                  };
-                }
-              })
-          );
-          setLikedPosts(postsWithAuthor);
+          const tempLikedPosts = postDocs
+            .filter((doc) => doc && doc.exists())
+            .map((doc) => ({ ...doc.data(), id: doc.id }));
+          setLikedPosts(tempLikedPosts);
         } catch (error) {
           console.error("Error fetching liked posts:", error);
           setLikedPosts([]);
@@ -634,30 +584,12 @@ export default function Profile() {
               const postDoc = await getDoc(doc(db, "posts", postData.postId));
 
               if (postDoc.exists()) {
-                const postObj = {
+                postsData.push({
                   id: postDoc.id,
                   ...postDoc.data(),
                   savedAt: postData.timestamp,
                   savedId: docSnapshot.id,
-                };
-                // Attach author info
-                const authorId = postObj.uid || postObj.authorId;
-                if (authorId) {
-                  try {
-                    const authorDoc = await getDoc(doc(db, "users", authorId));
-                    const authorData = authorDoc.exists()
-                      ? authorDoc.data()
-                      : {};
-                    postObj.authorName =
-                      authorData.name || authorData.username || "Anonymous";
-                    postObj.authorUsername = authorData.username || "user";
-                    postObj.authorProfileImage =
-                      authorData.profilePic ||
-                      authorData.profileImage ||
-                      "/default-avatar.png";
-                  } catch {}
-                }
-                postsData.push(postObj);
+                });
               }
             }
           } catch (error) {
@@ -1273,10 +1205,11 @@ export default function Profile() {
               disabled={!isSelectable}
             >
               <Star
-                className={`h-6 w-6 ${star <= currentRating
+                className={`h-6 w-6 ${
+                  star <= currentRating
                     ? "fill-yellow-400 text-yellow-400"
                     : "text-gray-300"
-                  } ${isSelectable && star <= currentRating ? "text-yellow-400" : ""}`}
+                } ${isSelectable && star <= currentRating ? "text-yellow-400" : ""}`}
               />
             </button>
           ))}
@@ -1332,15 +1265,9 @@ export default function Profile() {
                             <Image
                               src={userData?.coverPic || "/coverimg.png"}
                               width={1200}
-                            <Image
-                              src={userData?.coverPic || "/coverimg.png"}
-                              width={1200}
                               height={256}
                               alt="Cover Image"
-                              alt="Cover Image"
                               className="object-cover w-full h-full transition-all duration-500 group-hover:scale-105"
-                              priority
-                            />
                               priority
                             />
                             {/* Gradient overlay */}
@@ -1372,10 +1299,11 @@ export default function Profile() {
                   <div className="relative px-6 sm:px-8 pb-8 pt-4">
                     {/* Profile picture positioned over cover image */}
                     <div
-                      className={`${isBusinessUser
+                      className={`${
+                        isBusinessUser
                           ? "absolute -top-12 left-8 z-10"
                           : "flex justify-center -mt-12 mb-6"
-                        }`}
+                      }`}
                     >
                       <Dialog>
                         <DialogTrigger>
@@ -1384,18 +1312,9 @@ export default function Profile() {
                               <AvatarImage
                                 src={userData?.profilePic || "/avatar.png"}
                                 alt={userData?.name}
-                              <AvatarImage
-                                src={userData?.profilePic || "/avatar.png"}
-                                alt={userData?.name}
                                 className="object-cover"
                               />
-                              />
                               <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-bold text-2xl">
-                                {isBusinessUser
-                                  ? userData?.businessName?.charAt(0) || "B"
-                                  : userData?.name?.charAt(0) || "U"}
-                              </AvatarFallback>
-                            </Avatar>
                                 {isBusinessUser
                                   ? userData?.businessName?.charAt(0) || "B"
                                   : userData?.name?.charAt(0) || "U"}
@@ -1407,20 +1326,11 @@ export default function Profile() {
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-md">
                           <DialogHeader>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-md">
-                          <DialogHeader>
                             <DialogTitle className="text-xl font-bold">
                               Profile Picture
                             </DialogTitle>
                           </DialogHeader>
-                          </DialogHeader>
                           <div className="mt-4 rounded-2xl overflow-hidden">
-                            <Image
-                              src={userData?.profilePic || "/avatar.png"}
-                              width={400}
-                              height={400}
-                              alt="Profile Image"
                             <Image
                               src={userData?.profilePic || "/avatar.png"}
                               width={400}
@@ -1432,16 +1342,12 @@ export default function Profile() {
                         </DialogContent>
                       </Dialog>
                     </div>
-                            />
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                    </div>
 
                     {/* Main content with proper spacing for profile picture */}
                     <div
-                      className={`${isBusinessUser ? "pt-20" : "pt-0"
-                        } space-y-6`}
+                      className={`${
+                        isBusinessUser ? "pt-20" : "pt-0"
+                      } space-y-6`}
                     >
                       {/* Name, username and bio section */}
                       <div className="space-y-4">
@@ -1450,9 +1356,6 @@ export default function Profile() {
                           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                             <div className="space-y-3">
                               <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 flex flex-wrap items-center gap-3">
-                                {isBusinessUser
-                                  ? userData?.businessName || userData?.name
-                                  : userData?.name}
                                 {isBusinessUser
                                   ? userData?.businessName || userData?.name
                                   : userData?.name}
@@ -1467,19 +1370,7 @@ export default function Profile() {
                                 ) : isBusinessUser && userData?.isFranchise ? (
                                   <Badge
                                     variant="outline"
-                                  >
-                                    Member
-                                  </Badge>
-                                ) : isBusinessUser && userData?.isFranchise ? (
-                                  <Badge
-                                    variant="outline"
                                     className="bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 border-blue-200 px-3 py-1 text-sm font-medium rounded-full"
-                                  >
-                                    Franchise
-                                  </Badge>
-                                ) : isBusinessUser ? (
-                                  <Badge
-                                    variant="outline"
                                   >
                                     Franchise
                                   </Badge>
@@ -1492,22 +1383,13 @@ export default function Profile() {
                                   </Badge>
                                 ) : null}
                               </h1>
-                                  >
-                                    Headquarters
-                                  </Badge>
-                                ) : null}
-                              </h1>
 
                               <div className="flex items-center text-gray-600 gap-2 text-lg">
                                 <div className="p-2 rounded-full bg-gray-100">
                                   <User className="w-4 h-4" />
                                 </div>
-                                  <User className="w-4 h-4" />
-                                </div>
                                 <span className="font-medium">
                                   @{userData?.username}
-                                </span>
-                              </div>
                                 </span>
                               </div>
                             </div>
@@ -1533,75 +1415,64 @@ export default function Profile() {
                                   </Link>
                                 </Button>
                               )}
-                            </div>
-                          </div>
 
-                          {/* Bio section */}
-                          {isBusinessUser && userData?.bio && (
-                            <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl p-4 border border-gray-200">
-                              <p className="text-gray-700 leading-relaxed">
-                                {userData.bio}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Franchise Selector with improved styling */}
-                      {isBusinessUser &&
-                        hasFranchises &&
-                        !userData?.franchiseOwner && (
-                          <div className="flex flex-wrap gap-3">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  className="gap-3 px-6 py-3 h-auto rounded-2xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all duration-200"
-                                >
-                                  {loadingFranchises ? (
-                                    <RefreshCw className="h-5 w-5 animate-spin" />
-                                  ) : selectedFranchiseId ? (
-                                    <div className="p-1.5 rounded-lg bg-blue-100">
-                                      <Store className="h-4 w-4 text-blue-600" />
-                                    </div>
-                                  ) : (
-                                    <div className="p-1.5 rounded-lg bg-amber-100">
-                                      <Building2 className="h-4 w-4 text-amber-600" />
-                                    </div>
-                                  )}
-                                  <div className="flex flex-col items-start">
-                                    <span className="font-medium">
-                                      {loadingFranchises
-                                        ? "Loading..."
-                                        : selectedFranchiseId
-                                          ? franchises.find(
-                                              (f) =>
-                                                f.id === selectedFranchiseId
-                                            )?.businessName || "Franchise"
-                                          : "Headquarters"}
-                                    </span>
-                                    <Badge
-                                      variant="outline"
-                                      className={`text-xs px-2 py-0.5 ${
-                                        selectedFranchiseId
-                                          ? "bg-blue-50 text-blue-600 border-blue-200"
-                                          : "bg-amber-50 text-amber-600 border-amber-200"
-                                      }`}
+                              {/* Switch Location Dropdown */}
+                              {isBusinessUser &&
+                                hasFranchises &&
+                                !userData?.franchiseOwner && (
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        variant="outline"
+                                        className="gap-3 px-6 py-3 h-auto rounded-2xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all duration-200"
+                                      >
+                                        {loadingFranchises ? (
+                                          <RefreshCw className="h-5 w-5 animate-spin" />
+                                        ) : selectedFranchiseId ? (
+                                          <div className="p-1.5 rounded-lg bg-blue-100">
+                                            <Store className="h-4 w-4 text-blue-600" />
+                                          </div>
+                                        ) : (
+                                          <div className="p-1.5 rounded-lg bg-amber-100">
+                                            <Building2 className="h-4 w-4 text-amber-600" />
+                                          </div>
+                                        )}
+                                        <div className="flex flex-col items-start">
+                                          <span className="font-medium">
+                                            {loadingFranchises
+                                              ? "Loading..."
+                                              : selectedFranchiseId
+                                                ? franchises.find(
+                                                    (f) =>
+                                                      f.id ===
+                                                      selectedFranchiseId
+                                                  )?.businessName || "Franchise"
+                                                : "Headquarters"}
+                                          </span>
+                                          <Badge
+                                            variant="outline"
+                                            className={`text-xs px-2 py-0.5 ${
+                                              selectedFranchiseId
+                                                ? "bg-blue-50 text-blue-600 border-blue-200"
+                                                : "bg-amber-50 text-amber-600 border-amber-200"
+                                            }`}
+                                          >
+                                            {selectedFranchiseId
+                                              ? "Franchise"
+                                              : "HQ"}
+                                          </Badge>
+                                        </div>
+                                        <ChevronDown className="h-4 w-4 ml-2" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent
+                                      align="start"
+                                      className="w-72 rounded-2xl shadow-xl border-0 bg-white/95 backdrop-blur-sm"
                                     >
-                                      {selectedFranchiseId ? "Franchise" : "HQ"}
-                                    </Badge>
-                                  </div>
-                                  <ChevronDown className="h-4 w-4 ml-2" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent
-                                align="start"
-                                className="w-72 rounded-2xl shadow-xl border-0 bg-white/95 backdrop-blur-sm"
-                              >
-                                <DropdownMenuLabel className="px-4 py-3 text-lg font-semibold">
-                                  Switch Location
-                                </DropdownMenuLabel>
-                                <DropdownMenuSeparator />
+                                      <DropdownMenuLabel className="px-4 py-3 text-lg font-semibold">
+                                        Switch Location
+                                      </DropdownMenuLabel>
+                                      <DropdownMenuSeparator />
 
                                       <DropdownMenuItem
                                         className="flex items-center gap-3 cursor-pointer px-4 py-3 rounded-xl mx-2 hover:bg-amber-50"
@@ -1637,10 +1508,12 @@ export default function Profile() {
                                           </div>
                                           <div className="flex-1">
                                             <span className="font-medium">
-                                              {franchise.businessName || "Franchise"}
+                                              {franchise.businessName ||
+                                                "Franchise"}
                                             </span>
                                           </div>
-                                          {selectedFranchiseId === franchise.id && (
+                                          {selectedFranchiseId ===
+                                            franchise.id && (
                                             <Badge className="bg-blue-100 text-blue-700 border-blue-200">
                                               Current
                                             </Badge>
@@ -1676,15 +1549,8 @@ export default function Profile() {
                         </div>
                       </div>
 
-
-
                       {/* Stats row with enhanced design */}
                       <div className="grid grid-cols-4 gap-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-3xl p-6 border border-gray-200">
-                        {isBusinessUser ? (
-                          <>
-                            <FollowingDialog
-                              followingCount={followingCount}
-                              userId={userId}
                         {isBusinessUser ? (
                           <>
                             <FollowingDialog
@@ -1705,9 +1571,6 @@ export default function Profile() {
                             <FollowerDialog
                               followerCount={followersCount}
                               userId={userId}
-                            <FollowerDialog
-                              followerCount={followersCount}
-                              userId={userId}
                               className="flex flex-col items-center pl-4 border-l border-gray-300"
                             >
                               <div className="text-center">
@@ -1725,11 +1588,8 @@ export default function Profile() {
                                 <div className="text-2xl font-bold text-gray-900 mb-1">
                                   {posts.length}
                                 </div>
-                                  {posts.length}
-                                </div>
                                 <div className="text-sm text-gray-600 font-medium">
                                   Posts
-                                </div>
                                 </div>
                               </div>
                             </div>
@@ -1739,19 +1599,10 @@ export default function Profile() {
                                 <div className="text-2xl font-bold text-gray-900 mb-1">
                                   {userPhotos.length || 0}
                                 </div>
-                                  {userPhotos.length || 0}
-                                </div>
                                 <div className="text-sm text-gray-600 font-medium">
                                   Photos
                                 </div>
                               </div>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="col-span-4 flex justify-center">
-                            <FollowingDialog
-                              followingCount={followingCount}
-                              userId={userId}
                             </div>
                           </>
                         ) : (
@@ -1773,12 +1624,8 @@ export default function Profile() {
                           </div>
                         )}
                       </div>
-                          </div>
-                        )}
-                      </div>
 
                       {/* Location map with modern styling */}
-                      {showLocationIFrame && (
                       {showLocationIFrame && (
                         <div className="rounded-3xl border border-gray-200 overflow-hidden bg-white shadow-lg">
                           <div className="p-6 bg-gradient-to-r from-green-50 to-emerald-50 border-b border-gray-200">
@@ -1790,18 +1637,11 @@ export default function Profile() {
                                 ? "Business Location"
                                 : "User Location"}
                             </h3>
-                              {isBusinessUser
-                                ? "Business Location"
-                                : "User Location"}
-                            </h3>
                             {userData?.locations?.address && (
                               <div className="mt-2 text-gray-700 ml-11">
                                 {userData.locations.address}
                               </div>
-                                {userData.locations.address}
-                              </div>
                             )}
-                          </div>
                           </div>
                           <div className="h-[350px] w-full relative">
                             {userData?.location?.latitude &&
@@ -1827,14 +1667,7 @@ export default function Profile() {
                                   <p className="text-gray-500 font-medium">
                                     No location data available
                                   </p>
-                                    No location data available
-                                  </p>
                                 </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
                               </div>
                             )}
                           </div>
@@ -1948,65 +1781,65 @@ export default function Profile() {
                             {userData?.business_categories?.includes(
                               "product"
                             ) && (
-                                <TabsTrigger
-                                  title="Products"
-                                  value="products"
-                                  className={cn(
-                                    "rounded-2xl flex-1 transition-all duration-300",
-                                    "data-[state=active]:bg-white data-[state=active]:text-orange-600 data-[state=active]:shadow-lg",
-                                    "px-4 py-4 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-white/50"
-                                  )}
-                                >
-                                  <div className="p-1.5 rounded-lg bg-orange-100">
-                                    <SquareChartGantt className="w-4 h-4 text-orange-600" />
-                                  </div>
-                                  <span className="hidden sm:block">
-                                    Products
-                                  </span>
-                                </TabsTrigger>
-                              )}
+                              <TabsTrigger
+                                title="Products"
+                                value="products"
+                                className={cn(
+                                  "rounded-2xl flex-1 transition-all duration-300",
+                                  "data-[state=active]:bg-white data-[state=active]:text-orange-600 data-[state=active]:shadow-lg",
+                                  "px-4 py-4 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-white/50"
+                                )}
+                              >
+                                <div className="p-1.5 rounded-lg bg-orange-100">
+                                  <SquareChartGantt className="w-4 h-4 text-orange-600" />
+                                </div>
+                                <span className="hidden sm:block">
+                                  Products
+                                </span>
+                              </TabsTrigger>
+                            )}
 
                             {userData?.business_categories?.includes(
                               "service"
                             ) && (
-                                <TabsTrigger
-                                  value="services"
-                                  title="Services"
-                                  className={cn(
-                                    "rounded-2xl flex-1 transition-all duration-300",
-                                    "data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-lg",
-                                    "px-4 py-4 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-white/50"
-                                  )}
-                                >
-                                  <div className="p-1.5 rounded-lg bg-indigo-100">
-                                    <Settings className="w-4 h-4 text-indigo-600" />
-                                  </div>
-                                  <span className="hidden sm:block">
-                                    Services
-                                  </span>
-                                </TabsTrigger>
-                              )}
+                              <TabsTrigger
+                                value="services"
+                                title="Services"
+                                className={cn(
+                                  "rounded-2xl flex-1 transition-all duration-300",
+                                  "data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-lg",
+                                  "px-4 py-4 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-white/50"
+                                )}
+                              >
+                                <div className="p-1.5 rounded-lg bg-indigo-100">
+                                  <Settings className="w-4 h-4 text-indigo-600" />
+                                </div>
+                                <span className="hidden sm:block">
+                                  Services
+                                </span>
+                              </TabsTrigger>
+                            )}
 
                             {userData?.business_categories?.includes(
                               "real-estate"
                             ) && (
-                                <TabsTrigger
-                                  value="properties"
-                                  title="Properties"
-                                  className={cn(
-                                    "rounded-2xl flex-1 transition-all duration-300",
-                                    "data-[state=active]:bg-white data-[state=active]:text-teal-600 data-[state=active]:shadow-lg",
-                                    "px-4 py-4 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-white/50"
-                                  )}
-                                >
-                                  <div className="p-1.5 rounded-lg bg-teal-100">
-                                    <Home className="w-4 h-4 text-teal-600" />
-                                  </div>
-                                  <span className="hidden sm:block">
-                                    Properties
-                                  </span>
-                                </TabsTrigger>
-                              )}
+                              <TabsTrigger
+                                value="properties"
+                                title="Properties"
+                                className={cn(
+                                  "rounded-2xl flex-1 transition-all duration-300",
+                                  "data-[state=active]:bg-white data-[state=active]:text-teal-600 data-[state=active]:shadow-lg",
+                                  "px-4 py-4 font-semibold text-sm flex items-center justify-center gap-2 hover:bg-white/50"
+                                )}
+                              >
+                                <div className="p-1.5 rounded-lg bg-teal-100">
+                                  <Home className="w-4 h-4 text-teal-600" />
+                                </div>
+                                <span className="hidden sm:block">
+                                  Properties
+                                </span>
+                              </TabsTrigger>
+                            )}
 
                             <TabsTrigger
                               value="saved"
@@ -2055,7 +1888,6 @@ export default function Profile() {
                               </div>
                             </div>
                             {renderPosts}
-                            {renderPosts}
                           </div>
                         </TabsContent>
 
@@ -2071,11 +1903,7 @@ export default function Profile() {
                                   <h2 className="text-2xl font-bold text-gray-900">
                                     Your Franchises
                                   </h2>
-                                    Your Franchises
-                                  </h2>
                                   <p className="text-gray-600 mt-1">
-                                    Manage all your franchise locations.
-                                  </p>
                                     Manage all your franchise locations.
                                   </p>
                                 </div>
@@ -2087,14 +1915,10 @@ export default function Profile() {
                                   Add New Franchise
                                 </Button>
                               </div>
-                              </div>
 
-                              {loadingFranchises ? (
                               {loadingFranchises ? (
                                 <div className="flex justify-center py-12">
                                   <Loader />
-                                </div>
-                              ) : franchises.length === 0 ? (
                                 </div>
                               ) : franchises.length === 0 ? (
                                 <div className="text-center py-16 bg-gradient-to-br from-gray-50 to-gray-100 rounded-3xl border border-gray-200">
@@ -2119,30 +1943,16 @@ export default function Profile() {
                                   </Button>
                                 </div>
                               ) : (
-                                </div>
-                              ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                  {franchises.map((franchise) => (
-                                    <Card
-                                      key={franchise.id}
                                   {franchises.map((franchise) => (
                                     <Card
                                       key={franchise.id}
                                       className="overflow-hidden bg-white/80 backdrop-blur-sm border-0 shadow-xl rounded-3xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1"
                                     >
-                                    >
                                       <CardHeader className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50">
-                                        <div className="flex justify-between items-start">
                                         <div className="flex justify-between items-start">
                                           <div className="flex items-center gap-4">
                                             <Avatar className="h-14 w-14 border-3 border-white shadow-lg">
-                                              <AvatarImage
-                                                src={
-                                                  franchise.profilePic ||
-                                                  "/avatar.png"
-                                                }
-                                                alt={franchise.businessName}
-                                              />
                                               <AvatarImage
                                                 src={
                                                   franchise.profilePic ||
@@ -2157,22 +1967,11 @@ export default function Profile() {
                                               </AvatarFallback>
                                             </Avatar>
                                             <div>
-                                            </Avatar>
-                                            <div>
                                               <h3 className="font-bold text-lg text-gray-900">
-                                                {franchise.businessName}
-                                              </h3>
                                                 {franchise.businessName}
                                               </h3>
                                               <p className="text-sm text-gray-600 mt-1 flex items-center gap-1">
                                                 <MapPinIcon className="w-3 h-3" />
-                                                {franchise.locations?.address ||
-                                                  "No address"}
-                                              </p>
-                                            </div>
-                                          </div>
-                                          <Badge
-                                            variant="outline"
                                                 {franchise.locations?.address ||
                                                   "No address"}
                                               </p>
@@ -2186,53 +1985,34 @@ export default function Profile() {
                                           </Badge>
                                         </div>
                                       </CardHeader>
-                                          >
-                                            Franchise
-                                          </Badge>
-                                        </div>
-                                      </CardHeader>
                                       <CardContent className="p-6">
                                         <div className="grid grid-cols-2 gap-4 mb-6">
                                           <div className="space-y-1">
                                             <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">
                                               Admin
                                             </span>
-                                              Admin
-                                            </span>
                                             <p className="font-semibold text-gray-900">
                                               {franchise.adminName}
-                                              {franchise.adminName}
                                             </p>
-                                          </div>
                                           </div>
                                           <div className="space-y-1">
                                             <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">
                                               Contact
                                             </span>
-                                              Contact
-                                            </span>
                                             <p className="font-semibold text-gray-900">
-                                              {franchise.phone}
                                               {franchise.phone}
                                             </p>
                                           </div>
-                                          </div>
                                           <div className="space-y-1 col-span-2">
                                             <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">
-                                              Email
-                                            </span>
                                               Email
                                             </span>
                                             <p className="font-semibold text-gray-900 truncate">
                                               {franchise.email}
-                                              {franchise.email}
                                             </p>
-                                          </div>
                                           </div>
                                           <div className="space-y-1 col-span-2">
                                             <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">
-                                              Created
-                                            </span>
                                               Created
                                             </span>
                                             <p className="font-semibold text-gray-900">
@@ -2247,16 +2027,11 @@ export default function Profile() {
                                             </p>
                                           </div>
                                         </div>
-                                          </div>
-                                        </div>
 
                                         <div className="flex gap-3">
                                           <Button
                                             variant="outline"
-                                          <Button
-                                            variant="outline"
                                             className="gap-2 text-blue-700 border-blue-200 hover:bg-blue-50 hover:border-blue-300 flex-1 rounded-2xl py-3 h-auto font-semibold transition-all duration-200"
-                                            onClick={() =>
                                             onClick={() =>
                                               handleSwitchFranchise(
                                                 franchise.id
@@ -2266,16 +2041,7 @@ export default function Profile() {
                                             <Store className="h-4 w-4" />
                                             <span>View Franchise</span>
                                           </Button>
-                                            }
-                                          >
-                                            <Store className="h-4 w-4" />
-                                            <span>View Franchise</span>
-                                          </Button>
 
-                                          <AlertDialog>
-                                            <AlertDialogTrigger asChild>
-                                              <Button
-                                                variant="outline"
                                           <AlertDialog>
                                             <AlertDialogTrigger asChild>
                                               <Button
@@ -2285,16 +2051,9 @@ export default function Profile() {
                                                 <Trash2 className="h-4 w-4" />
                                               </Button>
                                             </AlertDialogTrigger>
-                                              >
-                                                <Trash2 className="h-4 w-4" />
-                                              </Button>
-                                            </AlertDialogTrigger>
                                             <AlertDialogContent className="rounded-3xl border-0 shadow-2xl">
                                               <AlertDialogHeader>
-                                              <AlertDialogHeader>
                                                 <AlertDialogTitle className="text-2xl font-bold text-red-600">
-                                                  Delete Franchise
-                                                </AlertDialogTitle>
                                                   Delete Franchise
                                                 </AlertDialogTitle>
                                                 <AlertDialogDescription className="text-lg text-gray-600">
@@ -2305,38 +2064,21 @@ export default function Profile() {
                                                   administrator account.
                                                 </AlertDialogDescription>
                                               </AlertDialogHeader>
-                                                </AlertDialogDescription>
-                                              </AlertDialogHeader>
                                               <AlertDialogFooter className="gap-3">
                                                 <AlertDialogCancel className="rounded-2xl px-6 py-3 h-auto">
                                                   Cancel
                                                 </AlertDialogCancel>
                                                 <AlertDialogAction
-                                                  Cancel
-                                                </AlertDialogCancel>
-                                                <AlertDialogAction
                                                   className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 rounded-2xl px-6 py-3 h-auto"
-                                                  onClick={() => {
                                                   onClick={() => {
                                                     // Delete franchise handler would go here
                                                     console.log(
                                                       "Delete franchise:",
                                                       franchise.id
-                                                      franchise.id
                                                     );
                                                   }}
                                                 >
                                                   Delete Franchise
-                                                </AlertDialogAction>
-                                              </AlertDialogFooter>
-                                            </AlertDialogContent>
-                                          </AlertDialog>
-                                        </div>
-                                      </CardContent>
-                                    </Card>
-                                  ))}
-                                </div>
-                              )}
                                                 </AlertDialogAction>
                                               </AlertDialogFooter>
                                             </AlertDialogContent>
@@ -2365,7 +2107,6 @@ export default function Profile() {
                                 {likedPosts.length} likes
                               </div>
                             </div>
-                            <div className="space-y-4">
                             <div className="space-y-4">
                               {likedPosts.length === 0 ? (
                                 <div className="text-center py-16 bg-gradient-to-br from-red-50 to-pink-50 rounded-3xl border border-red-100">
@@ -2427,9 +2168,6 @@ export default function Profile() {
                             {userData && (
                               <>
                                 {loadingPhotos ? (
-                            {userData && (
-                              <>
-                                {loadingPhotos ? (
                                   <div className="flex justify-center py-12">
                                     <Loader />
                                   </div>
@@ -2477,13 +2215,6 @@ export default function Profile() {
                                   currentUserView={true}
                                 />
                               )}
-                              {userData && user && (
-                                <ShowProductsTabContent
-                                  userId={userId}
-                                  userData={userData}
-                                  currentUserView={true}
-                                />
-                              )}
                             </div>
                           </TabsContent>
                         )}
@@ -2503,12 +2234,6 @@ export default function Profile() {
                                   Business Services
                                 </div>
                               </div>
-                              {userData && user && (
-                                <ShowServicesTabContent
-                                  userId={userId}
-                                  userData={userData}
-                                />
-                              )}
                               {userData && user && (
                                 <ShowServicesTabContent
                                   userId={userId}
@@ -2556,7 +2281,6 @@ export default function Profile() {
                               </div>
                             </div>
                             <div className="space-y-4">
-                            <div className="space-y-4">
                               {loadingSavedPosts ? (
                                 <div className="flex justify-center py-12">
                                   <Loader />
@@ -2586,17 +2310,13 @@ export default function Profile() {
                           className="p-8 focus-visible:outline-none focus:outline-none transition-all duration-300 animate-in fade-in-50"
                         >
                           <div className="space-y-6">
-                          <div className="space-y-6">
                             <div className="flex items-center justify-between">
                               <h2 className="text-2xl font-bold text-gray-900">
-                                Your Orders
-                              </h2>
                                 Your Orders
                               </h2>
                               <div className="text-sm text-gray-500 bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full border border-emerald-200">
                                 {orders.length} orders
                               </div>
-                            </div>
                             </div>
 
                             {loadingOrders ? (
@@ -2620,9 +2340,6 @@ export default function Profile() {
                                 {orders.map((order) => (
                                   <Card
                                     key={order.id}
-                                {orders.map((order) => (
-                                  <Card
-                                    key={order.id}
                                     className="overflow-hidden bg-white/80 backdrop-blur-sm border-0 shadow-xl rounded-3xl hover:shadow-2xl transition-all duration-300"
                                   >
                                     <CardHeader className="p-6 bg-gradient-to-r from-emerald-50 to-green-50">
@@ -2630,7 +2347,6 @@ export default function Profile() {
                                         <div className="space-y-2">
                                           <div className="flex items-center gap-3">
                                             <h3 className="font-bold text-lg text-gray-900">
-                                              Order #
                                               Order #
                                               {order.orderId.substring(0, 8)}...
                                             </h3>
@@ -2660,16 +2376,7 @@ export default function Profile() {
                                           </p>
                                         </div>
                                         <div className="text-right">
-                                            {format(
-                                              new Date(order.timestamp),
-                                              "MMM d, yyyy · h:mm a"
-                                            )}
-                                          </p>
-                                        </div>
-                                        <div className="text-right">
                                           <p className="text-2xl font-bold text-gray-900">
-                                            ₹{order.amount?.toFixed(2)}
-                                          </p>
                                             ₹{order.amount?.toFixed(2)}
                                           </p>
                                           <p className="text-gray-600 font-medium">
@@ -2679,25 +2386,14 @@ export default function Profile() {
                                       </div>
                                     </CardHeader>
                                     <CardContent className="p-0">
-                                            {order.businessName}
-                                          </p>
-                                        </div>
-                                      </div>
-                                    </CardHeader>
-                                    <CardContent className="p-0">
                                       <div className="px-6 py-4 bg-white border-b border-gray-100">
-                                        <div className="flex justify-between items-center">
                                         <div className="flex justify-between items-center">
                                           <h4 className="font-semibold text-gray-900">
                                             Order Items
                                           </h4>
-                                          </h4>
                                           <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
                                             {order.products?.length || 0}{" "}
                                             item(s)
-                                          </span>
-                                        </div>
-                                      </div>
                                           </span>
                                         </div>
                                       </div>
@@ -2706,22 +2402,9 @@ export default function Profile() {
                                         {order.products?.map((product, idx) => (
                                           <div
                                             key={idx}
-                                        {order.products?.map((product, idx) => (
-                                          <div
-                                            key={idx}
                                             className="p-6 flex items-center gap-4 hover:bg-gray-50 transition-colors duration-200"
                                           >
-                                          >
                                             <div className="relative w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl overflow-hidden flex-shrink-0">
-                                              {product.imageUrl ? (
-                                                <Image
-                                                  src={product.imageUrl}
-                                                  alt={product.productName}
-                                                  fill
-                                                  className="object-cover"
-                                                />
-                                              ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-gray-400">
                                               {product.imageUrl ? (
                                                 <Image
                                                   src={product.imageUrl}
@@ -2735,14 +2418,9 @@ export default function Profile() {
                                                 </div>
                                               )}
                                             </div>
-                                                </div>
-                                              )}
-                                            </div>
 
                                             <div className="flex-grow space-y-2">
                                               <h5 className="font-semibold text-gray-900">
-                                                {product.productName}
-                                              </h5>
                                                 {product.productName}
                                               </h5>
                                               <div className="flex items-center text-gray-600">
@@ -2751,25 +2429,13 @@ export default function Profile() {
                                                   × {product.quantity}
                                                 </span>
                                               </div>
-                                                </span>
-                                              </div>
 
-                                              {order.status === "completed" && (
                                               {order.status === "completed" && (
                                                 <div className="mt-3">
                                                   {productRatings[
                                                     product.productId
                                                   ] ? (
-                                                  {productRatings[
-                                                    product.productId
-                                                  ] ? (
                                                     <div className="space-y-2">
-                                                      {renderStarRating(
-                                                        productRatings[
-                                                          product.productId
-                                                        ].rating
-                                                      )}
-                                                      <div className="flex items-center justify-between">
                                                       {renderStarRating(
                                                         productRatings[
                                                           product.productId
@@ -2783,19 +2449,7 @@ export default function Profile() {
                                                         <Button
                                                           variant="ghost"
                                                           size="sm"
-                                                        </span>
-                                                        <Button
-                                                          variant="ghost"
-                                                          size="sm"
                                                           className="text-sm h-8 px-3 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-xl"
-                                                          onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleOpenRatingDialog(
-                                                              product,
-                                                              order
-                                                            );
-                                                          }}
-                                                        >
                                                           onClick={(e) => {
                                                             e.stopPropagation();
                                                             handleOpenRatingDialog(
@@ -2812,22 +2466,7 @@ export default function Profile() {
                                                     <Button
                                                       variant="outline"
                                                       size="sm"
-                                                        </Button>
-                                                      </div>
-                                                    </div>
-                                                  ) : (
-                                                    <Button
-                                                      variant="outline"
-                                                      size="sm"
                                                       className="text-sm h-9 px-4 rounded-2xl border-2 hover:bg-yellow-50 hover:border-yellow-300"
-                                                      onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleOpenRatingDialog(
-                                                          product,
-                                                          order
-                                                        );
-                                                      }}
-                                                    >
                                                       onClick={(e) => {
                                                         e.stopPropagation();
                                                         handleOpenRatingDialog(
@@ -2843,26 +2482,9 @@ export default function Profile() {
                                                 </div>
                                               )}
                                             </div>
-                                                      Rate & Review
-                                                    </Button>
-                                                  )}
-                                                </div>
-                                              )}
-                                            </div>
 
                                             <div className="text-right">
-                                            <div className="text-right">
                                               <p className="text-lg font-bold text-gray-900">
-                                                ₹
-                                                {(
-                                                  product.amount *
-                                                  product.quantity
-                                                ).toFixed(2)}
-                                              </p>
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
                                                 ₹
                                                 {(
                                                   product.amount *
@@ -2880,13 +2502,7 @@ export default function Profile() {
                                             <span className="text-lg font-semibold text-gray-900">
                                               Total Amount
                                             </span>
-                                            </span>
                                             <span className="text-2xl font-bold text-gray-900">
-                                              ₹{order.amount?.toFixed(2)}
-                                            </span>
-                                          </div>
-                                          <Button
-                                            variant="outline"
                                               ₹{order.amount?.toFixed(2)}
                                             </span>
                                           </div>
@@ -2898,21 +2514,8 @@ export default function Profile() {
                                               handleGenerateBill(order);
                                             }}
                                           >
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleGenerateBill(order);
-                                            }}
-                                          >
                                             <FileText className="h-5 w-5" />
                                             <span>Generate Invoice</span>
-                                          </Button>
-                                        </div>
-                                      </div>
-                                    </CardContent>
-                                  </Card>
-                                ))}
-                              </div>
-                            )}
                                           </Button>
                                         </div>
                                       </div>
@@ -2994,7 +2597,6 @@ export default function Profile() {
                               </div>
                             </div>
                             <div className="space-y-4">
-                            <div className="space-y-4">
                               {loadingSavedPosts ? (
                                 <div className="flex justify-center py-12">
                                   <Loader />
@@ -3031,7 +2633,6 @@ export default function Profile() {
                                 {likedPosts.length} likes
                               </div>
                             </div>
-                            <div className="space-y-4">
                             <div className="space-y-4">
                               {likedPosts.length === 0 ? (
                                 <div className="text-center py-16 bg-gradient-to-br from-red-50 to-pink-50 rounded-3xl border border-red-100">
@@ -3073,17 +2674,13 @@ export default function Profile() {
                           className="p-8 focus-visible:outline-none focus:outline-none transition-all duration-300 animate-in fade-in-50"
                         >
                           <div className="space-y-6">
-                          <div className="space-y-6">
                             <div className="flex items-center justify-between">
                               <h2 className="text-2xl font-bold text-gray-900">
-                                Your Orders
-                              </h2>
                                 Your Orders
                               </h2>
                               <div className="text-sm text-gray-500 bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full border border-emerald-200">
                                 {orders.length} orders
                               </div>
-                            </div>
                             </div>
 
                             {/* Same orders content as business users */}
@@ -3108,9 +2705,6 @@ export default function Profile() {
                                 {orders.map((order) => (
                                   <Card
                                     key={order.id}
-                                {orders.map((order) => (
-                                  <Card
-                                    key={order.id}
                                     className="overflow-hidden bg-white/80 backdrop-blur-sm border-0 shadow-xl rounded-3xl hover:shadow-2xl transition-all duration-300"
                                   >
                                     {/* Same order card content as above */}
@@ -3119,7 +2713,6 @@ export default function Profile() {
                                         <div className="space-y-2">
                                           <div className="flex items-center gap-3">
                                             <h3 className="font-bold text-lg text-gray-900">
-                                              Order #
                                               Order #
                                               {order.orderId.substring(0, 8)}...
                                             </h3>
@@ -3149,16 +2742,7 @@ export default function Profile() {
                                           </p>
                                         </div>
                                         <div className="text-right">
-                                            {format(
-                                              new Date(order.timestamp),
-                                              "MMM d, yyyy · h:mm a"
-                                            )}
-                                          </p>
-                                        </div>
-                                        <div className="text-right">
                                           <p className="text-2xl font-bold text-gray-900">
-                                            ₹{order.amount?.toFixed(2)}
-                                          </p>
                                             ₹{order.amount?.toFixed(2)}
                                           </p>
                                           <p className="text-gray-600 font-medium">
@@ -3168,25 +2752,14 @@ export default function Profile() {
                                       </div>
                                     </CardHeader>
                                     <CardContent className="p-0">
-                                            {order.businessName}
-                                          </p>
-                                        </div>
-                                      </div>
-                                    </CardHeader>
-                                    <CardContent className="p-0">
                                       <div className="px-6 py-4 bg-white border-b border-gray-100">
-                                        <div className="flex justify-between items-center">
                                         <div className="flex justify-between items-center">
                                           <h4 className="font-semibold text-gray-900">
                                             Order Items
                                           </h4>
-                                          </h4>
                                           <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
                                             {order.products?.length || 0}{" "}
                                             item(s)
-                                          </span>
-                                        </div>
-                                      </div>
                                           </span>
                                         </div>
                                       </div>
@@ -3195,22 +2768,9 @@ export default function Profile() {
                                         {order.products?.map((product, idx) => (
                                           <div
                                             key={idx}
-                                        {order.products?.map((product, idx) => (
-                                          <div
-                                            key={idx}
                                             className="p-6 flex items-center gap-4 hover:bg-gray-50 transition-colors duration-200"
                                           >
-                                          >
                                             <div className="relative w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl overflow-hidden flex-shrink-0">
-                                              {product.imageUrl ? (
-                                                <Image
-                                                  src={product.imageUrl}
-                                                  alt={product.productName}
-                                                  fill
-                                                  className="object-cover"
-                                                />
-                                              ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-gray-400">
                                               {product.imageUrl ? (
                                                 <Image
                                                   src={product.imageUrl}
@@ -3224,14 +2784,9 @@ export default function Profile() {
                                                 </div>
                                               )}
                                             </div>
-                                                </div>
-                                              )}
-                                            </div>
 
                                             <div className="flex-grow space-y-2">
                                               <h5 className="font-semibold text-gray-900">
-                                                {product.productName}
-                                              </h5>
                                                 {product.productName}
                                               </h5>
                                               <div className="flex items-center text-gray-600">
@@ -3240,25 +2795,13 @@ export default function Profile() {
                                                   × {product.quantity}
                                                 </span>
                                               </div>
-                                                </span>
-                                              </div>
 
-                                              {order.status === "completed" && (
                                               {order.status === "completed" && (
                                                 <div className="mt-3">
                                                   {productRatings[
                                                     product.productId
                                                   ] ? (
-                                                  {productRatings[
-                                                    product.productId
-                                                  ] ? (
                                                     <div className="space-y-2">
-                                                      {renderStarRating(
-                                                        productRatings[
-                                                          product.productId
-                                                        ].rating
-                                                      )}
-                                                      <div className="flex items-center justify-between">
                                                       {renderStarRating(
                                                         productRatings[
                                                           product.productId
@@ -3272,19 +2815,7 @@ export default function Profile() {
                                                         <Button
                                                           variant="ghost"
                                                           size="sm"
-                                                        </span>
-                                                        <Button
-                                                          variant="ghost"
-                                                          size="sm"
                                                           className="text-sm h-8 px-3 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-xl"
-                                                          onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleOpenRatingDialog(
-                                                              product,
-                                                              order
-                                                            );
-                                                          }}
-                                                        >
                                                           onClick={(e) => {
                                                             e.stopPropagation();
                                                             handleOpenRatingDialog(
@@ -3301,22 +2832,7 @@ export default function Profile() {
                                                     <Button
                                                       variant="outline"
                                                       size="sm"
-                                                        </Button>
-                                                      </div>
-                                                    </div>
-                                                  ) : (
-                                                    <Button
-                                                      variant="outline"
-                                                      size="sm"
                                                       className="text-sm h-9 px-4 rounded-2xl border-2 hover:bg-yellow-50 hover:border-yellow-300"
-                                                      onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleOpenRatingDialog(
-                                                          product,
-                                                          order
-                                                        );
-                                                      }}
-                                                    >
                                                       onClick={(e) => {
                                                         e.stopPropagation();
                                                         handleOpenRatingDialog(
@@ -3332,26 +2848,9 @@ export default function Profile() {
                                                 </div>
                                               )}
                                             </div>
-                                                      Rate & Review
-                                                    </Button>
-                                                  )}
-                                                </div>
-                                              )}
-                                            </div>
 
                                             <div className="text-right">
-                                            <div className="text-right">
                                               <p className="text-lg font-bold text-gray-900">
-                                                ₹
-                                                {(
-                                                  product.amount *
-                                                  product.quantity
-                                                ).toFixed(2)}
-                                              </p>
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
                                                 ₹
                                                 {(
                                                   product.amount *
@@ -3369,13 +2868,7 @@ export default function Profile() {
                                             <span className="text-lg font-semibold text-gray-900">
                                               Total Amount
                                             </span>
-                                            </span>
                                             <span className="text-2xl font-bold text-gray-900">
-                                              ₹{order.amount?.toFixed(2)}
-                                            </span>
-                                          </div>
-                                          <Button
-                                            variant="outline"
                                               ₹{order.amount?.toFixed(2)}
                                             </span>
                                           </div>
@@ -3387,21 +2880,8 @@ export default function Profile() {
                                               handleGenerateBill(order);
                                             }}
                                           >
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleGenerateBill(order);
-                                            }}
-                                          >
                                             <FileText className="h-5 w-5" />
                                             <span>Generate Invoice</span>
-                                          </Button>
-                                        </div>
-                                      </div>
-                                    </CardContent>
-                                  </Card>
-                                ))}
-                              </div>
-                            )}
                                           </Button>
                                         </div>
                                       </div>
@@ -3568,7 +3048,6 @@ export default function Profile() {
                 How would you rate this product?
               </span>
               <div className="p-4 bg-gray-50 rounded-2xl">
-                {renderStarRating(ratingValue, true)}
                 {renderStarRating(ratingValue, true)}
               </div>
               <span className="text-sm text-gray-600 font-medium">
