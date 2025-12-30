@@ -26,7 +26,7 @@ function EnhancedPostCard({ post, onLike, onView }) {
       console.error("Error handling like:", error);
     }
   };
-
+  console.log("EnhancedPostCard post:", post);
   return (
     <Card onClick={onView}>
       <CardContent className="pt-6">

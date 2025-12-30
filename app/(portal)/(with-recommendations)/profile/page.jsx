@@ -533,14 +533,64 @@ export default function Profile() {
             return;
           }
 
+          // Always fetch latest post data for up-to-date likes
           const postDocs = await Promise.all(
             postIds.map((id) => getDoc(doc(db, "posts", id)).catch(() => null))
           );
 
-          const tempLikedPosts = postDocs
-            .filter((doc) => doc && doc.exists())
-            .map((doc) => ({ ...doc.data(), id: doc.id }));
-          setLikedPosts(tempLikedPosts);
+          // Attach author info and normalize each liked post
+          const postsWithAuthor = await Promise.all(
+            postDocs
+              .filter((doc) => doc && doc.exists())
+              .map(async (doc) => {
+                const raw = doc.data();
+                const postData = {
+                  ...raw,
+                  id: doc.id,
+                  postId: doc.id,
+                  likes: raw.likes || 0,
+                  isLiked: true, // All are liked by current user
+                };
+                // Always fetch author info from users/{uid}
+                const authorId = postData.uid;
+                if (!authorId) {
+                  console.warn("Post missing uid:", postData);
+                  return {
+                    ...postData,
+                    authorName: "Anonymous",
+                    authorUsername: "user",
+                    authorProfileImage: "/default-avatar.png",
+                  };
+                }
+                try {
+                  const authorDoc = await getDoc(doc(db, "users", authorId));
+                  const authorData = authorDoc.exists() ? authorDoc.data() : {};
+                  return {
+                    ...postData,
+                    authorName:
+                      authorData.name || authorData.username || "Anonymous",
+                    authorUsername: authorData.username || "user",
+                    authorProfileImage:
+                      authorData.profilePic ||
+                      authorData.profileImage ||
+                      "/default-avatar.png",
+                  };
+                } catch (err) {
+                  console.warn(
+                    "Error fetching author for post:",
+                    postData,
+                    err
+                  );
+                  return {
+                    ...postData,
+                    authorName: "Anonymous",
+                    authorUsername: "user",
+                    authorProfileImage: "/default-avatar.png",
+                  };
+                }
+              })
+          );
+          setLikedPosts(postsWithAuthor);
         } catch (error) {
           console.error("Error fetching liked posts:", error);
           setLikedPosts([]);
@@ -584,12 +634,30 @@ export default function Profile() {
               const postDoc = await getDoc(doc(db, "posts", postData.postId));
 
               if (postDoc.exists()) {
-                postsData.push({
+                const postObj = {
                   id: postDoc.id,
                   ...postDoc.data(),
                   savedAt: postData.timestamp,
                   savedId: docSnapshot.id,
-                });
+                };
+                // Attach author info
+                const authorId = postObj.uid || postObj.authorId;
+                if (authorId) {
+                  try {
+                    const authorDoc = await getDoc(doc(db, "users", authorId));
+                    const authorData = authorDoc.exists()
+                      ? authorDoc.data()
+                      : {};
+                    postObj.authorName =
+                      authorData.name || authorData.username || "Anonymous";
+                    postObj.authorUsername = authorData.username || "user";
+                    postObj.authorProfileImage =
+                      authorData.profilePic ||
+                      authorData.profileImage ||
+                      "/default-avatar.png";
+                  } catch {}
+                }
+                postsData.push(postObj);
               }
             }
           } catch (error) {
@@ -858,7 +926,10 @@ export default function Profile() {
             className="cursor-pointer hover:shadow-md transition-shadow border border-gray-100"
           >
             <CardContent className="pt-6">
-              <PostCard post={post} onView={() => router.push(`/feed/${post.id || post.postId}`)} />
+              <PostCard
+                post={post}
+                onView={() => router.push(`/feed/${post.id || post.postId}`)}
+              />
             </CardContent>
           </Card>
         ))}
@@ -906,9 +977,15 @@ export default function Profile() {
 
   const renderSavedPostCard = useCallback(
     (post) => (
-      <Card key={post.id} className="cursor-pointer hover:shadow-md transition-shadow border border-gray-100">
+      <Card
+        key={post.id}
+        className="cursor-pointer hover:shadow-md transition-shadow border border-gray-100"
+      >
         <CardContent className="pt-6">
-          <PostCard post={post} onView={() => router.push(`/feed/${post.id || post.postId}`)} />
+          <PostCard
+            post={post}
+            onView={() => router.push(`/feed/${post.id || post.postId}`)}
+          />
         </CardContent>
       </Card>
     ),
@@ -1253,14 +1330,14 @@ export default function Profile() {
                       <Dialog>
                         <DialogTrigger className="z-30 w-full h-full group">
                           <div className="relative w-full h-full">
-                          <Image
-                            src={userData?.coverPic || "/coverimg.png"}
-                            width={1200}
+                            <Image
+                              src={userData?.coverPic || "/coverimg.png"}
+                              width={1200}
                               height={256}
-                            alt="Cover Image"
+                              alt="Cover Image"
                               className="object-cover w-full h-full transition-all duration-500 group-hover:scale-105"
-                            priority
-                          />
+                              priority
+                            />
                             {/* Gradient overlay */}
                             <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
@@ -1300,39 +1377,39 @@ export default function Profile() {
                         <DialogTrigger>
                           <div className="relative group cursor-pointer">
                             <Avatar className="w-24 h-24 sm:w-28 sm:h-28 border-4 border-white shadow-2xl ring-4 ring-white/50 transition-all duration-300 group-hover:scale-105 group-hover:shadow-3xl">
-                          <AvatarImage
-                            src={userData?.profilePic || "/avatar.png"}
-                            alt={userData?.name}
+                              <AvatarImage
+                                src={userData?.profilePic || "/avatar.png"}
+                                alt={userData?.name}
                                 className="object-cover"
-                          />
+                              />
                               <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-bold text-2xl">
-                            {isBusinessUser
-                              ? userData?.businessName?.charAt(0) || "B"
-                              : userData?.name?.charAt(0) || "U"}
-                          </AvatarFallback>
-                        </Avatar>
+                                {isBusinessUser
+                                  ? userData?.businessName?.charAt(0) || "B"
+                                  : userData?.name?.charAt(0) || "U"}
+                              </AvatarFallback>
+                            </Avatar>
                             {/* Subtle hover ring */}
                             <div className="absolute inset-0 rounded-full bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                           </div>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-md">
+                          <DialogHeader>
                             <DialogTitle className="text-xl font-bold">
                               Profile Picture
                             </DialogTitle>
-                        </DialogHeader>
+                          </DialogHeader>
                           <div className="mt-4 rounded-2xl overflow-hidden">
-                          <Image
-                            src={userData?.profilePic || "/avatar.png"}
-                            width={400}
-                            height={400}
-                            alt="Profile Image"
+                            <Image
+                              src={userData?.profilePic || "/avatar.png"}
+                              width={400}
+                              height={400}
+                              alt="Profile Image"
                               className="w-full object-cover"
-                          />
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
+                            />
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
 
                     {/* Main content with proper spacing for profile picture */}
                     <div
@@ -1347,42 +1424,42 @@ export default function Profile() {
                           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                             <div className="space-y-3">
                               <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 flex flex-wrap items-center gap-3">
-                          {isBusinessUser
-                            ? userData?.businessName || userData?.name
-                            : userData?.name}
+                                {isBusinessUser
+                                  ? userData?.businessName || userData?.name
+                                  : userData?.name}
                                 {isBusinessUser &&
                                 userData?.role === "member" ? (
-                            <Badge
-                              variant="outline"
+                                  <Badge
+                                    variant="outline"
                                     className="bg-gradient-to-r from-violet-50 to-violet-100 text-violet-700 border-violet-200 px-3 py-1 text-sm font-medium rounded-full"
-                            >
-                              Member
-                            </Badge>
-                          ) : isBusinessUser && userData?.isFranchise ? (
-                            <Badge
-                              variant="outline"
+                                  >
+                                    Member
+                                  </Badge>
+                                ) : isBusinessUser && userData?.isFranchise ? (
+                                  <Badge
+                                    variant="outline"
                                     className="bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 border-blue-200 px-3 py-1 text-sm font-medium rounded-full"
-                            >
-                              Franchise
-                            </Badge>
-                          ) : isBusinessUser ? (
-                            <Badge
-                              variant="outline"
+                                  >
+                                    Franchise
+                                  </Badge>
+                                ) : isBusinessUser ? (
+                                  <Badge
+                                    variant="outline"
                                     className="bg-gradient-to-r from-amber-50 to-orange-100 text-amber-700 border-amber-200 px-3 py-1 text-sm font-medium rounded-full"
-                            >
-                              Headquarters
-                            </Badge>
-                          ) : null}
-                        </h1>
+                                  >
+                                    Headquarters
+                                  </Badge>
+                                ) : null}
+                              </h1>
 
                               <div className="flex items-center text-gray-600 gap-2 text-lg">
                                 <div className="p-2 rounded-full bg-gray-100">
-                          <User className="w-4 h-4" />
-                        </div>
+                                  <User className="w-4 h-4" />
+                                </div>
                                 <span className="font-medium">
                                   @{userData?.username}
-                                    </span>
-                          </div>
+                                </span>
+                              </div>
                             </div>
 
                             {/* Action buttons - keep only Edit Profile here */}
@@ -1400,12 +1477,14 @@ export default function Profile() {
                                     }
                                   >
                                     <EditIcon className="w-4 h-4 mr-2" />
-                                    <span className="font-medium">Edit Profile</span>
+                                    <span className="font-medium">
+                                      Edit Profile
+                                    </span>
                                   </Link>
                                 </Button>
                               )}
                             </div>
-                    </div>
+                          </div>
 
                           {/* Bio section */}
                           {isBusinessUser && userData?.bio && (
@@ -1536,11 +1615,11 @@ export default function Profile() {
 
                       {/* Stats row with enhanced design */}
                       <div className="grid grid-cols-4 gap-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-3xl p-6 border border-gray-200">
-                      {isBusinessUser ? (
-                        <>
-                          <FollowingDialog
-                            followingCount={followingCount}
-                            userId={userId}
+                        {isBusinessUser ? (
+                          <>
+                            <FollowingDialog
+                              followingCount={followingCount}
+                              userId={userId}
                               className="flex flex-col items-center pl-4 border-l border-gray-300"
                             >
                               <div className="text-center">
@@ -1553,9 +1632,9 @@ export default function Profile() {
                               </div>
                             </FollowingDialog>
 
-                          <FollowerDialog
-                            followerCount={followersCount}
-                            userId={userId}
+                            <FollowerDialog
+                              followerCount={followersCount}
+                              userId={userId}
                               className="flex flex-col items-center pl-4 border-l border-gray-300"
                             >
                               <div className="text-center">
@@ -1571,30 +1650,30 @@ export default function Profile() {
                             <div className="flex flex-col items-center pl-4 border-l border-gray-300">
                               <div className="text-center">
                                 <div className="text-2xl font-bold text-gray-900 mb-1">
-                              {posts.length}
-                            </div>
+                                  {posts.length}
+                                </div>
                                 <div className="text-sm text-gray-600 font-medium">
                                   Posts
-                          </div>
+                                </div>
                               </div>
                             </div>
 
                             <div className="flex flex-col items-center pl-4 border-l border-gray-300">
                               <div className="text-center">
                                 <div className="text-2xl font-bold text-gray-900 mb-1">
-                              {userPhotos.length || 0}
-                            </div>
+                                  {userPhotos.length || 0}
+                                </div>
                                 <div className="text-sm text-gray-600 font-medium">
                                   Photos
                                 </div>
                               </div>
-                          </div>
-                        </>
-                      ) : (
-                        <div className="col-span-4 flex justify-center">
-                          <FollowingDialog
-                            followingCount={followingCount}
-                            userId={userId}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="col-span-4 flex justify-center">
+                            <FollowingDialog
+                              followingCount={followingCount}
+                              userId={userId}
                               className="flex flex-col items-center"
                             >
                               <div className="text-center">
@@ -1606,58 +1685,58 @@ export default function Profile() {
                                 </div>
                               </div>
                             </FollowingDialog>
-                        </div>
-                      )}
-                    </div>
+                          </div>
+                        )}
+                      </div>
 
                       {/* Location map with modern styling */}
-                    {showLocationIFrame && (
+                      {showLocationIFrame && (
                         <div className="rounded-3xl border border-gray-200 overflow-hidden bg-white shadow-lg">
                           <div className="p-6 bg-gradient-to-r from-green-50 to-emerald-50 border-b border-gray-200">
                             <h3 className="font-bold text-lg flex items-center gap-3 text-gray-900">
                               <div className="p-2 rounded-xl bg-green-100">
                                 <MapPinIcon className="w-5 h-5 text-green-600" />
                               </div>
-                            {isBusinessUser
-                              ? "Business Location"
-                              : "User Location"}
-                          </h3>
+                              {isBusinessUser
+                                ? "Business Location"
+                                : "User Location"}
+                            </h3>
                             {userData?.locations?.address && (
                               <div className="mt-2 text-gray-700 ml-11">
-                              {userData.locations.address}
-                            </div>
+                                {userData.locations.address}
+                              </div>
                             )}
-                        </div>
+                          </div>
                           <div className="h-[350px] w-full relative">
-                          {userData?.location?.latitude &&
-                          userData?.location?.longitude ? (
-                            <MapComponent
-                              location={{
-                                lat: userData.location.latitude,
-                                lng: userData.location.longitude,
-                              }}
-                              name={
-                                isBusinessUser
-                                  ? userData?.businessName
-                                  : userData?.name
-                              }
-                              address={
-                                userData?.locations?.address || "Location"
-                              }
-                            />
-                          ) : (
+                            {userData?.location?.latitude &&
+                            userData?.location?.longitude ? (
+                              <MapComponent
+                                location={{
+                                  lat: userData.location.latitude,
+                                  lng: userData.location.longitude,
+                                }}
+                                name={
+                                  isBusinessUser
+                                    ? userData?.businessName
+                                    : userData?.name
+                                }
+                                address={
+                                  userData?.locations?.address || "Location"
+                                }
+                              />
+                            ) : (
                               <div className="flex justify-center items-center h-full bg-gray-50">
                                 <div className="text-center">
                                   <MapPinIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                                   <p className="text-gray-500 font-medium">
-                                No location data available
-                              </p>
+                                    No location data available
+                                  </p>
                                 </div>
-                            </div>
-                          )}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
                     </div>
                   </div>
                 </Card>
@@ -1872,7 +1951,7 @@ export default function Profile() {
                                 {posts.length} posts
                               </div>
                             </div>
-                          {renderPosts}
+                            {renderPosts}
                           </div>
                         </TabsContent>
 
@@ -1886,11 +1965,11 @@ export default function Profile() {
                               <div className="flex items-center justify-between">
                                 <div>
                                   <h2 className="text-2xl font-bold text-gray-900">
-                                Your Franchises
-                              </h2>
+                                    Your Franchises
+                                  </h2>
                                   <p className="text-gray-600 mt-1">
-                                Manage all your franchise locations.
-                              </p>
+                                    Manage all your franchise locations.
+                                  </p>
                                 </div>
                                 <Button
                                   onClick={() => setIsFranchiseModalOpen(true)}
@@ -1899,13 +1978,13 @@ export default function Profile() {
                                   <PlusCircle className="h-4 w-4 mr-2" />
                                   Add New Franchise
                                 </Button>
-                            </div>
+                              </div>
 
-                            {loadingFranchises ? (
+                              {loadingFranchises ? (
                                 <div className="flex justify-center py-12">
                                   <Loader />
-                              </div>
-                            ) : franchises.length === 0 ? (
+                                </div>
+                              ) : franchises.length === 0 ? (
                                 <div className="text-center py-16 bg-gradient-to-br from-gray-50 to-gray-100 rounded-3xl border border-gray-200">
                                   <div className="p-4 rounded-full bg-blue-100 w-fit mx-auto mb-4">
                                     <Building2 className="w-12 h-12 text-blue-600" />
@@ -1926,154 +2005,154 @@ export default function Profile() {
                                     <PlusCircle className="h-4 w-4 mr-2" />
                                     Create First Franchise
                                   </Button>
-                              </div>
-                            ) : (
+                                </div>
+                              ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {franchises.map((franchise) => (
-                                  <Card
-                                    key={franchise.id}
+                                  {franchises.map((franchise) => (
+                                    <Card
+                                      key={franchise.id}
                                       className="overflow-hidden bg-white/80 backdrop-blur-sm border-0 shadow-xl rounded-3xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1"
-                                  >
+                                    >
                                       <CardHeader className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50">
-                                      <div className="flex justify-between items-start">
+                                        <div className="flex justify-between items-start">
                                           <div className="flex items-center gap-4">
                                             <Avatar className="h-14 w-14 border-3 border-white shadow-lg">
-                                            <AvatarImage
-                                              src={
-                                                franchise.profilePic ||
-                                                "/avatar.png"
-                                              }
-                                              alt={franchise.businessName}
-                                            />
+                                              <AvatarImage
+                                                src={
+                                                  franchise.profilePic ||
+                                                  "/avatar.png"
+                                                }
+                                                alt={franchise.businessName}
+                                              />
                                               <AvatarFallback className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-bold">
                                                 {franchise.businessName?.charAt(
                                                   0
                                                 ) || "F"}
                                               </AvatarFallback>
-                                          </Avatar>
-                                          <div>
+                                            </Avatar>
+                                            <div>
                                               <h3 className="font-bold text-lg text-gray-900">
-                                              {franchise.businessName}
-                                            </h3>
+                                                {franchise.businessName}
+                                              </h3>
                                               <p className="text-sm text-gray-600 mt-1 flex items-center gap-1">
                                                 <MapPinIcon className="w-3 h-3" />
-                                              {franchise.locations?.address ||
-                                                "No address"}
-                                            </p>
+                                                {franchise.locations?.address ||
+                                                  "No address"}
+                                              </p>
+                                            </div>
                                           </div>
-                                        </div>
-                                        <Badge
-                                          variant="outline"
+                                          <Badge
+                                            variant="outline"
                                             className="bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 border-blue-200 px-3 py-1 rounded-full font-semibold"
-                                        >
-                                          Franchise
-                                        </Badge>
-                                      </div>
-                                    </CardHeader>
+                                          >
+                                            Franchise
+                                          </Badge>
+                                        </div>
+                                      </CardHeader>
                                       <CardContent className="p-6">
                                         <div className="grid grid-cols-2 gap-4 mb-6">
                                           <div className="space-y-1">
                                             <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">
-                                            Admin
-                                          </span>
+                                              Admin
+                                            </span>
                                             <p className="font-semibold text-gray-900">
-                                            {franchise.adminName}
+                                              {franchise.adminName}
                                             </p>
-                                        </div>
+                                          </div>
                                           <div className="space-y-1">
                                             <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">
-                                            Contact
-                                          </span>
+                                              Contact
+                                            </span>
                                             <p className="font-semibold text-gray-900">
-                                            {franchise.phone}
+                                              {franchise.phone}
                                             </p>
-                                        </div>
+                                          </div>
                                           <div className="space-y-1 col-span-2">
                                             <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">
-                                            Email
-                                          </span>
+                                              Email
+                                            </span>
                                             <p className="font-semibold text-gray-900 truncate">
-                                            {franchise.email}
+                                              {franchise.email}
                                             </p>
-                                        </div>
+                                          </div>
                                           <div className="space-y-1 col-span-2">
                                             <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">
-                                            Created
-                                          </span>
+                                              Created
+                                            </span>
                                             <p className="font-semibold text-gray-900">
-                                            {franchise.createdAt?.toDate
-                                              ? format(
-                                                  new Date(
-                                                    franchise.createdAt?.toDate()
-                                                  ),
-                                                  "MMM d, yyyy"
-                                                )
-                                              : "N/A"}
+                                              {franchise.createdAt?.toDate
+                                                ? format(
+                                                    new Date(
+                                                      franchise.createdAt?.toDate()
+                                                    ),
+                                                    "MMM d, yyyy"
+                                                  )
+                                                : "N/A"}
                                             </p>
+                                          </div>
                                         </div>
-                                      </div>
 
                                         <div className="flex gap-3">
-                                        <Button
-                                          variant="outline"
+                                          <Button
+                                            variant="outline"
                                             className="gap-2 text-blue-700 border-blue-200 hover:bg-blue-50 hover:border-blue-300 flex-1 rounded-2xl py-3 h-auto font-semibold transition-all duration-200"
-                                          onClick={() =>
+                                            onClick={() =>
                                               handleSwitchFranchise(
                                                 franchise.id
                                               )
-                                          }
-                                        >
-                                          <Store className="h-4 w-4" />
-                                          <span>View Franchise</span>
-                                        </Button>
+                                            }
+                                          >
+                                            <Store className="h-4 w-4" />
+                                            <span>View Franchise</span>
+                                          </Button>
 
-                                        <AlertDialog>
-                                          <AlertDialogTrigger asChild>
-                                            <Button
-                                              variant="outline"
+                                          <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                              <Button
+                                                variant="outline"
                                                 className="gap-2 text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 rounded-2xl py-3 px-4 h-auto transition-all duration-200"
-                                            >
-                                              <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                          </AlertDialogTrigger>
+                                              >
+                                                <Trash2 className="h-4 w-4" />
+                                              </Button>
+                                            </AlertDialogTrigger>
                                             <AlertDialogContent className="rounded-3xl border-0 shadow-2xl">
-                                            <AlertDialogHeader>
+                                              <AlertDialogHeader>
                                                 <AlertDialogTitle className="text-2xl font-bold text-red-600">
-                                                Delete Franchise
-                                              </AlertDialogTitle>
+                                                  Delete Franchise
+                                                </AlertDialogTitle>
                                                 <AlertDialogDescription className="text-lg text-gray-600">
                                                   Are you sure you want to
                                                   delete this franchise? This
                                                   action cannot be undone and
                                                   will remove the franchise
                                                   administrator account.
-                                              </AlertDialogDescription>
-                                            </AlertDialogHeader>
+                                                </AlertDialogDescription>
+                                              </AlertDialogHeader>
                                               <AlertDialogFooter className="gap-3">
                                                 <AlertDialogCancel className="rounded-2xl px-6 py-3 h-auto">
-                                                Cancel
-                                              </AlertDialogCancel>
-                                              <AlertDialogAction
+                                                  Cancel
+                                                </AlertDialogCancel>
+                                                <AlertDialogAction
                                                   className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 rounded-2xl px-6 py-3 h-auto"
-                                                onClick={() => {
+                                                  onClick={() => {
                                                     // Delete franchise handler would go here
                                                     console.log(
                                                       "Delete franchise:",
-                                                            franchise.id
+                                                      franchise.id
                                                     );
                                                   }}
                                                 >
                                                   Delete Franchise
-                                              </AlertDialogAction>
-                                            </AlertDialogFooter>
-                                          </AlertDialogContent>
-                                        </AlertDialog>
-                                      </div>
-                                    </CardContent>
-                                  </Card>
-                                ))}
-                              </div>
-                            )}
+                                                </AlertDialogAction>
+                                              </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                          </AlertDialog>
+                                        </div>
+                                      </CardContent>
+                                    </Card>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           </TabsContent>
                         )}
@@ -2092,7 +2171,7 @@ export default function Profile() {
                                 {likedPosts.length} likes
                               </div>
                             </div>
-                          <div className="space-y-4">
+                            <div className="space-y-4">
                               {likedPosts.length === 0 ? (
                                 <div className="text-center py-16 bg-gradient-to-br from-red-50 to-pink-50 rounded-3xl border border-red-100">
                                   <div className="p-4 rounded-full bg-red-100 w-fit mx-auto mb-4">
@@ -2112,7 +2191,14 @@ export default function Profile() {
                                     className="cursor-pointer hover:shadow-2xl transition-all duration-300 border-0 bg-white/80 backdrop-blur-sm shadow-lg rounded-3xl hover:-translate-y-1"
                                   >
                                     <CardContent className="p-6">
-                                      <PostCard post={post} onView={() => router.push(`/feed/${post.id || post.postId}`)} />
+                                      <PostCard
+                                        post={post}
+                                        onView={() =>
+                                          router.push(
+                                            `/feed/${post.id || post.postId}`
+                                          )
+                                        }
+                                      />
                                     </CardContent>
                                   </Card>
                                 ))
@@ -2143,31 +2229,31 @@ export default function Profile() {
                                 )}
                               </div>
                             </div>
-                          {userData && (
-                            <>
-                              {loadingPhotos ? (
+                            {userData && (
+                              <>
+                                {loadingPhotos ? (
                                   <div className="flex justify-center py-12">
                                     <Loader />
                                   </div>
-                              ) : (
-                                <>
-                                  <PhotosGrid
-                                    photos={userPhotos}
-                                    userId={userData.uid}
-                                    onPhotoDeleted={() => {}}
-                                    onAddPhoto={openAddPhotoModal}
-                                  />
-                                  {auth.currentUser && (
-                                    <AddPhotoModal
-                                      isOpen={isAddPhotoModalOpen}
-                                      onClose={closeAddPhotoModal}
-                                      userId={auth.currentUser.uid}
+                                ) : (
+                                  <>
+                                    <PhotosGrid
+                                      photos={userPhotos}
+                                      userId={userData.uid}
+                                      onPhotoDeleted={() => {}}
+                                      onAddPhoto={openAddPhotoModal}
                                     />
-                                  )}
-                                </>
-                              )}
-                            </>
-                          )}
+                                    {auth.currentUser && (
+                                      <AddPhotoModal
+                                        isOpen={isAddPhotoModalOpen}
+                                        onClose={closeAddPhotoModal}
+                                        userId={auth.currentUser.uid}
+                                      />
+                                    )}
+                                  </>
+                                )}
+                              </>
+                            )}
                           </div>
                         </TabsContent>
 
@@ -2186,13 +2272,13 @@ export default function Profile() {
                                   Business Products
                                 </div>
                               </div>
-                            {userData && user && (
-                              <ShowProductsTabContent
-                                userId={userId}
-                                userData={userData}
-                                currentUserView={true}
-                              />
-                            )}
+                              {userData && user && (
+                                <ShowProductsTabContent
+                                  userId={userId}
+                                  userData={userData}
+                                  currentUserView={true}
+                                />
+                              )}
                             </div>
                           </TabsContent>
                         )}
@@ -2212,12 +2298,12 @@ export default function Profile() {
                                   Business Services
                                 </div>
                               </div>
-                            {userData && user && (
-                              <ShowServicesTabContent
-                                userId={userId}
-                                userData={userData}
-                              />
-                            )}
+                              {userData && user && (
+                                <ShowServicesTabContent
+                                  userId={userId}
+                                  userData={userData}
+                                />
+                              )}
                             </div>
                           </TabsContent>
                         )}
@@ -2239,7 +2325,7 @@ export default function Profile() {
                                   Real Estate
                                 </div>
                               </div>
-                            {userData && user && <ShowPropertiesTabContent />}
+                              {userData && user && <ShowPropertiesTabContent />}
                             </div>
                           </TabsContent>
                         )}
@@ -2258,7 +2344,7 @@ export default function Profile() {
                                 {savedPosts.length} saved
                               </div>
                             </div>
-                          <div className="space-y-4">
+                            <div className="space-y-4">
                               {loadingSavedPosts ? (
                                 <div className="flex justify-center py-12">
                                   <Loader />
@@ -2287,15 +2373,15 @@ export default function Profile() {
                           value="orders"
                           className="p-8 focus-visible:outline-none focus:outline-none transition-all duration-300 animate-in fade-in-50"
                         >
-                            <div className="space-y-6">
+                          <div className="space-y-6">
                             <div className="flex items-center justify-between">
                               <h2 className="text-2xl font-bold text-gray-900">
-                                  Your Orders
-                                </h2>
+                                Your Orders
+                              </h2>
                               <div className="text-sm text-gray-500 bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full border border-emerald-200">
                                 {orders.length} orders
                               </div>
-                              </div>
+                            </div>
 
                             {loadingOrders ? (
                               <div className="flex justify-center py-12">
@@ -2315,9 +2401,9 @@ export default function Profile() {
                               </div>
                             ) : (
                               <div className="space-y-6">
-                              {orders.map((order) => (
-                                <Card
-                                  key={order.id}
+                                {orders.map((order) => (
+                                  <Card
+                                    key={order.id}
                                     className="overflow-hidden bg-white/80 backdrop-blur-sm border-0 shadow-xl rounded-3xl hover:shadow-2xl transition-all duration-300"
                                   >
                                     <CardHeader className="p-6 bg-gradient-to-r from-emerald-50 to-green-50">
@@ -2325,183 +2411,183 @@ export default function Profile() {
                                         <div className="space-y-2">
                                           <div className="flex items-center gap-3">
                                             <h3 className="font-bold text-lg text-gray-900">
-                                            Order #
+                                              Order #
                                               {order.orderId.substring(0, 8)}...
-                                          </h3>
-                                          <Badge
-                                            variant={
-                                              order.status === "completed"
-                                                ? "success"
-                                                : "outline"
-                                            }
+                                            </h3>
+                                            <Badge
+                                              variant={
+                                                order.status === "completed"
+                                                  ? "success"
+                                                  : "outline"
+                                              }
                                               className={`px-3 py-1 rounded-full font-semibold ${
                                                 order.status === "completed"
                                                   ? "bg-green-100 text-green-700 border-green-200"
                                                   : "bg-gray-100 text-gray-700 border-gray-200"
                                               }`}
-                                          >
-                                            {order.status === "completed"
-                                              ? "Completed"
-                                              : order.status}
-                                          </Badge>
-                                        </div>
+                                            >
+                                              {order.status === "completed"
+                                                ? "Completed"
+                                                : order.status}
+                                            </Badge>
+                                          </div>
                                           <p className="text-gray-600 flex items-center gap-2">
                                             <Calendar className="w-4 h-4" />
-                                          {format(
-                                            new Date(order.timestamp),
-                                            "MMM d, yyyy · h:mm a"
-                                          )}
-                                        </p>
-                                      </div>
-                                      <div className="text-right">
+                                            {format(
+                                              new Date(order.timestamp),
+                                              "MMM d, yyyy · h:mm a"
+                                            )}
+                                          </p>
+                                        </div>
+                                        <div className="text-right">
                                           <p className="text-2xl font-bold text-gray-900">
-                                          ₹{order.amount?.toFixed(2)}
-                                        </p>
+                                            ₹{order.amount?.toFixed(2)}
+                                          </p>
                                           <p className="text-gray-600 font-medium">
-                                          {order.businessName}
-                                        </p>
+                                            {order.businessName}
+                                          </p>
+                                        </div>
                                       </div>
-                                    </div>
-                                  </CardHeader>
-                                  <CardContent className="p-0">
+                                    </CardHeader>
+                                    <CardContent className="p-0">
                                       <div className="px-6 py-4 bg-white border-b border-gray-100">
-                                      <div className="flex justify-between items-center">
+                                        <div className="flex justify-between items-center">
                                           <h4 className="font-semibold text-gray-900">
                                             Order Items
-                                        </h4>
+                                          </h4>
                                           <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
                                             {order.products?.length || 0}{" "}
                                             item(s)
-                                        </span>
+                                          </span>
+                                        </div>
                                       </div>
-                                    </div>
 
                                       <div className="divide-y divide-gray-100">
-                                      {order.products?.map((product, idx) => (
-                                        <div
-                                          key={idx}
+                                        {order.products?.map((product, idx) => (
+                                          <div
+                                            key={idx}
                                             className="p-6 flex items-center gap-4 hover:bg-gray-50 transition-colors duration-200"
-                                        >
+                                          >
                                             <div className="relative w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl overflow-hidden flex-shrink-0">
-                                            {product.imageUrl ? (
-                                              <Image
-                                                src={product.imageUrl}
-                                                alt={product.productName}
-                                                fill
-                                                className="object-cover"
-                                              />
-                                            ) : (
-                                              <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                              {product.imageUrl ? (
+                                                <Image
+                                                  src={product.imageUrl}
+                                                  alt={product.productName}
+                                                  fill
+                                                  className="object-cover"
+                                                />
+                                              ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-gray-400">
                                                   <Package className="w-8 h-8" />
-                                              </div>
-                                            )}
-                                          </div>
+                                                </div>
+                                              )}
+                                            </div>
 
                                             <div className="flex-grow space-y-2">
                                               <h5 className="font-semibold text-gray-900">
-                                              {product.productName}
-                                            </h5>
+                                                {product.productName}
+                                              </h5>
                                               <div className="flex items-center text-gray-600">
                                                 <span className="text-sm">
                                                   ₹{product.amount?.toFixed(2)}{" "}
                                                   × {product.quantity}
-                                              </span>
-                                            </div>
+                                                </span>
+                                              </div>
 
-                                            {order.status === "completed" && (
+                                              {order.status === "completed" && (
                                                 <div className="mt-3">
-                                                {productRatings[
-                                                  product.productId
-                                                ] ? (
+                                                  {productRatings[
+                                                    product.productId
+                                                  ] ? (
                                                     <div className="space-y-2">
-                                                    {renderStarRating(
-                                                      productRatings[
-                                                        product.productId
-                                                      ].rating
-                                                    )}
-                                                    <div className="flex items-center justify-between">
+                                                      {renderStarRating(
+                                                        productRatings[
+                                                          product.productId
+                                                        ].rating
+                                                      )}
+                                                      <div className="flex items-center justify-between">
                                                         <span className="text-sm text-green-600 font-medium">
                                                           ✓ You rated this
                                                           product
-                                                      </span>
-                                                      <Button
-                                                        variant="ghost"
-                                                        size="sm"
+                                                        </span>
+                                                        <Button
+                                                          variant="ghost"
+                                                          size="sm"
                                                           className="text-sm h-8 px-3 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-xl"
-                                                        onClick={(e) => {
-                                                          e.stopPropagation();
-                                                          handleOpenRatingDialog(
-                                                            product,
-                                                            order
-                                                          );
-                                                        }}
-                                                      >
+                                                          onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleOpenRatingDialog(
+                                                              product,
+                                                              order
+                                                            );
+                                                          }}
+                                                        >
                                                           Edit Rating
-                                                      </Button>
+                                                        </Button>
+                                                      </div>
                                                     </div>
-                                                  </div>
-                                                ) : (
-                                                  <Button
-                                                    variant="outline"
-                                                    size="sm"
+                                                  ) : (
+                                                    <Button
+                                                      variant="outline"
+                                                      size="sm"
                                                       className="text-sm h-9 px-4 rounded-2xl border-2 hover:bg-yellow-50 hover:border-yellow-300"
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      handleOpenRatingDialog(
-                                                        product,
-                                                        order
-                                                      );
-                                                    }}
-                                                  >
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleOpenRatingDialog(
+                                                          product,
+                                                          order
+                                                        );
+                                                      }}
+                                                    >
                                                       <Star className="h-4 w-4 mr-2" />
-                                                    Rate & Review
-                                                  </Button>
-                                                )}
-                                              </div>
-                                            )}
-                                          </div>
+                                                      Rate & Review
+                                                    </Button>
+                                                  )}
+                                                </div>
+                                              )}
+                                            </div>
 
-                                          <div className="text-right">
+                                            <div className="text-right">
                                               <p className="text-lg font-bold text-gray-900">
-                                              ₹
-                                              {(
-                                                product.amount *
-                                                product.quantity
-                                              ).toFixed(2)}
-                                            </p>
+                                                ₹
+                                                {(
+                                                  product.amount *
+                                                  product.quantity
+                                                ).toFixed(2)}
+                                              </p>
+                                            </div>
                                           </div>
-                                        </div>
-                                      ))}
-                                    </div>
+                                        ))}
+                                      </div>
 
                                       <div className="p-6 bg-gradient-to-r from-gray-50 to-gray-100 border-t border-gray-200">
                                         <div className="flex flex-col gap-4">
                                           <div className="flex justify-between items-center">
                                             <span className="text-lg font-semibold text-gray-900">
                                               Total Amount
-                                          </span>
+                                            </span>
                                             <span className="text-2xl font-bold text-gray-900">
-                                            ₹{order.amount?.toFixed(2)}
-                                          </span>
-                                        </div>
-                                        <Button
-                                          variant="outline"
+                                              ₹{order.amount?.toFixed(2)}
+                                            </span>
+                                          </div>
+                                          <Button
+                                            variant="outline"
                                             className="flex items-center justify-center gap-2 w-full py-3 h-auto rounded-2xl border-2 border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-300 font-semibold transition-all duration-200"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleGenerateBill(order);
-                                          }}
-                                        >
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleGenerateBill(order);
+                                            }}
+                                          >
                                             <FileText className="h-5 w-5" />
                                             <span>Generate Invoice</span>
-                                        </Button>
+                                          </Button>
+                                        </div>
                                       </div>
-                                    </div>
-                                  </CardContent>
-                                </Card>
-                              ))}
-                            </div>
-                          )}
+                                    </CardContent>
+                                  </Card>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </TabsContent>
                       </Tabs>
@@ -2574,7 +2660,7 @@ export default function Profile() {
                                 {savedPosts.length} saved
                               </div>
                             </div>
-                          <div className="space-y-4">
+                            <div className="space-y-4">
                               {loadingSavedPosts ? (
                                 <div className="flex justify-center py-12">
                                   <Loader />
@@ -2611,7 +2697,7 @@ export default function Profile() {
                                 {likedPosts.length} likes
                               </div>
                             </div>
-                          <div className="space-y-4">
+                            <div className="space-y-4">
                               {likedPosts.length === 0 ? (
                                 <div className="text-center py-16 bg-gradient-to-br from-red-50 to-pink-50 rounded-3xl border border-red-100">
                                   <div className="p-4 rounded-full bg-red-100 w-fit mx-auto mb-4">
@@ -2631,7 +2717,14 @@ export default function Profile() {
                                     className="cursor-pointer hover:shadow-2xl transition-all duration-300 border-0 bg-white/80 backdrop-blur-sm shadow-lg rounded-3xl hover:-translate-y-1"
                                   >
                                     <CardContent className="p-6">
-                                      <PostCard post={post} onView={() => router.push(`/feed/${post.id || post.postId}`)} />
+                                      <PostCard
+                                        post={post}
+                                        onView={() =>
+                                          router.push(
+                                            `/feed/${post.id || post.postId}`
+                                          )
+                                        }
+                                      />
                                     </CardContent>
                                   </Card>
                                 ))
@@ -2644,15 +2737,15 @@ export default function Profile() {
                           value="orders"
                           className="p-8 focus-visible:outline-none focus:outline-none transition-all duration-300 animate-in fade-in-50"
                         >
-                            <div className="space-y-6">
+                          <div className="space-y-6">
                             <div className="flex items-center justify-between">
                               <h2 className="text-2xl font-bold text-gray-900">
-                                  Your Orders
-                                </h2>
+                                Your Orders
+                              </h2>
                               <div className="text-sm text-gray-500 bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full border border-emerald-200">
                                 {orders.length} orders
                               </div>
-                              </div>
+                            </div>
 
                             {/* Same orders content as business users */}
                             {loadingOrders ? (
@@ -2673,9 +2766,9 @@ export default function Profile() {
                               </div>
                             ) : (
                               <div className="space-y-6">
-                              {orders.map((order) => (
-                                <Card
-                                  key={order.id}
+                                {orders.map((order) => (
+                                  <Card
+                                    key={order.id}
                                     className="overflow-hidden bg-white/80 backdrop-blur-sm border-0 shadow-xl rounded-3xl hover:shadow-2xl transition-all duration-300"
                                   >
                                     {/* Same order card content as above */}
@@ -2684,183 +2777,183 @@ export default function Profile() {
                                         <div className="space-y-2">
                                           <div className="flex items-center gap-3">
                                             <h3 className="font-bold text-lg text-gray-900">
-                                            Order #
+                                              Order #
                                               {order.orderId.substring(0, 8)}...
-                                          </h3>
-                                          <Badge
-                                            variant={
-                                              order.status === "completed"
-                                                ? "success"
-                                                : "outline"
-                                            }
+                                            </h3>
+                                            <Badge
+                                              variant={
+                                                order.status === "completed"
+                                                  ? "success"
+                                                  : "outline"
+                                              }
                                               className={`px-3 py-1 rounded-full font-semibold ${
                                                 order.status === "completed"
                                                   ? "bg-green-100 text-green-700 border-green-200"
                                                   : "bg-gray-100 text-gray-700 border-gray-200"
                                               }`}
-                                          >
-                                            {order.status === "completed"
-                                              ? "Completed"
-                                              : order.status}
-                                          </Badge>
-                                        </div>
+                                            >
+                                              {order.status === "completed"
+                                                ? "Completed"
+                                                : order.status}
+                                            </Badge>
+                                          </div>
                                           <p className="text-gray-600 flex items-center gap-2">
                                             <Calendar className="w-4 h-4" />
-                                          {format(
-                                            new Date(order.timestamp),
-                                            "MMM d, yyyy · h:mm a"
-                                          )}
-                                        </p>
-                                      </div>
-                                      <div className="text-right">
+                                            {format(
+                                              new Date(order.timestamp),
+                                              "MMM d, yyyy · h:mm a"
+                                            )}
+                                          </p>
+                                        </div>
+                                        <div className="text-right">
                                           <p className="text-2xl font-bold text-gray-900">
-                                          ₹{order.amount?.toFixed(2)}
-                                        </p>
+                                            ₹{order.amount?.toFixed(2)}
+                                          </p>
                                           <p className="text-gray-600 font-medium">
-                                          {order.businessName}
-                                        </p>
+                                            {order.businessName}
+                                          </p>
+                                        </div>
                                       </div>
-                                    </div>
-                                  </CardHeader>
-                                  <CardContent className="p-0">
+                                    </CardHeader>
+                                    <CardContent className="p-0">
                                       <div className="px-6 py-4 bg-white border-b border-gray-100">
-                                      <div className="flex justify-between items-center">
+                                        <div className="flex justify-between items-center">
                                           <h4 className="font-semibold text-gray-900">
                                             Order Items
-                                        </h4>
+                                          </h4>
                                           <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
                                             {order.products?.length || 0}{" "}
                                             item(s)
-                                        </span>
+                                          </span>
+                                        </div>
                                       </div>
-                                    </div>
 
                                       <div className="divide-y divide-gray-100">
-                                      {order.products?.map((product, idx) => (
-                                        <div
-                                          key={idx}
+                                        {order.products?.map((product, idx) => (
+                                          <div
+                                            key={idx}
                                             className="p-6 flex items-center gap-4 hover:bg-gray-50 transition-colors duration-200"
-                                        >
+                                          >
                                             <div className="relative w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl overflow-hidden flex-shrink-0">
-                                            {product.imageUrl ? (
-                                              <Image
-                                                src={product.imageUrl}
-                                                alt={product.productName}
-                                                fill
-                                                className="object-cover"
-                                              />
-                                            ) : (
-                                              <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                              {product.imageUrl ? (
+                                                <Image
+                                                  src={product.imageUrl}
+                                                  alt={product.productName}
+                                                  fill
+                                                  className="object-cover"
+                                                />
+                                              ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-gray-400">
                                                   <Package className="w-8 h-8" />
-                                              </div>
-                                            )}
-                                          </div>
+                                                </div>
+                                              )}
+                                            </div>
 
                                             <div className="flex-grow space-y-2">
                                               <h5 className="font-semibold text-gray-900">
-                                              {product.productName}
-                                            </h5>
+                                                {product.productName}
+                                              </h5>
                                               <div className="flex items-center text-gray-600">
                                                 <span className="text-sm">
                                                   ₹{product.amount?.toFixed(2)}{" "}
                                                   × {product.quantity}
-                                              </span>
-                                            </div>
+                                                </span>
+                                              </div>
 
-                                            {order.status === "completed" && (
+                                              {order.status === "completed" && (
                                                 <div className="mt-3">
-                                                {productRatings[
-                                                  product.productId
-                                                ] ? (
+                                                  {productRatings[
+                                                    product.productId
+                                                  ] ? (
                                                     <div className="space-y-2">
-                                                    {renderStarRating(
-                                                      productRatings[
-                                                        product.productId
-                                                      ].rating
-                                                    )}
-                                                    <div className="flex items-center justify-between">
+                                                      {renderStarRating(
+                                                        productRatings[
+                                                          product.productId
+                                                        ].rating
+                                                      )}
+                                                      <div className="flex items-center justify-between">
                                                         <span className="text-sm text-green-600 font-medium">
                                                           ✓ You rated this
                                                           product
-                                                      </span>
-                                                      <Button
-                                                        variant="ghost"
-                                                        size="sm"
+                                                        </span>
+                                                        <Button
+                                                          variant="ghost"
+                                                          size="sm"
                                                           className="text-sm h-8 px-3 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-xl"
-                                                        onClick={(e) => {
-                                                          e.stopPropagation();
-                                                          handleOpenRatingDialog(
-                                                            product,
-                                                            order
-                                                          );
-                                                        }}
-                                                      >
+                                                          onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleOpenRatingDialog(
+                                                              product,
+                                                              order
+                                                            );
+                                                          }}
+                                                        >
                                                           Edit Rating
-                                                      </Button>
+                                                        </Button>
+                                                      </div>
                                                     </div>
-                                                  </div>
-                                                ) : (
-                                                  <Button
-                                                    variant="outline"
-                                                    size="sm"
+                                                  ) : (
+                                                    <Button
+                                                      variant="outline"
+                                                      size="sm"
                                                       className="text-sm h-9 px-4 rounded-2xl border-2 hover:bg-yellow-50 hover:border-yellow-300"
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      handleOpenRatingDialog(
-                                                        product,
-                                                        order
-                                                      );
-                                                    }}
-                                                  >
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleOpenRatingDialog(
+                                                          product,
+                                                          order
+                                                        );
+                                                      }}
+                                                    >
                                                       <Star className="h-4 w-4 mr-2" />
-                                                    Rate & Review
-                                                  </Button>
-                                                )}
-                                              </div>
-                                            )}
-                                          </div>
+                                                      Rate & Review
+                                                    </Button>
+                                                  )}
+                                                </div>
+                                              )}
+                                            </div>
 
-                                          <div className="text-right">
+                                            <div className="text-right">
                                               <p className="text-lg font-bold text-gray-900">
-                                              ₹
-                                              {(
-                                                product.amount *
-                                                product.quantity
-                                              ).toFixed(2)}
-                                            </p>
+                                                ₹
+                                                {(
+                                                  product.amount *
+                                                  product.quantity
+                                                ).toFixed(2)}
+                                              </p>
+                                            </div>
                                           </div>
-                                        </div>
-                                      ))}
-                                    </div>
+                                        ))}
+                                      </div>
 
                                       <div className="p-6 bg-gradient-to-r from-gray-50 to-gray-100 border-t border-gray-200">
                                         <div className="flex flex-col gap-4">
                                           <div className="flex justify-between items-center">
                                             <span className="text-lg font-semibold text-gray-900">
                                               Total Amount
-                                          </span>
+                                            </span>
                                             <span className="text-2xl font-bold text-gray-900">
-                                            ₹{order.amount?.toFixed(2)}
-                                          </span>
-                                        </div>
-                                        <Button
-                                          variant="outline"
+                                              ₹{order.amount?.toFixed(2)}
+                                            </span>
+                                          </div>
+                                          <Button
+                                            variant="outline"
                                             className="flex items-center justify-center gap-2 w-full py-3 h-auto rounded-2xl border-2 border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-300 font-semibold transition-all duration-200"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleGenerateBill(order);
-                                          }}
-                                        >
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleGenerateBill(order);
+                                            }}
+                                          >
                                             <FileText className="h-5 w-5" />
                                             <span>Generate Invoice</span>
-                                        </Button>
+                                          </Button>
+                                        </div>
                                       </div>
-                                    </div>
-                                  </CardContent>
-                                </Card>
-                              ))}
-                            </div>
-                          )}
+                                    </CardContent>
+                                  </Card>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </TabsContent>
                       </Tabs>
@@ -2874,7 +2967,9 @@ export default function Profile() {
           {/* Right sidebar - Quick Actions */}
           <aside className="hidden xl:block w-80 space-y-6">
             <Card className="p-6 bg-white/80 backdrop-blur-sm border-0 shadow-xl rounded-3xl">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">Quick Actions</h3>
+              <h3 className="text-lg font-bold text-gray-900 mb-4">
+                Quick Actions
+              </h3>
               <div className="space-y-3">
                 {isCurrentUser && isBusinessUser && (
                   <>
@@ -2923,23 +3018,25 @@ export default function Profile() {
 
                     <Button
                       variant="outline"
-                      onClick={() => router.push('/profile/calls')}
+                      onClick={() => router.push("/profile/calls")}
                       className="w-full justify-start gap-3 py-3 h-auto rounded-2xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
                     >
                       <PhoneCall className="w-4 h-4" />
                       Manage AI Calls
                     </Button>
 
-                    {userData && !selectedFranchiseId && !userData?.franchiseOwner && (
-                      <Button
-                        variant="outline"
-                        onClick={() => setIsFranchiseModalOpen(true)}
-                        className="w-full justify-start gap-3 py-3 h-auto rounded-2xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                      >
-                        <Globe className="w-4 h-4" />
-                        Add Franchise
-                      </Button>
-                    )}
+                    {userData &&
+                      !selectedFranchiseId &&
+                      !userData?.franchiseOwner && (
+                        <Button
+                          variant="outline"
+                          onClick={() => setIsFranchiseModalOpen(true)}
+                          className="w-full justify-start gap-3 py-3 h-auto rounded-2xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                        >
+                          <Globe className="w-4 h-4" />
+                          Add Franchise
+                        </Button>
+                      )}
 
                     {selectedFranchiseId && (
                       <Button
@@ -2948,7 +3045,7 @@ export default function Profile() {
                         className="w-full justify-start gap-3 py-3 h-auto rounded-2xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
                       >
                         <ArrowLeftIcon className="w-4 h-4" />
-                        Return to {userData?.franchiseOwner ? 'Business' : 'HQ'}
+                        Return to {userData?.franchiseOwner ? "Business" : "HQ"}
                       </Button>
                     )}
                   </>
@@ -3017,7 +3114,7 @@ export default function Profile() {
                 How would you rate this product?
               </span>
               <div className="p-4 bg-gray-50 rounded-2xl">
-              {renderStarRating(ratingValue, true)}
+                {renderStarRating(ratingValue, true)}
               </div>
               <span className="text-sm text-gray-600 font-medium">
                 {ratingValue === 0 && "Select a rating"}
